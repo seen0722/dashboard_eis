@@ -1,0 +1,20 @@
+# ⚠ 原始資料含 4,385 筆員工姓名與工號 —— 絕不進版控
+data/raw/
+*.xlsx
+~$*
+
+# 產生物（可用 src/build_review.py 重建）
+out/
+
+# 驗證用暫存（截圖含專案代號與人力數字，且可重新產生）
+.playwright-mcp/
+*.png
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/

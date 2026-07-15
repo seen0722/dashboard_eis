@@ -1,0 +1,23 @@
+# 指標門檻。由需求方依實務調整。
+
+over_allocation:
+  # 超配清單的下限（絕對 FTE）。低於此值不列入——避免 plan 只有 0.5 的專案
+  # 因為 +0.2 就顯示成 140% 而佔據版面。
+  min_excess_fte: 0.5
+
+  # 分母過小警告：plan 低於此值時，百分比不具意義，UI 應淡化百分比
+  small_denominator_fte: 2.0
+
+display:
+  # 排序依據：absolute（絕對超出量）或 percent。一律用 absolute——
+  # 按 % 排會把 AON100(413%, 超出 1.41) 排在 THORPE(159%, 超出 6.25) 前面。
+  sort_by: absolute
+
+  # 單位下鑽時每個專案顯示幾個部門
+  top_depts: 8
+
+# 標記自己的部門（報告自曝用）
+own_departments:
+  - BA80700R01   # 第十事業處-研發二處-研發三部
+  - BA80710R01   # 研發三部-研發一課
+  - BA80720R01   # 研發三部-研發二課

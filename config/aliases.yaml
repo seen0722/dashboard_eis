@@ -1,0 +1,27 @@
+# 專案別名對照：actual 端的名字 → plan 端的標準名
+#
+# ⚠ 這是本專案的核心資產，也是所有分析正確性的根基。
+# ⚠ 一律人工維護。工具可用字串相似度「提示」候選，但嚴禁自動套用——猜錯會靜默污染數字。
+#
+# 根本原因：plan（人力分攤-updated）沒有 PROJECTCODE 欄，用人取的名字；
+#           EIS 用系統發的 BR code。中間沒有主鍵。
+#           → 最高 ROI 的修法是請 PM 在 plan 加一欄 PROJECTCODE（見 docs/open-questions.md C3）
+#
+# 比對前一律先 lower()，故純大小寫差異（SELENA/Selena）不需列在這裡。
+
+confirmed:
+  # 需求方確認 2026-07-15
+  foxtrot14: 'foxtrot'
+  delta3-7: 'd7k3'
+  kilo10: 'tablet 10" - new project'      # plan 用佔位名，實際執行有正式代號
+  kilo12: 'tablet 12" - new project'
+  mania_s: 'mania-s'                       # 底線 vs 連字號。注意 Mania-C 與 Mania-S 是兩個不同專案
+
+# 演算法推測，需求方尚未確認 → 只列出、不生效（僅 confirmed 會被套用）
+# ⚠ 這些必須真的列在這裡而不是被註解掉——報告會顯示「尚有 N 條未確認」，
+#   註解掉會讓 N 變成 0，把未知顯示成「沒有問題」。
+candidates:
+  af310: 'af130'          # 字串 0.80、量級 0.86、都是 EMS。AF110/AF210/AF900 兩邊都對得上，
+                          # 只有 AF130（plan 有 actual 無）與 AF310（actual 有 plan 無）各缺一邊，像打錯字
+  mania: 'mania-c'        # 字串 0.83、都是 BD/Aopen。注意 Mania-C 與 Mania-S 是兩個不同專案
+  pickle: 'pickle ball'   # 字串 0.71、都是 Trenton
