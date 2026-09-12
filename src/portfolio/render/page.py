@@ -45,7 +45,13 @@ def _stage_strip(snap: dict, lang: str, latest_month: int) -> str:
     return f'<div class="stages">{"".join(cells)}</div>'
 
 
-def _upcoming(snap: dict, lang: str, today: str, weeks: int) -> str:
+def _passed_mark(lang: str, overdue: bool, sig: bool) -> str:
+    if not overdue:
+        return ""
+    return f' <span class="{"sig" if sig else "dim"}">{e(t(lang, "passed"))}</span>'
+
+
+def _upcoming(snap: dict, lang: str, today: str, weeks: int, late: set[str]) -> str:
     rows = []
     for p in snap["projects"]:
         if not p["in_briefing"] or p["stage_cat"] == "Suspended":
@@ -53,9 +59,9 @@ def _upcoming(snap: dict, lang: str, today: str, weeks: int) -> str:
         for k in ("evt", "dvt", "pvt", "mp"):
             d = p["dates"][k]
             if d and -7 <= _days(d, today) <= weeks * 7:
-                rows.append((d, p["name"], p["customer"], k.upper(), _days(d, today) < 0))
+                rows.append((d, p["name"], p["customer"], k.upper(), _days(d, today) < 0, p["code"] in late))
     rows.sort()
-    body = "".join(f'<tr><td>{d[5:].replace("-", "/")}{" <span class=sig>" + e(t(lang, "passed")) + "</span>" if late else ""}</td><td><b>{e(n)}</b></td><td>{e(c)}</td><td>{m}</td></tr>' for d, n, c, m, late in rows)
+    body = "".join(f'<tr><td>{d[5:].replace("-", "/")}{_passed_mark(lang, overdue, sig)}</td><td><b>{e(n)}</b></td><td>{e(c)}</td><td>{m}</td></tr>' for d, n, c, m, overdue, sig in rows)
     return (f'<table><thead><tr><th>{e(t(lang, "col_date"))}</th><th>{e(t(lang, "col_project"))}</th><th>{e(t(lang, "col_customer"))}</th><th>{e(t(lang, "col_milestone"))}</th></tr></thead>'
             f'<tbody>{body}</tbody></table>')
 
@@ -110,7 +116,7 @@ def render_page(snap: dict, lang: str, today: str, th: dict) -> str:
 <title>{e(t(lang, "doc_title", ym=ym))}</title><style>{CSS}</style></head><body>
 <header><div><h1>{e(t(lang, "h1"))}</h1><p>{e(t(lang, "intro"))}</p></div>{_title_block(m, lang, len(cl), lm)}</header>
 <section><h2>{e(t(lang, "s_decisions"))}</h2><p class="lead">{e(t(lang, "s_decisions_lead"))}</p>{_exceptions(snap, lang, th)}</section>
-<section>{_stage_strip(snap, lang, lm)}<div class="two"><div><h2>{e(t(lang, "s_upcoming", weeks=th["upcoming_weeks"]))}</h2><p class="lead">{e(t(lang, "s_upcoming_lead"))}</p>{_upcoming(snap, lang, today, th["upcoming_weeks"])}</div>
+<section>{_stage_strip(snap, lang, lm)}<div class="two"><div><h2>{e(t(lang, "s_upcoming", weeks=th["upcoming_weeks"]))}</h2><p class="lead">{e(t(lang, "s_upcoming_lead"))}</p>{_upcoming(snap, lang, today, th["upcoming_weeks"], late)}</div>
 <div><h2>{e(t(lang, "s_timeline"))}</h2><p class="lead">{e(t(lang, "s_timeline_lead"))}</p><div class="tl"><table><thead><tr><th>{e(t(lang, "col_project"))}</th><th>{e(t(lang, "col_customer"))}</th><th>{e(t(lang, "col_stage"))}</th><th>{head_svg}</th></tr></thead><tbody>{rows}</tbody></table>
 <div class="legend"><span>{e(t(lang, "legend_marks"))}</span><span><i style="background:#E8590C"></i>{e(t(lang, "legend_late"))}</span><span>{e(t(lang, "legend_today"))}</span></div></div></div></div></section>
 <section><h2>{e(t(lang, "s_capacity"))}</h2><p class="lead">{e(t(lang, "s_capacity_lead"))}</p>{capacity_svg(ps, snap["capacity"], lm, lang)}
