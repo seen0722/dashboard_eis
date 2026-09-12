@@ -49,6 +49,9 @@ def test_zh_renders_without_missing_keys():
 
 def test_find_pii():
     assert find_pii("ok LA0801557 x") == ["LA0801557"]
-    assert find_pii("Jiayu Ong(翁家瑜)") == ["Ong(翁家瑜)"]
+    assert find_pii("Jiayu Ong(翁家瑜)") == ["Jiayu Ong(翁家瑜)"]
+    assert find_pii("BILLY_CHEN(陳澤明)") == ["BILLY_CHEN(陳澤明)"]
+    assert find_pii("Billy(陳澤明)") == ["Billy(陳澤明)"]
+    assert find_pii("CRICKET(維護單價) and THORPE(維護)") == []
     assert find_pii("nothing here", {"SECRET"}) == []
     assert find_pii("by SECRET person", {"SECRET"}) == ["SECRET"]
