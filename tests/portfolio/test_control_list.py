@@ -81,6 +81,57 @@ def test_short_task_row_does_not_raise(xlsx):
     assert t.month == 1 and t.fte == 0.0 and t.description == ""
 
 
+def test_short_month_row_does_not_raise(xlsx):
+    p = xlsx("2026  EIS Resource Control List-SHORTM (X Y).xlsx", {
+        "Plan vs. Acutal ": pva_sheet(),
+        "BU-Task": [[None] * 11, TASK_HDR],
+        "FU-Task": [[None] * 11, TASK_HDR],
+        # 第一列短於 header（缺後面幾欄），第二列正常
+        "8": [MONTH_HDR,
+              ["202608", "Pega", "BA80700R01", "第十事業處-研發二處-研發三部", "BU10", "R", "BU", "BSP", "k", "BR0000015346"],
+              ["202608", "Pega", "BA80700R02", "第十事業處-研發二處-研發四部", "BU10", "R", "BU", "BSP", "k", "BR0000015346", "THORPE", "Trenton", 1.5, 4, 0.3, "x", 1, 1]],
+    })
+    cl, issues = read_control_list(p)
+    assert [i.check for i in issues] == []
+    assert ("BA80700R02", 1.5, 4) in [(l.dept_code, l.allocated, l.keyed_in) for l in cl.load_rows]
+
+
+def test_read_month_tolerates_rows_shorter_than_header():
+    """xlsb 不像 openpyxl 會把列補齊，短列會讓原本的寫法 IndexError。"""
+    from src.portfolio.extract.control_list import _read_month
+    rows = [tuple(MONTH_HDR),
+            ("202608", "Pega", "BA80700R01", "研發三部", "BU10", "R", "BU", "BSP", "k", "BR0000015346"),
+            ("202608", "Pega", "BA80700R02", "研發四部", "BU10", "R", "BU", "BSP", "k", "BR0000015346", "THORPE", "Trenton", 1.5, 4, 0.3, "x", 1, 1)]
+    out = _read_month(rows, 8)
+    assert [(r.dept_code, r.allocated, r.keyed_in) for r in out] == [("BA80700R01", 0.0, 0), ("BA80700R02", 1.5, 4)]
+
+
+def test_read_month_with_empty_or_short_header_returns_nothing():
+    from src.portfolio.extract.control_list import _read_month
+    assert _read_month([], 8) == []
+    assert _read_month([()], 8) == []
+    assert _read_month([(None,)], 8) == []
+    assert _read_month([("年月", "Company Code")], 8) == []       # 缺必要欄
+
+
+def test_empty_first_row_in_month_sheet_is_skipped(xlsx):
+    p = xlsx("2026  EIS Resource Control List-EMPTYM (X Y).xlsx", {
+        "Plan vs. Acutal ": pva_sheet(), "BU-Task": [[None] * 11, TASK_HDR], "FU-Task": [[None] * 11, TASK_HDR],
+        "8": [[None], MONTH_HDR]})
+    cl, issues = read_control_list(p)
+    assert cl.load_rows == [] and [i.check for i in issues] == []
+
+
+def test_parse_failure_becomes_cl_unreadable_not_an_exception(xlsx, monkeypatch):
+    from src.portfolio.extract import control_list as mod
+    p = xlsx("2026  EIS Resource Control List-BOOM (X Y).xlsx", sheets())
+    monkeypatch.setattr(mod, "_read_tasks", lambda rows, side: (_ for _ in ()).throw(IndexError("tuple index out of range")))
+    cl, issues = read_control_list(p)
+    assert [i.check for i in issues] == ["cl_unreadable"]
+    assert "BOOM" in issues[0].detail and "IndexError" in issues[0].detail
+    assert cl.label == "BOOM"
+
+
 def test_find_and_label(tmp_path):
     for n in ["2026  EIS Resource Control List-ABLE (A B).xlsx", "2026  EIS Resource Control List-RFQ_OTHERS(Re Pe).xlsx",
               "2026  EIS Resource Control List-CPL22B (K Y).xlsb", "~$2026 EIS Resource Summary.xlsx", "2026 EIS Resource Summary.xlsx"]:

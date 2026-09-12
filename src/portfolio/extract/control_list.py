@@ -90,7 +90,7 @@ def _read_tasks(rows, side: str) -> tuple[list[Task], set[str]]:
 
 def _read_month(rows, month: int) -> list[DeptLoadRow]:
     rows = list(rows)
-    if not rows or rows[0][0] != "年月":
+    if not rows or not rows[0] or rows[0][0] != "年月":
         return []
     hdr = [str(c).strip() if c is not None else "" for c in rows[0]]
     need = ("部門代碼", "部門名稱", "BU/FU", "Function", "PROJECTCODE", "主管填入人力", "單位TotalKeyIn人數")
@@ -99,7 +99,10 @@ def _read_month(rows, month: int) -> list[DeptLoadRow]:
     ci = {n: hdr.index(n) for n in need}
     out = []
     for r in rows[1:]:
-        if not r or r[0] is None or r[ci["BU/FU"]] != "BU":
+        if not r or r[0] is None:
+            continue
+        r = tuple(r) + (None,) * (len(hdr) - len(r))     # xlsb 不補齊短列；補到 header 長度才能安全取欄
+        if r[ci["BU/FU"]] != "BU":
             continue
         try:
             keyed = int(r[ci["單位TotalKeyIn人數"]] or 0)
@@ -113,31 +116,36 @@ def _read_month(rows, month: int) -> list[DeptLoadRow]:
 
 
 def read_control_list(path: str | Path) -> tuple[ControlList, list[Issue]]:
+    """讀檔與解析都在保護傘下：任何例外都變成 cl_unreadable，永遠回傳 (cl, issues)。"""
     path = Path(path)
     label = label_from_filename(path)
     cl = ControlList(label=label, path=str(path))
     issues: list[Issue] = []
-    sheetnames, pva_rows, bu_task_rows, fu_task_rows, month_rows = [], [], [], [], {}
     try:
-        with open_workbook(path) as wb:
-            sheetnames = wb.sheetnames
-            pva = _pva_sheet(wb)
-            if pva:
-                pva_rows = list(wb.rows(pva))
-            for sheet in ("BU-Task", "FU-Task"):
-                if sheet in sheetnames:
-                    rows = list(wb.rows(sheet))
-                    if sheet == "BU-Task":
-                        bu_task_rows = rows
-                    else:
-                        fu_task_rows = rows
-            for m in range(1, 13):
-                s = str(m)
-                if s in sheetnames:
-                    month_rows[m] = list(wb.rows(s))
-    except Exception as e:  # noqa: BLE001 - 檔案層級の失敗要進健康度而不是中斷
-        issues.append(Issue("track", "cl_unreadable", f"{path.name}: {e.__class__.__name__}: {e}", SRC))
-        return cl, issues
+        _fill(cl, path, label, issues)
+    except Exception as exc:  # noqa: BLE001 - 檔案層級的失敗要進健康度而不是中斷
+        issues.append(Issue("track", "cl_unreadable", f"{label}: {exc.__class__.__name__}: {exc}", SRC))
+    return cl, issues
+
+
+def _fill(cl: ControlList, path: Path, label: str, issues: list[Issue]) -> None:
+    sheetnames, pva_rows, bu_task_rows, fu_task_rows, month_rows = [], [], [], [], {}
+    with open_workbook(path) as wb:
+        sheetnames = wb.sheetnames
+        pva = _pva_sheet(wb)
+        if pva:
+            pva_rows = list(wb.rows(pva))
+        for sheet in ("BU-Task", "FU-Task"):
+            if sheet in sheetnames:
+                rows = list(wb.rows(sheet))
+                if sheet == "BU-Task":
+                    bu_task_rows = rows
+                else:
+                    fu_task_rows = rows
+        for m in range(1, 13):
+            s = str(m)
+            if s in sheetnames:
+                month_rows[m] = list(wb.rows(s))
     if pva_rows:
         cl.pva = _read_pva(pva_rows)
         for role in ROLES:
@@ -161,4 +169,3 @@ def read_control_list(path: str | Path) -> tuple[ControlList, list[Issue]]:
         cl.load_rows.extend(load)
         codes |= {r.code for r in load if r.code}
     cl.codes = sorted(codes)
-    return cl, issues
