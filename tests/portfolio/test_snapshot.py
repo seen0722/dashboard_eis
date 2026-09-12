@@ -22,3 +22,30 @@ def test_cross_month_corrections():
     issues = cross_month_corrections(prev, [p], 8)
     assert len(issues) == 1 and issues[0].check == "cross_month_correction" and "Jul" in issues[0].detail and "17.0" in issues[0].detail
     assert cross_month_corrections(None, [p], 8) == []
+
+
+def test_cross_month_corrections_malformed_prev_no_meta_short_fte():
+    # prev with no meta, short fte should not raise and return []
+    prev = {"projects": [{"code": "BR1", "name": "A", "fte": [17.0]}]}
+    p = Project(code="BR1", name="A"); p.fte[6] = 3.7
+    issues = cross_month_corrections(prev, [p], 8)
+    assert issues == []
+
+
+def test_cross_month_corrections_malformed_prev_missing_fte():
+    # prev project entry missing "fte" should not raise and return []
+    prev = {"meta": {"latest_month": 7}, "projects": [{"code": "BR1", "name": "A"}]}
+    p = Project(code="BR1", name="A"); p.fte[6] = 3.7
+    issues = cross_month_corrections(prev, [p], 8)
+    assert issues == []
+
+
+def test_read_previous_missing_root(tmp_path):
+    # read_previous with non-existent root directory should return None
+    assert read_previous(tmp_path / "nowhere", "202609") is None
+
+
+def test_read_previous_missing_file(tmp_path):
+    # read_previous with empty earlier directory and no portfolio.json should return None
+    (tmp_path / "202607").mkdir()
+    assert read_previous(tmp_path, "202608") is None

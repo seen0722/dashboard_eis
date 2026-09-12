@@ -6,14 +6,19 @@ from ..entities import Project, Issue, MONTHS
 def cross_month_corrections(prev: dict | None, projects: list[Project], latest_month: int, tol: float = 0.05) -> list[Issue]:
     if not prev:
         return []
-    old = {p["code"]: p for p in prev.get("projects", [])}
+    old = {p.get("code"): p for p in prev.get("projects", []) if p.get("code")}
     out = []
+    max_check_month = min(latest_month - 1, prev.get("meta", {}).get("latest_month", 12))
     for p in projects:
         o = old.get(p.code)
-        if not o:
+        if not o or "fte" not in o:
             continue
-        for m in range(min(latest_month - 1, prev["meta"].get("latest_month", 12))):
-            a, b = o["fte"][m], p.fte[m]
+        old_fte = o["fte"]
+        # Skip if fte list is too short to safely compare
+        if len(old_fte) < max_check_month:
+            continue
+        for m in range(max_check_month):
+            a, b = old_fte[m], p.fte[m]
             if abs(a - b) > tol:
                 out.append(Issue("track", "cross_month_correction", f"{p.name} {MONTHS[m]} FTE {a:.1f} -> {b:.1f}", "snapshot", p.code))
     return out
