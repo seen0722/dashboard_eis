@@ -18,3 +18,8 @@ __pycache__/
 *.py[cod]
 venv/
 .venv/
+
+# 每月輸入包與正規化快照：含專案代號、人力、NTD，不進版控
+input-*/
+data/snapshots/
+*.xlsb
