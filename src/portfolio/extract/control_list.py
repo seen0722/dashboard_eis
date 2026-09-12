@@ -1,4 +1,4 @@
-"""每案的 EIS Resource Control List。只讀四類分頁：Plan vs Actual、BU/FU-Task、月分頁、Project List。
+"""每案的 EIS Resource Control List。只讀四類分頁：Plan vs Actual、BU/FU-Task、月分頁。
 絕不讀「人力」「實名制」（含姓名工號）。"""
 from __future__ import annotations
 import re
@@ -72,9 +72,10 @@ def _read_tasks(rows, side: str) -> tuple[list[Task], set[str]]:
             continue
         if not r or r[0] is None:
             break
+        r = tuple(r) + (None,) * (11 - len(r)) if len(r) < 11 else r
         try:
             month = int(r[7])
-        except (TypeError, ValueError, IndexError):
+        except (TypeError, ValueError):
             continue
         if not 1 <= month <= 12:
             continue
@@ -116,14 +117,29 @@ def read_control_list(path: str | Path) -> tuple[ControlList, list[Issue]]:
     label = label_from_filename(path)
     cl = ControlList(label=label, path=str(path))
     issues: list[Issue] = []
+    sheetnames, pva_rows, bu_task_rows, fu_task_rows, month_rows = [], [], [], [], {}
     try:
-        wb = open_workbook(path)
-    except Exception as e:  # noqa: BLE001 - 檔案層級的失敗要進健康度而不是中斷
+        with open_workbook(path) as wb:
+            sheetnames = wb.sheetnames
+            pva = _pva_sheet(wb)
+            if pva:
+                pva_rows = list(wb.rows(pva))
+            for sheet in ("BU-Task", "FU-Task"):
+                if sheet in sheetnames:
+                    rows = list(wb.rows(sheet))
+                    if sheet == "BU-Task":
+                        bu_task_rows = rows
+                    else:
+                        fu_task_rows = rows
+            for m in range(1, 13):
+                s = str(m)
+                if s in sheetnames:
+                    month_rows[m] = list(wb.rows(s))
+    except Exception as e:  # noqa: BLE001 - 檔案層級の失敗要進健康度而不是中斷
         issues.append(Issue("track", "cl_unreadable", f"{path.name}: {e.__class__.__name__}: {e}", SRC))
         return cl, issues
-    pva = _pva_sheet(wb)
-    if pva:
-        cl.pva = _read_pva(wb.rows(pva))
+    if pva_rows:
+        cl.pva = _read_pva(pva_rows)
         for role in ROLES:
             if role not in cl.pva:
                 issues.append(Issue("track", "cl_pva_role_missing", f"{label}: Plan vs Actual has no {role} block", SRC))
@@ -131,21 +147,18 @@ def read_control_list(path: str | Path) -> tuple[ControlList, list[Issue]]:
         issues.append(Issue("track", "cl_no_plan_vs_actual", f"{label}: no 'Plan vs. Actual' sheet", SRC))
     codes: set[str] = set()
     any_task_sheet = False
-    for sheet, side in (("BU-Task", "BU"), ("FU-Task", "FU")):
-        if sheet not in wb.sheetnames:
-            continue
-        any_task_sheet = True
-        tasks, c = _read_tasks(wb.rows(sheet), side)
-        cl.tasks.extend(tasks); codes |= c
+    for rows, side in [(bu_task_rows, "BU"), (fu_task_rows, "FU")]:
+        if rows:
+            any_task_sheet = True
+            tasks, c = _read_tasks(rows, side)
+            cl.tasks.extend(tasks); codes |= c
     if not any_task_sheet:
         issues.append(Issue("track", "cl_no_task_sheet", f"{label}: no BU-Task / FU-Task sheet", SRC))
-    months = [s for s in wb.sheetnames if s.isdigit() and 1 <= int(s) <= 12]
-    if not months:
+    if not month_rows:
         issues.append(Issue("track", "cl_no_month_sheets", f"{label}: no monthly sheets 1..12", SRC))
-    for s in months:
-        rows = _read_month(wb.rows(s), int(s))
-        cl.load_rows.extend(rows)
-        codes |= {r.code for r in rows if r.code}
+    for month, rows in month_rows.items():
+        load = _read_month(rows, month)
+        cl.load_rows.extend(load)
+        codes |= {r.code for r in load if r.code}
     cl.codes = sorted(codes)
-    wb.close()
     return cl, issues

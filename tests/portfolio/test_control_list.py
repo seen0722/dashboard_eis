@@ -65,6 +65,22 @@ def test_missing_sheets_become_issues(xlsx):
     assert {i.check for i in issues} == {"cl_no_plan_vs_actual", "cl_no_task_sheet", "cl_no_month_sheets"}
 
 
+def test_short_task_row_does_not_raise(xlsx):
+    def short_sheets():
+        return {
+            "BU-Task": [[None] * 11, TASK_HDR,
+                        ["x", "BR0000015346", "THORPE", "BA80700R01", "第十事業處-研發二處-研發三部", "BSP", "2026", "1"]],
+            "FU-Task": [[None] * 11, TASK_HDR],
+            "Plan vs. Acutal ": pva_sheet(),
+            "1": [MONTH_HDR],
+        }
+    p = xlsx("2026  EIS Resource Control List-SHORT (X Y).xlsx", short_sheets())
+    cl, issues = read_control_list(p)
+    assert cl.label == "SHORT" and len(cl.tasks) == 1
+    t = cl.tasks[0]
+    assert t.month == 1 and t.fte == 0.0 and t.description == ""
+
+
 def test_find_and_label(tmp_path):
     for n in ["2026  EIS Resource Control List-ABLE (A B).xlsx", "2026  EIS Resource Control List-RFQ_OTHERS(Re Pe).xlsx",
               "2026  EIS Resource Control List-CPL22B (K Y).xlsb", "~$2026 EIS Resource Summary.xlsx", "2026 EIS Resource Summary.xlsx"]:
