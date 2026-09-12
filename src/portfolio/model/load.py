@@ -22,6 +22,7 @@ def _short(name: str) -> str:
 def build_dept_loads(control_lists: list[ControlList]) -> tuple[list[DeptLoad], list[Issue]]:
     loads: dict[str, DeptLoad] = {}
     seen: dict[tuple[str, int], set[int]] = {}
+    seen_functions: dict[str, set[str]] = {}
     for cl in control_lists:
         for r in cl.load_rows:
             d = loads.setdefault(r.dept_code, DeptLoad(r.dept_code, _short(r.dept_name), r.function))
@@ -29,8 +30,11 @@ def build_dept_loads(control_lists: list[ControlList]) -> tuple[list[DeptLoad], 
             d.allocated[m] = round(d.allocated[m] + r.allocated, 4)
             d.keyed_in[m] = max(d.keyed_in[m], r.keyed_in)
             seen.setdefault((r.dept_code, r.month), set()).add(r.keyed_in)
+            seen_functions.setdefault(r.dept_code, set()).add(r.function)
     issues = [Issue("track", "dept_denominator_inconsistent", f"{code} month {month}: keyed-in headcount differs across files {sorted(v)}", "Control List")
               for (code, month), v in sorted(seen.items()) if len(v) > 1]
+    issues.extend([Issue("track", "dept_function_inconsistent", f"{code}: function differs across files {sorted(v)}; using {loads[code].function}", "Control List")
+                   for code, v in sorted(seen_functions.items()) if len(v) > 1])
     for d in loads.values():
         d.util = [round(d.allocated[m] / d.keyed_in[m] * 100) if d.keyed_in[m] else None for m in range(12)]
     return sorted(loads.values(), key=lambda d: (d.function, d.dept_code)), issues

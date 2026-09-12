@@ -24,3 +24,12 @@ def test_inconsistent_denominator_is_reported():
     loads, issues = build_dept_loads([a, b])
     assert issues[0].check == "dept_denominator_inconsistent"
     assert loads[0].keyed_in[7] == 6      # 取最大值，寧可低估負載
+
+
+def test_inconsistent_function_is_reported():
+    a = ControlList("A", "a", load_rows=[row("D1", 8, 1, 5, "BR1", fn="BSP")])
+    b = ControlList("B", "b", load_rows=[row("D1", 8, 1, 5, "BR2", fn="PM")])
+    loads, issues = build_dept_loads([a, b])
+    d1 = loads[0]
+    assert d1.function == "BSP"  # first seen wins
+    assert any(issue.check == "dept_function_inconsistent" for issue in issues)
