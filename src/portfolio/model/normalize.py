@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import replace
 from ..config import Config, normalize_name
-from ..entities import Project, Issue, MasterProject, BriefingRow, MonthlyFTE, ControlList, ROLES
+from ..entities import Project, Issue, MasterProject, BriefingRow, MonthlyFTE, ControlList, PlanVsActual, ROLES
 from .keys import MasterIndex, resolve_code
 from .mask import mask_names
 from .stages import stage_cat
@@ -13,6 +13,22 @@ def _get(projects: dict[str, Project], code: str, name: str, idx: MasterIndex) -
         m = idx.by_code.get(code)
         projects[code] = Project(code=code, name=m.name if m else name, group=m.group if m else "", family=m.family if m else "")
     return projects[code]
+
+
+def _add12(a: list[float], b: list[float]) -> list[float]:
+    """月對月相加。長度一律補成 12，不動傳入的 list。"""
+    at = lambda xs, i: float(xs[i]) if i < len(xs) else 0.0
+    return [round(at(a, i) + at(b, i), 4) for i in range(12)]
+
+
+def _merge_pva(cur: dict[str, PlanVsActual], new: dict[str, PlanVsActual]) -> dict[str, PlanVsActual]:
+    """兩份 Control List 落到同一 code 時，plan / actual / ntd 月對月相加。產生新物件，兩邊來源都不被改。"""
+    out = dict(cur)
+    for role, v in new.items():
+        old = out.get(role)
+        out[role] = v if old is None else PlanVsActual(role=role, plan=_add12(old.plan, v.plan),
+                                                       actual=_add12(old.actual, v.actual), ntd=_add12(old.ntd, v.ntd))
+    return out
 
 
 def _primary_code(cl: ControlList, idx: MasterIndex, aliases: dict) -> tuple[str, bool]:
@@ -49,12 +65,18 @@ def build_projects(master: list[MasterProject], briefing: list[BriefingRow], sum
             p.customer, p.product, p.dates = r.customer, r.product, dict(r.dates)
             if p.code.startswith("NAME:"):
                 p.name = r.name
+    summary_seen: set[str] = set()
     for s in summary:
         code, ok = resolve_code(s.name, None, idx, cfg.aliases)
         if not ok:
             unresolved("Resource Summary", s.name)
         p = _get(projects, code, s.name, idx)
-        p.fte, p.ntd = list(s.fte), list(s.ntd)
+        if code in summary_seen:
+            issues.append(Issue("track", "duplicate_source", f"{s.name}: second Resource Summary block for {code}", "Resource Summary", code))
+            p.fte, p.ntd = _add12(p.fte, s.fte), _add12(p.ntd, s.ntd)
+        else:
+            summary_seen.add(code)
+            p.fte, p.ntd = list(s.fte), list(s.ntd)
         if not p.group:
             p.group = s.group
     masked_total = 0
@@ -65,13 +87,17 @@ def build_projects(master: list[MasterProject], briefing: list[BriefingRow], sum
         if not ok:
             unresolved("Control List", cl.label)
         p = _get(projects, code, cl.label, idx)
+        dup = p.in_control_list
+        if dup:
+            issues.append(Issue("track", "duplicate_source", f"{cl.label}: second control list for {code}", "Control List", code))
         p.in_control_list = True
-        p.pva = {role: cl.pva[role] for role in ROLES if role in cl.pva}
+        pva = {role: cl.pva[role] for role in ROLES if role in cl.pva}
+        p.pva = _merge_pva(p.pva, pva) if dup else pva
         p.has_plan = any(sum(v.plan) > 0 for v in p.pva.values())
         masked = []
         for t in cl.tasks:
             desc, n = mask_names(t.description, protect); masked_total += n
             masked.append(replace(t, description=desc))
-        p.tasks = masked
+        p.tasks = p.tasks + masked if dup else masked
     issues.append(Issue("ok", "names_masked", str(masked_total), "Control List"))
     return sorted(projects.values(), key=lambda p: p.name), issues, latest

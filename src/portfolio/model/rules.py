@@ -89,7 +89,8 @@ CHECKS = [
     ("mp_typo", "track", "briefing", False), ("customer_blank", "track", "briefing", False),
     ("name_unresolved", "track", "cross", True), ("task_description_blank", "track", "control_list", False),
     ("briefing_stale", "track", "briefing", False), ("cl_unreadable", "track", "control_list", True),
-    ("cl_format_drift", "track", "control_list", True), ("dept_denominator_inconsistent", "track", "control_list", True),
+    ("cl_format_drift", "track", "control_list", True), ("duplicate_source", "track", "cross", True),
+    ("dept_denominator_inconsistent", "track", "control_list", True),
     ("dept_function_inconsistent", "track", "control_list", True),
     ("cross_month_correction", "track", "snapshot", True), ("names_masked", "ok", "control_list", True),
 ]

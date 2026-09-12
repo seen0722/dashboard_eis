@@ -55,7 +55,8 @@ def test_health_rows_and_task_gaps():
           proj("NA", customer="NA", plan=1), proj("KILO12", "RFQ", "RFQ / RFI", mp="2028-08-12", mp_orig="2027-08-26", plan=1)]
     issues = [Issue("track", "name_unresolved", "GHOST", "Briefing"), Issue("track", "cl_unreadable", "CPL22B", "Control List"),
               Issue("track", "cross_month_correction", "THORPE Jul FU 17.0 -> 3.7", "snapshot"), Issue("ok", "names_masked", "3", "Control List"),
-              Issue("track", "dept_function_inconsistent", "D1: function differs", "Control List")]
+              Issue("track", "dept_function_inconsistent", "D1: function differs", "Control List"),
+              Issue("track", "duplicate_source", "KOS: second Resource Summary block for BR9", "Resource Summary", "BR9")]
     assert task_description_gaps(ps) == [("THORPE", [8])]
     rows = {r.check: r for r in build_health(ps, [], issues, cfg, TODAY, "20260907")}
     assert rows["budget_missing"].level == "decide"
@@ -67,3 +68,4 @@ def test_health_rows_and_task_gaps():
     assert rows["task_description_blank"].names == ["THORPE (8)"]
     assert rows["names_masked"].level == "ok" and rows["names_masked"].count == 3
     assert rows["dept_function_inconsistent"].count == 1
+    assert rows["duplicate_source"].count == 1 and rows["duplicate_source"].source == "cross"

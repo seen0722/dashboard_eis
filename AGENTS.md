@@ -532,6 +532,12 @@ Review 檔疑似**半手工整理**，跨月結構不一致。ingest **不可依
 - 跑法：`python -m src.portfolio.cli --input input-YY --report-month YYYYMM [--lang zh]`
 - 輸入：一包目錄（Project List、Briefing、Resource Summary、N 份 Control List）。`input-*/` 與 `data/snapshots/` 都 gitignored。
 - 主鍵：PROJECTCODE。名稱備援對照在 config/portfolio_aliases.yaml（與舊 config/aliases.yaml 無關）。
+- 名稱解析順序（`model/keys.py::resolve_code`）：code → alias → 正規化全名 → **唯一的段尾碼比對**。
+  段尾碼＝把 master 名與候選名都用 `_ - 空白` 切段並轉大寫，master 的段序列以候選的段序列結尾才算命中
+  （`KOS` → `TR_BU10_IPC_KOS`）；命中 0 個或 2 個以上一律視為對不上，進 `name_unresolved`。
+  刻意不用字串 `endswith`，否則 `OKOS` 會被誤判成 `..._KOS`。
+- 多筆來源落到同一 code 時累加而非覆蓋（Resource Summary 月對月相加、Control List 合併 pva 與 tasks），
+  並記 `duplicate_source`。
 - 門檻：config/thresholds.yaml 的 `portfolio:`；stage 分類：config/stages.yaml。
 - PII：不讀「人力」「實名制」分頁；任務文字遮罩；輸出前 find_pii 擋下工號與姓名，命中則不寫檔（exit 2）。
 - 跨月：每月 snapshot JSON 留在 data/snapshots/YYYYMM/，下個月自動比對過去月份數字是否被改。

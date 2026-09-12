@@ -46,6 +46,33 @@ def test_control_list_with_two_codes_is_flagged():
     assert {p.code for p in projects} >= {"BR0000015346"}
 
 
+def test_two_summary_blocks_for_one_code_accumulate():
+    master, briefing, _, cls = make_inputs()
+    summary = [MonthlyFTE("KOS", "Unicorn", [12.0] * 8 + [0] * 4, [1e6] * 8 + [0] * 4),
+               MonthlyFTE("KOS", "Othes", [3.0] * 8 + [0] * 4, [5e5] * 8 + [0] * 4)]
+    projects, issues, _ = build_projects(master, briefing, summary, cls, load_config())
+    kos = {p.code: p for p in projects}["NAME:KOS"]
+    assert kos.fte[0] == 15.0 and kos.fte[8] == 0.0 and kos.ntd[0] == 1.5e6
+    assert [i.check for i in issues].count("duplicate_source") == 1
+    assert summary[0].fte[0] == 12.0 and summary[1].fte[0] == 3.0     # 不動呼叫端資料
+
+
+def test_two_control_lists_for_one_code_merge():
+    master, briefing, summary, cls = make_inputs()
+    second = ControlList("THORPE 2nd", "z.xlsx", codes=["BR0000015346"],
+                         pva={"BU RD": PlanVsActual("BU RD", plan=[0.5] * 12, actual=[2.0] * 8 + [0] * 4),
+                              "PM": PlanVsActual("PM", plan=[1.0] * 12)},
+                         tasks=[Task(9, "BU", "BSP", "研發三部", 1.0, "extra work")])
+    projects, issues, _ = build_projects(master, briefing, summary, cls + [second], load_config())
+    t = {p.code: p for p in projects}["BR0000015346"]
+    assert t.pva["BU RD"].plan[0] == 15.0 and t.pva["BU RD"].actual[0] == 20.0
+    assert t.pva["PM"].plan[0] == 1.0                                 # 只有第二份有 PM 區塊
+    assert [(x.month, x.description) for x in t.tasks] == [(8, "Thorpe SW release by [name]"), (9, "extra work")]
+    dups = [i for i in issues if i.check == "duplicate_source"]
+    assert len(dups) == 1 and dups[0].code == "BR0000015346"
+    assert cls[0].pva["BU RD"].plan[0] == 14.5 and second.pva["BU RD"].plan[0] == 0.5   # 不動呼叫端資料
+
+
 def test_does_not_mutate_caller_tasks():
     master, briefing, summary, cls = make_inputs()
     original_desc = cls[0].tasks[0].description
