@@ -116,11 +116,14 @@ class Project:
 @dataclass
 class Exception_:
     rank: int
-    title: str
-    evidence: str
-    ask: str
-    source: str
+    title: str                  # key，render 層查表
+    evidence: str               # 語言中立的資料片段
+    ask: str                    # key
+    source: str                 # key
     codes: list[str] = field(default_factory=list)
+    count: int = 0
+    ask_data: str = ""          # 塞進 ask 句子的數字
+    extra: dict = field(default_factory=dict)
 
 
 @dataclass
