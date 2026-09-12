@@ -104,6 +104,8 @@ def _appendix_one(p: dict, lang: str, today: str, latest_month: int, i: int) -> 
 
 def render_page(snap: dict, lang: str, today: str, th: dict) -> str:
     m = snap["meta"]; lm = m["latest_month"]
+    if lm < 1:
+        raise ValueError("no manpower month in snapshot")   # 整頁都以「最新月」定位，沒有它不該畫出半張報表
     ps = snap["projects"]; cl = [p for p in ps if p["in_control_list"]]
     late = {c for x in snap["exceptions"] if x["title"] == "milestones_passed" for c in x["codes"]}
     start = f"{today[:7]}-01"

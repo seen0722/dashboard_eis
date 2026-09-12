@@ -1,4 +1,5 @@
 import re
+import pytest
 from dataclasses import asdict
 from src.portfolio.entities import Project, PlanVsActual, Task, Exception_, HealthRow, Issue
 from src.portfolio.model.load import DeptLoad
@@ -41,6 +42,12 @@ def test_page_sections_and_strings():
     assert "Q11" not in html.split("Six-month timeline")[0]
     assert '<span class="dim">passed</span>' in html
     assert '<span class="sig">passed</span>' in html
+
+
+def test_render_refuses_a_snapshot_with_no_manpower_month():
+    s = snap(); s["meta"]["latest_month"] = 0
+    with pytest.raises(ValueError, match="no manpower month"):
+        render_page(s, "en", "2026-09-12", TH)
 
 
 def test_zh_renders_without_missing_keys():

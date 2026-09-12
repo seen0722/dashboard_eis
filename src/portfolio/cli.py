@@ -2,6 +2,7 @@
 from __future__ import annotations
 import argparse
 import datetime as dt
+import json
 import sys
 from pathlib import Path
 from .config import load_config
@@ -45,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
         cl, i4 = read_control_list(f); cls.append(cl); issues += i4
     projects, i5, snap_date = build_projects(master, briefing, summary, cls, cfg); issues += i5
     lm = _latest_month(summary)
+    if lm < 1:
+        print(f"no month with non-zero Total EIS 人力 in {summ_f.name}; cannot build the report", file=sys.stderr); return 1
     loads, i6 = build_dept_loads(cls); issues += i6
     snap_iso = f"{snap_date[:4]}-{snap_date[4:6]}-{snap_date[6:]}"
     for r in briefing:
@@ -60,11 +63,12 @@ def main(argv: list[str] | None = None) -> int:
             h.count, h.names = len(stale), [i.detail for i in stale]
     snap = build_snapshot(a.report_month, lm, snap_date, a.today, projects, loads, capacity_by_month(loads), exceptions, health, issues)
     snap["meta"]["snap_rev"] = len({r.snap for r in briefing})
-    write_snapshot(snap, a.snapshots)
     html = render_page(snap, a.lang, a.today, th)
-    pii = find_pii(html)
+    # 負向檢查在任何寫檔之前，HTML 與 snapshot JSON 都要過；命中就兩個檔案都不寫。
+    pii = find_pii(html) + find_pii(json.dumps(snap, ensure_ascii=False))
     if pii:
-        print(f"PII found, refusing to write HTML: {pii[:5]}", file=sys.stderr); return 2
+        print(f"PII found, refusing to write HTML or snapshot: {pii[:5]}", file=sys.stderr); return 2
+    write_snapshot(snap, a.snapshots)
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     f = out / f"portfolio_{a.report_month}_{a.lang}.html"; f.write_text(html, encoding="utf-8")
     print(f"wrote {f} ({len(html)} bytes); {len(projects)} projects; {len(cls)} control lists; latest month {lm}; snapshot {snap_date}")
