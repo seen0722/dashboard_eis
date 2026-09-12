@@ -50,14 +50,15 @@ def task_description_gaps(projects: list[Project]) -> list[tuple[str, list[int]]
 def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_month: int, cfg: Config, today: str) -> list[Exception_]:
     th = cfg.thresholds
     m = latest_month - 1
+    has_month = latest_month >= 1   # no non-zero month in Resource Summary -> treat FTE/util data as absent, never index with m
     passed = milestones_passed(projects, today)
     susp = [p for p in projects if p.in_briefing and p.stage_cat == "Suspended"]
-    susp_fte = [(p, p.fte[m]) for p in susp if p.fte[m] > th["suspended_fte_min"]]
+    susp_fte = [(p, p.fte[m]) for p in susp if p.fte[m] > th["suspended_fte_min"]] if has_month else []
     cls = [p for p in projects if p.in_control_list]
     noplan = [p for p in cls if not p.has_plan]
     slipped = mp_slipped(projects, th["mp_slip_days"])
-    spare = [d for d in loads if d.util[m] is not None and d.util[m] < th["spare_capacity_pct"]]
-    full = len([d for d in loads if d.util[m] is not None]) - len(spare)
+    spare = [d for d in loads if d.util[m] is not None and d.util[m] < th["spare_capacity_pct"]] if has_month else []
+    full = (len([d for d in loads if d.util[m] is not None]) - len(spare)) if has_month else 0
     ex = [
         Exception_(1, "milestones_passed", "; ".join(f"{p.name} {k.upper()} {d} (+{n}d, stage {p.stage})" for p, k, d, n in passed),
                    "milestones_passed", "briefing", [p.code for p, *_ in passed]),
@@ -70,6 +71,10 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
         Exception_(5, "spare_capacity", ", ".join(f"{d.function} {d.dept_name} ({d.keyed_in[m]} people, {d.util[m]}%)" for d in sorted(spare, key=lambda d: d.util[m])),
                    "spare_capacity", "control_list_month", []),
     ]
+    # By design: ex[1] (suspended_charging).count is the total number of suspended projects (len(susp)),
+    # while its codes/evidence list only those still charging (susp_fte) — the title template uses both
+    # numbers ("{n} projects suspended, {charging} still charging" via extra["charging"] below). Do not
+    # "fix" count to len(susp_fte); that would drop the total-suspended figure the template needs.
     for e, n in zip(ex, (len(passed), len(susp), len(noplan), len(slipped), len(spare))):
         e.count = n
     ex[1].extra = {"pct": round(len(susp) * 100 / max(1, len([p for p in projects if p.in_briefing]))), "charging": len(susp_fte)}

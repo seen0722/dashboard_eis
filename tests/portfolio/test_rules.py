@@ -36,6 +36,18 @@ def test_exceptions_five_fixed_entries():
     assert ex[4].codes == [] and "SW 研發二課" in ex[4].evidence and "1" in ex[4].ask_data
 
 
+def test_exceptions_when_no_latest_month():
+    cfg = load_config()
+    ps = [proj("THORPE", mp="2026-07-31", plan=14.5), proj("KOS", "suspended", "Suspended", fte8=0.5, in_cl=False), proj("NOPLAN"),
+          proj("KILO12", "RFQ", "RFQ / RFI", mp="2028-08-12", mp_orig="2027-08-26", plan=1)]
+    loads = [DeptLoad("D1", "研發三部", "BSP", keyed_in=[5] * 12, util=[100] * 12), DeptLoad("D2", "研發二課", "SW", keyed_in=[8] * 12, util=[68] * 12)]
+    ex = build_exceptions(ps, loads, 0, cfg, TODAY)
+    assert ex[0].codes == ["BRTHORPE"]
+    assert ex[1].codes == []
+    assert ex[4].evidence == ""
+    assert ex[4].ask_data == "0"
+
+
 def test_health_rows_and_task_gaps():
     cfg = load_config()
     t_ok, t_blank = Task(7, "BU", "BSP", "x", 1.0, "do stuff"), Task(8, "BU", "BSP", "x", 1.0, "")
