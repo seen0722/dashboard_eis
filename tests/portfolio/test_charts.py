@@ -31,6 +31,10 @@ def test_capacity_svg_has_series_and_budget_note():
              "FU RD": PlanVsActual("FU RD", actual=[2] * 8 + [0] * 4)}
     svg = capacity_svg([asdict(x)], [12] * 12, 8, "en")
     assert svg.count("<polyline") == 4 and "Budget covers 1 / 1" in svg
+    assert svg.count("<polygon") == 1
+    assert "Ceiling 12" in svg and "BU actual 10" in svg
+    first_polyline = svg[svg.index("<polyline"):svg.index("/>", svg.index("<polyline")) + 2]
+    assert 'stroke="#22262A"' in first_polyline and "stroke-dasharray" not in first_polyline
 
 
 def test_capacity_ceiling_is_carried_forward_past_latest_month():

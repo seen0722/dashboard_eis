@@ -91,18 +91,25 @@ def capacity_svg(projects: list[dict], capacity: list[int], latest_month: int, l
     act = [a + b for a, b in zip(_sum(cl, "BU RD", "actual", latest_month), _sum(cl, "PM", "actual", latest_month))]
     fu = _sum(cl, "FU RD", "actual", latest_month)
     plan = [a + b for a, b in zip(_sum(wp, "BU RD", "plan", only_plan=True), _sum(wp, "PM", "plan", only_plan=True))]
-    W, H, pl, pb = 1100, 300, 40, 30; cw = (W - pl - 20) / 12
+    W, H, pl, pb, pr = 1100, 300, 40, 30, 110; cw = (W - pl - pr) / 12
     mx = max(act + plan + capacity + [1]) * 1.12
     y = lambda v: H - pb - v / mx * (H - pb - 20); X = lambda i: pl + i * cw + cw / 2
     line = lambda arr, c, dash, w: f'<polyline fill="none" stroke="{c}" stroke-width="{w}" {f"stroke-dasharray=\"{dash}\"" if dash else ""} points="{" ".join(f"{X(i):.1f},{y(v):.1f}" for i, v in enumerate(arr))}"/>'
-    ends = lambda arr, c, dy: "".join(f'<text x="{X(i):.1f}" y="{y(v)+dy:.1f}" font-size="11" text-anchor="middle" fill="{c}">{v:.0f}</text>' for i, v in enumerate(arr) if i in (0, len(arr) - 1))
+    label = lambda i, v, key, c, dy: f'<text x="{X(i)+6:.1f}" y="{y(v)+dy:.1f}" font-size="11" text-anchor="start" fill="{c}">{escape(t(lang, key))} {v:.0f}</text>'
     grid = "".join(f'<line x1="{pl}" x2="{W-10}" y1="{y(v):.1f}" y2="{y(v):.1f}" stroke="{GRID}"/><text x="{pl-6}" y="{y(v)+4:.1f}" font-size="11" text-anchor="end" fill="{INK3}">{v}</text>' for v in (50, 100, 150, 200, 250) if v < mx)
     fut = f'<rect x="{X(latest_month) - cw/2:.1f}" y="10" width="{cw*(12-latest_month):.1f}" height="{H-pb-10}" fill="#eceeeb"/>' if latest_month < 12 else ""
-    note = f'<text x="{X(min(11, latest_month + 1)):.1f}" y="26" font-size="11" text-anchor="middle" fill="{INK2}">{escape(t(lang, "cap_budget_note", covered=len(wp), total=len(cl)))}</text>'
+    note = f'<text x="{X(min(11, latest_month + 1)):.1f}" y="18" font-size="11" text-anchor="middle" fill="{INK2}">{escape(t(lang, "cap_budget_note", covered=len(wp), total=len(cl)))}</text>'
     axis = "".join(f'<text x="{X(i):.1f}" y="{H-8}" font-size="12" text-anchor="middle" fill="{INK2}">{m}</text>' for i, m in enumerate(MONTHS))
-    return (f'<svg viewBox="0 0 {W} {H}" width="100%" role="img">{grid}{fut}{note}'
-            f'{line(capacity, INK, "5 4", 1.5)}{line(act, SLATE, None, 2.5)}{line(plan, SLATE, "3 4", 1.5)}{line(fu, TEAL, None, 2)}'
-            f'{ends(capacity, INK, -9)}{ends(act, SLATE, 18)}{ends(fu, TEAL, -8)}{axis}</svg>')
+    n = min(latest_month, len(act), len(capacity))
+    headroom = ("<polygon fill=\"#3D5A80\" opacity=\".08\" points=\"" +
+                " ".join(f"{X(i):.1f},{y(capacity[i]):.1f}" for i in range(n)) + " " +
+                " ".join(f"{X(i):.1f},{y(act[i]):.1f}" for i in reversed(range(n))) + "\"/>") if n > 0 else ""
+    last_act = len(act) - 1; last_fu = len(fu) - 1
+    labels = (label(11, capacity[11], "lbl_ceiling", INK, -6) + label(11, plan[11], "lbl_budget", INK2, 14)
+              + label(last_act, act[last_act], "lbl_actual", SLATE, -6) + label(last_fu, fu[last_fu], "lbl_fu", TEAL, 14))
+    return (f'<svg viewBox="0 0 {W} {H}" width="100%" role="img">{grid}{fut}{note}{headroom}'
+            f'{line(capacity, INK, None, 2.5)}{line(act, SLATE, None, 2.5)}{line(plan, SLATE2, "6 4", 2.5)}{line(fu, TEAL, None, 2)}'
+            f'{labels}{axis}</svg>')
 
 
 def pva_svg(pva: dict, role: str, latest_month: int) -> str:
