@@ -91,8 +91,9 @@ def capacity_svg(projects: list[dict], capacity: list[int], latest_month: int, l
     act = [a + b for a, b in zip(_sum(cl, "BU RD", "actual", latest_month), _sum(cl, "PM", "actual", latest_month))]
     fu = _sum(cl, "FU RD", "actual", latest_month)
     plan = [a + b for a, b in zip(_sum(wp, "BU RD", "plan", only_plan=True), _sum(wp, "PM", "plan", only_plan=True))]
+    act_wp = [a + b for a, b in zip(_sum(wp, "BU RD", "actual", latest_month), _sum(wp, "PM", "actual", latest_month))]
     W, H, pl, pb, pr = 1100, 300, 40, 30, 110; cw = (W - pl - pr) / 12
-    mx = max(act + plan + capacity + [1]) * 1.12
+    mx = max(act + plan + act_wp + capacity + [1]) * 1.12
     y = lambda v: H - pb - v / mx * (H - pb - 20); X = lambda i: pl + i * cw + cw / 2
     line = lambda arr, c, dash, w: f'<polyline fill="none" stroke="{c}" stroke-width="{w}" {f"stroke-dasharray=\"{dash}\"" if dash else ""} points="{" ".join(f"{X(i):.1f},{y(v):.1f}" for i, v in enumerate(arr))}"/>'
     label = lambda i, v, key, c, dy: f'<text x="{X(i)+6:.1f}" y="{y(v)+dy:.1f}" font-size="11" text-anchor="start" fill="{c}">{escape(t(lang, key))} {v:.0f}</text>'
@@ -107,8 +108,14 @@ def capacity_svg(projects: list[dict], capacity: list[int], latest_month: int, l
     last_act = len(act) - 1; last_fu = len(fu) - 1
     labels = (label(11, capacity[11], "lbl_ceiling", INK, -6) + label(11, plan[11], "lbl_budget", INK2, 14)
               + label(last_act, act[last_act], "lbl_actual", SLATE, -6) + label(last_fu, fu[last_fu], "lbl_fu", TEAL, 14))
+    idx = latest_month - 1
+    if 0 <= idx < len(act_wp):
+        y_wp, y_act_lbl = y(act_wp[idx]), y(act[last_act]) - 6
+        dy_wp = 14 if abs(y_wp - y_act_lbl) < 12 else 0
+        labels += (f'<text x="{X(idx)+6:.1f}" y="{y_wp+dy_wp:.1f}" font-size="11" text-anchor="start" fill="{INK2}">'
+                   f'{escape(t(lang, "lbl_actual_planned", n=len(wp)))} {act_wp[idx]:.0f}</text>')
     return (f'<svg viewBox="0 0 {W} {H}" width="100%" role="img">{grid}{fut}{note}{headroom}'
-            f'{line(capacity, INK, None, 2.5)}{line(act, SLATE, None, 2.5)}{line(plan, SLATE2, "6 4", 2.5)}{line(fu, TEAL, None, 2)}'
+            f'{line(capacity, INK, None, 2.5)}{line(plan, SLATE2, "6 4", 2.5)}{line(act_wp, SLATE, "2 3", 1.2)}{line(act, SLATE, None, 2.5)}{line(fu, TEAL, None, 2)}'
             f'{labels}{axis}</svg>')
 
 

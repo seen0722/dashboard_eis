@@ -30,9 +30,10 @@ def test_capacity_svg_has_series_and_budget_note():
     x.pva = {"BU RD": PlanVsActual("BU RD", plan=[10] * 12, actual=[9] * 8 + [0] * 4), "PM": PlanVsActual("PM", plan=[1] * 12, actual=[1] * 8 + [0] * 4),
              "FU RD": PlanVsActual("FU RD", actual=[2] * 8 + [0] * 4)}
     svg = capacity_svg([asdict(x)], [12] * 12, 8, "en")
-    assert svg.count("<polyline") == 4 and "Budget covers 1 / 1" in svg
+    assert svg.count("<polyline") == 5 and "Budget covers 1 / 1" in svg
     assert svg.count("<polygon") == 1
     assert "Ceiling 12" in svg and "BU actual 10" in svg
+    assert "Same 1 projects actual 10" in svg
     first_polyline = svg[svg.index("<polyline"):svg.index("/>", svg.index("<polyline")) + 2]
     assert 'stroke="#22262A"' in first_polyline and "stroke-dasharray" not in first_polyline
 
