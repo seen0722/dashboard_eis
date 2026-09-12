@@ -76,7 +76,17 @@ def _sum(projects: list[dict], role: str, field: str, n: int = 12, only_plan: bo
     return [sum((p["pva"].get(role) or {}).get(field, [0] * 12)[i] for p in ps) for i in range(n)]
 
 
+def carry_forward(capacity: list[int], latest_month: int) -> list[int]:
+    """latest_month 之後還沒有填報人數，畫成 0 會讓天花板看起來消失。沿用最後一個非零月的值。
+    只改畫出來的序列，snapshot 的 capacity 保持原始值（0 代表「還沒填報」）。"""
+    out = list(capacity)
+    cut = max(0, min(latest_month, len(out)))
+    last = next((v for v in reversed(out[:cut]) if v), 0)
+    return out[:cut] + [last] * (len(out) - cut)
+
+
 def capacity_svg(projects: list[dict], capacity: list[int], latest_month: int, lang: str) -> str:
+    capacity = carry_forward(capacity, latest_month)
     cl = [p for p in projects if p.get("pva")]; wp = [p for p in cl if p["has_plan"]]
     act = [a + b for a, b in zip(_sum(cl, "BU RD", "actual", latest_month), _sum(cl, "PM", "actual", latest_month))]
     fu = _sum(cl, "FU RD", "actual", latest_month)

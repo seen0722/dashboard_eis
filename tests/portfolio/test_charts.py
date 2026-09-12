@@ -1,3 +1,4 @@
+import re
 from dataclasses import asdict
 from src.portfolio.entities import Project, PlanVsActual
 from src.portfolio.render.charts import timeline_svg, capacity_svg, pva_svg, week_gridlines
@@ -30,6 +31,20 @@ def test_capacity_svg_has_series_and_budget_note():
              "FU RD": PlanVsActual("FU RD", actual=[2] * 8 + [0] * 4)}
     svg = capacity_svg([asdict(x)], [12] * 12, 8, "en")
     assert svg.count("<polyline") == 4 and "Budget covers 1 / 1" in svg
+
+
+def test_capacity_ceiling_is_carried_forward_past_latest_month():
+    x = Project(code="BR1", name="A", in_control_list=True, has_plan=True)
+    x.pva = {"BU RD": PlanVsActual("BU RD", plan=[10] * 12, actual=[9] * 8 + [0] * 4)}
+    capacity = [12] * 8 + [0] * 4
+    svg = capacity_svg([asdict(x)], capacity, 8, "en")
+    H, pb, mx = 300, 30, max([9] * 8 + [0] * 4 + [10] * 12 + capacity + [1]) * 1.12
+    y = lambda v: H - pb - v / mx * (H - pb - 20)
+    pts = re.search(r'stroke="#22262A"[^>]*points="([^"]+)"', svg).group(1).split()
+    assert len(pts) == 12
+    assert all(abs(float(p.split(",")[1]) - y(12)) < 0.05 for p in pts)      # 沒有任何點掉到 0
+    assert f"{y(0):.1f}" not in [p.split(",")[1] for p in pts]
+    assert capacity == [12] * 8 + [0] * 4                                    # 不動呼叫端的 snapshot 值
 
 
 def test_pva_svg_bars():
