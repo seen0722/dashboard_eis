@@ -44,3 +44,14 @@ def test_control_list_with_two_codes_is_flagged():
     projects, issues, _ = build_projects(master, briefing, summary, cls, load_config())
     assert any(i.check == "cl_multiple_codes" for i in issues)
     assert {p.code for p in projects} >= {"BR0000015346"}
+
+
+def test_does_not_mutate_caller_tasks():
+    master, briefing, summary, cls = make_inputs()
+    original_desc = cls[0].tasks[0].description
+    projects, issues, _ = build_projects(master, briefing, summary, cls, load_config())
+    by = {p.code: p for p in projects}
+    t = by["BR0000015346"]
+    assert cls[0].tasks[0].description == original_desc
+    assert t.tasks[0] is not cls[0].tasks[0]
+    assert t.tasks[0].description == "Thorpe SW release by [name]"

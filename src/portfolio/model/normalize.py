@@ -1,5 +1,6 @@
 """把四種來源合併成以 PROJECTCODE 為鍵的 Project。任何對不上的名稱都產生 issue。"""
 from __future__ import annotations
+from dataclasses import replace
 from ..config import Config, normalize_name
 from ..entities import Project, Issue, MasterProject, BriefingRow, MonthlyFTE, ControlList, ROLES
 from .keys import MasterIndex, resolve_code
@@ -67,8 +68,10 @@ def build_projects(master: list[MasterProject], briefing: list[BriefingRow], sum
         p.in_control_list = True
         p.pva = {role: cl.pva[role] for role in ROLES if role in cl.pva}
         p.has_plan = any(sum(v.plan) > 0 for v in p.pva.values())
+        masked = []
         for t in cl.tasks:
-            t.description, n = mask_names(t.description, protect); masked_total += n
-        p.tasks = list(cl.tasks)
+            desc, n = mask_names(t.description, protect); masked_total += n
+            masked.append(replace(t, description=desc))
+        p.tasks = masked
     issues.append(Issue("ok", "names_masked", str(masked_total), "Control List"))
     return sorted(projects.values(), key=lambda p: p.name), issues, latest
