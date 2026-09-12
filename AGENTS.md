@@ -525,3 +525,14 @@ Review 檔疑似**半手工整理**，跨月結構不一致。ingest **不可依
 - `config/*.yaml`（aliases、exclusions、thresholds、muted）是人工維護的領域知識資產，須進版控並附理由。
 - 月快照 append-only：以檔案月份為分區主鍵，重跑同月只覆蓋該月。
 - 不自動 commit / push。
+
+## Portfolio Review 管線（src/portfolio，2026-09 起）
+
+- 目的：每月給 BU10 主管的英文單頁報告，第一屏是規則算出的「Decisions this month」。設計：docs/superpowers/specs/2026-09-12-bu10-portfolio-dashboard-design.md
+- 跑法：`python -m src.portfolio.cli --input input-YY --report-month YYYYMM [--lang zh]`
+- 輸入：一包目錄（Project List、Briefing、Resource Summary、N 份 Control List）。`input-*/` 與 `data/snapshots/` 都 gitignored。
+- 主鍵：PROJECTCODE。名稱備援對照在 config/portfolio_aliases.yaml（與舊 config/aliases.yaml 無關）。
+- 門檻：config/thresholds.yaml 的 `portfolio:`；stage 分類：config/stages.yaml。
+- PII：不讀「人力」「實名制」分頁；任務文字遮罩；輸出前 find_pii 擋下工號與姓名，命中則不寫檔（exit 2）。
+- 跨月：每月 snapshot JSON 留在 data/snapshots/YYYYMM/，下個月自動比對過去月份數字是否被改。
+- 測試：`python -m pytest tests/portfolio`。
