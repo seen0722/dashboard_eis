@@ -9,17 +9,31 @@ warnings.filterwarnings("ignore", message="Data Validation extension")
 
 
 class Workbook:
-    def __init__(self, sheetnames: list[str], reader):
+    def __init__(self, sheetnames: list[str], reader, underlying=None):
         self.sheetnames = sheetnames
         self._reader = reader          # callable(sheet) -> Iterator[tuple]
+        self._underlying = underlying  # openpyxl or pyxlsb workbook object
 
     def rows(self, sheet: str) -> Iterator[tuple]:
         return self._reader(sheet)
 
+    def close(self) -> None:
+        """Close underlying workbook resource. Idempotent and safe."""
+        if self._underlying is not None and hasattr(self._underlying, 'close'):
+            self._underlying.close()
+            self._underlying = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+        return False
+
 
 def _open_xlsx(path: Path) -> Workbook:
     wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
-    return Workbook(list(wb.sheetnames), lambda s: wb[s].iter_rows(values_only=True))
+    return Workbook(list(wb.sheetnames), lambda s: wb[s].iter_rows(values_only=True), underlying=wb)
 
 
 def _open_xlsb(path: Path):
@@ -35,7 +49,7 @@ def _xlsb_workbook(path: Path) -> Workbook:
         with wb.get_sheet(sheet) as sh:
             for row in sh.rows():
                 yield tuple(c.v for c in row)
-    return Workbook(names, reader)
+    return Workbook(names, reader, underlying=wb)
 
 
 def open_workbook(path: str | Path) -> Workbook:
