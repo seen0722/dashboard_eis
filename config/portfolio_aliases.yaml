@@ -1,0 +1,9 @@
+# 名稱備援對照（新管線）。只有在該列沒有 PROJECTCODE 時才用。
+# key 與 value 都是「正規化後」的名：大寫、去空白 / 底線 / 連字號。
+# 對照後仍找不到主檔的，會進健康度「需 alias」，不會靜默丟掉。
+names:
+  AERIS: ABLE                       # Briefing 8/17 起改名
+  VESCO: VASCO
+  FOXTROT: FOXTROT14
+  "AF900/AF903/AFCF25/AFBJ25": AF900
+  GOMEZ: GOMEZ10

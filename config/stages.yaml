@@ -1,0 +1,15 @@
+# Briefing Stage 文字 → stage_cat。由上而下第一個符合的生效，regex 不分大小寫。
+order:
+  - cat: Suspended
+    pattern: "suspend|discontinu|cancel|hold"
+  - cat: RFQ / RFI
+    pattern: "RFQ|RFI"
+  - cat: POC
+    pattern: "POC"
+  - cat: Execution
+    pattern: "EVT|DVT|PVT|EIV"
+  - cat: MP
+    pattern: "^MP|MP$|Ramp"
+  - cat: Sustain / EOP
+    pattern: "Sustain|EOP|EOL"
+fallback: Other
