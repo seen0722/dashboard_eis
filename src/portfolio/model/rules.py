@@ -64,7 +64,7 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
                    "milestones_passed", "briefing", [p.code for p, *_ in passed]),
         Exception_(2, "suspended_charging", ", ".join(f"{p.name} {v:.1f} FTE" for p, v in sorted(susp_fte, key=lambda x: -x[1])),
                    "suspended_charging", "briefing_summary", [p.code for p, _ in susp_fte]),
-        Exception_(3, "budget_missing", ", ".join(sorted(p.name for p in noplan)) + f" | {len(cls) - len(noplan)} / {len(cls)}",
+        Exception_(3, "budget_missing", ", ".join(sorted(p.name for p in noplan)),
                    "budget_missing", "control_list_pva", [p.code for p in noplan]),
         Exception_(4, "mp_slipped", "; ".join(f"{p.name} {p.dates['mp_orig']} -> {p.dates['mp']} ({n}d)" for p, n in slipped),
                    "mp_slipped", "briefing_mp", [p.code for p, _ in slipped]),
@@ -78,6 +78,8 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
     for e, n in zip(ex, (len(passed), len(susp), len(noplan), len(slipped), len(spare))):
         e.count = n
     ex[1].extra = {"pct": round(len(susp) * 100 / max(1, len([p for p in projects if p.in_briefing]))), "charging": len(susp_fte)}
+    # 涵蓋率是數字，不是證據：走 extra 讓 render 直接取用，evidence 只留專案名。
+    ex[2].extra = {"covered": len(cls) - len(noplan), "total": len(cls)}
     ex[4].ask_data = str(full)
     return ex
 
@@ -88,13 +90,14 @@ CHECKS = [
     ("in_briefing_no_cl", "track", "cross", False), ("in_cl_no_briefing", "track", "cross", False),
     ("mp_typo", "track", "briefing", False), ("customer_blank", "track", "briefing", False),
     ("name_unresolved", "track", "cross", True), ("task_description_blank", "track", "control_list", False),
-    ("briefing_stale", "track", "briefing", False), ("cl_unreadable", "track", "control_list", True),
+    ("briefing_stale", "track", "briefing", True), ("cl_unreadable", "track", "control_list", True),
     ("cl_format_drift", "track", "control_list", True), ("duplicate_source", "track", "cross", True),
     ("dept_denominator_inconsistent", "track", "control_list", True),
     ("dept_function_inconsistent", "track", "control_list", True),
     ("cross_month_correction", "track", "snapshot", True), ("names_masked", "ok", "control_list", True),
 ]
-DRIFT_CHECKS = {"cl_no_plan_vs_actual", "cl_pva_role_missing", "cl_no_task_sheet", "cl_no_month_sheets", "briefing_sheet_unreadable", "summary_block_without_ntd", "cl_multiple_codes"}
+DRIFT_CHECKS = {"cl_no_plan_vs_actual", "cl_pva_role_missing", "cl_no_task_sheet", "cl_no_month_sheets", "briefing_sheet_unreadable",
+                "summary_block_without_ntd", "cl_multiple_codes", "master_row_without_code"}
 
 
 def build_health(projects: list[Project], loads: list[DeptLoad], issues: list[Issue], cfg: Config, today: str, snap_date: str) -> list[HealthRow]:
@@ -109,8 +112,7 @@ def build_health(projects: list[Project], loads: list[DeptLoad], issues: list[Is
         "mp_typo": [p.name for p, n in mp_slipped(projects, th["mp_typo_days"])],
         "customer_blank": sorted(p.name for p in active if p.customer.strip().upper() in blank),
         "task_description_blank": [f"{n} ({','.join(map(str, ms))})" for n, ms in task_description_gaps(projects)],
-        "briefing_stale": [],   # 需要 BriefingRow.updated；由 cli 傳入的 issues 提供（見 Task 15）
-    }
+    }   # briefing_stale 需要 BriefingRow.updated，由 cli 放進 issues，走 from_issues 這條路
     rows = []
     for check, level, src, from_issues in CHECKS:
         if from_issues:

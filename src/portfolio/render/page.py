@@ -27,8 +27,6 @@ def _exceptions(snap: dict, lang: str, th: dict) -> str:
     for x in snap["exceptions"]:
         k = x["title"]; kw = {"n": x["count"], "days": th["mp_slip_days"], "pct": th["spare_capacity_pct"], "full": x.get("ask_data", "")}
         kw.update(x.get("extra", {}))
-        if k == "budget_missing":
-            ev, _, cov = x["evidence"].rpartition(" | "); kw["covered"] = cov.split(" / ")[0] if cov else "0"; x = {**x, "evidence": ev}
         src_kw = {"date": f"{snap['meta']['snap_date'][4:6]}/{snap['meta']['snap_date'][6:]}"}
         out.append(f'<li><div class="n">{x["rank"]}</div><div><b>{e(t(lang, f"ex_{k}_title", **kw))}</b>'
                    f'<div class="body">{e(x["evidence"]) or e(t(lang, "none"))}</div>'

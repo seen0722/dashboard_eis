@@ -57,10 +57,6 @@ def main(argv: list[str] | None = None) -> int:
     issues += cross_month_corrections(prev, projects, lm)
     exceptions = build_exceptions(projects, loads, lm, cfg, a.today)
     health = build_health(projects, loads, issues, cfg, a.today, snap_date)
-    stale = [i for i in issues if i.check == "briefing_stale"]
-    for h in health:
-        if h.check == "briefing_stale":
-            h.count, h.names = len(stale), [i.detail for i in stale]
     snap = build_snapshot(a.report_month, lm, snap_date, a.today, projects, loads, capacity_by_month(loads), exceptions, health, issues)
     snap["meta"]["snap_rev"] = len({r.snap for r in briefing})
     html = render_page(snap, a.lang, a.today, th)

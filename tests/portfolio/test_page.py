@@ -22,7 +22,7 @@ def snap():
     d.dates.update({"pvt": "2026-09-08"})
     ex = [Exception_(1, "milestones_passed", "THORPE MP 2026-07-31 (+43d, stage PVT)", "milestones_passed", "briefing", ["BR1"], count=1),
           Exception_(2, "suspended_charging", "", "suspended_charging", "briefing_summary", [], count=0, extra={"pct": 0, "charging": 0}),
-          Exception_(3, "budget_missing", " | 1 / 1", "budget_missing", "control_list_pva", [], count=0),
+          Exception_(3, "budget_missing", "", "budget_missing", "control_list_pva", [], count=0, extra={"covered": 1, "total": 1}),
           Exception_(4, "mp_slipped", "THORPE 2025-10-13 -> 2026-07-31 (291d)", "mp_slipped", "briefing_mp", ["BR1"], count=1),
           Exception_(5, "spare_capacity", "", "spare_capacity", "control_list_month", [], count=0, ask_data="2")]
     hl = [HealthRow("decide", "budget_missing", "budget_missing", 0, [], "control_list"), HealthRow("ok", "names_masked", "names_masked", 3, [], "control_list")]

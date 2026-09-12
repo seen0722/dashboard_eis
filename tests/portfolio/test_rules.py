@@ -1,7 +1,9 @@
+import re
+from pathlib import Path
 from src.portfolio.config import load_config
 from src.portfolio.entities import Project, PlanVsActual, Task, Issue
 from src.portfolio.model.load import DeptLoad
-from src.portfolio.model.rules import milestones_passed, build_exceptions, build_health, task_description_gaps
+from src.portfolio.model.rules import CHECKS, DRIFT_CHECKS, milestones_passed, build_exceptions, build_health, task_description_gaps
 
 TODAY = "2026-09-12"
 
@@ -31,7 +33,8 @@ def test_exceptions_five_fixed_entries():
     assert [e.title for e in ex] == ["milestones_passed", "suspended_charging", "budget_missing", "mp_slipped", "spare_capacity"]
     assert ex[0].codes == ["BRTHORPE"] and "43" in ex[0].evidence
     assert ex[1].codes == ["BRKOS"] and "0.5" in ex[1].evidence
-    assert ex[2].codes == ["BRNOPLAN"] and "2 / 3" in ex[2].evidence     # THORPE、KILO12 有 plan，共 3 份 Control List（THORPE, NOPLAN, KILO12）
+    # THORPE、KILO12 有 plan，共 3 份 Control List（THORPE, NOPLAN, KILO12）。涵蓋率走 extra，不混進 evidence。
+    assert ex[2].codes == ["BRNOPLAN"] and ex[2].evidence == "NOPLAN" and ex[2].extra == {"covered": 2, "total": 3}
     assert ex[3].codes == ["BRKILO12"] and "352" in ex[3].evidence
     assert ex[4].codes == [] and "SW 研發二課" in ex[4].evidence and "1" in ex[4].ask_data
 
@@ -69,3 +72,23 @@ def test_health_rows_and_task_gaps():
     assert rows["names_masked"].level == "ok" and rows["names_masked"].count == 3
     assert rows["dept_function_inconsistent"].count == 1
     assert rows["duplicate_source"].count == 1 and rows["duplicate_source"].source == "cross"
+
+
+def test_briefing_stale_is_counted_from_issues_only():
+    cfg = load_config()
+    issues = [Issue("track", "briefing_stale", "THORPE last updated 2026-05-01", "Briefing", "BR1")]
+    rows = {r.check: r for r in build_health([], [], issues, cfg, TODAY, "20260907")}
+    assert rows["briefing_stale"].count == 1 and rows["briefing_stale"].names == ["THORPE last updated 2026-05-01"]
+
+
+def test_every_issue_check_in_the_source_is_wired_into_the_health_table():
+    """任何 Issue(...) 的 check 字面值都必須被健康度算到，否則問題會無聲消失。"""
+    root = Path(__file__).resolve().parents[2] / "src" / "portfolio"
+    known = {c for c, *_ in CHECKS} | DRIFT_CHECKS
+    found: dict[str, str] = {}
+    for f in sorted(root.rglob("*.py")):
+        for m in re.finditer(r"""Issue\(\s*["'][a-z]+["']\s*,\s*["']([a-z_]+)["']""", f.read_text(encoding="utf-8")):
+            found.setdefault(m.group(1), str(f.relative_to(root)))
+    assert found, "no Issue( literals found — the regex stopped matching"
+    unwired = {c: where for c, where in found.items() if c not in known}
+    assert unwired == {}, f"Issue checks not in CHECKS or DRIFT_CHECKS: {unwired}"
