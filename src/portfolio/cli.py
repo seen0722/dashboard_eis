@@ -14,7 +14,7 @@ from .extract.resource_summary import read_resource_summary, latest_month as _la
 from .model.diff import cross_month_corrections
 from .model.load import build_dept_loads, capacity_by_month
 from .model.normalize import build_projects
-from .model.rules import build_exceptions, build_health, days_between
+from .model.rules import build_exceptions, build_health, days_between, second_identity_issues
 from .model.snapshot import build_snapshot, write_snapshot, read_previous
 from .render.page import render_page
 from .render.pii import find_pii
@@ -49,6 +49,7 @@ def main(argv: list[str] | None = None) -> int:
     if lm < 1:
         print(f"no month with non-zero Total EIS 人力 in {summ_f.name}; cannot build the report", file=sys.stderr); return 1
     loads, i6 = build_dept_loads(cls); issues += i6
+    issues += second_identity_issues(projects, lm, cfg)
     snap_iso = f"{snap_date[:4]}-{snap_date[4:6]}-{snap_date[6:]}"
     for r in briefing:
         if r.snap == snap_date and r.updated and days_between(snap_iso, r.updated) > th["briefing_stale_days"]:

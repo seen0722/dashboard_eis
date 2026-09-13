@@ -2,8 +2,9 @@
 from __future__ import annotations
 import datetime as dt
 import re
-from ..config import Config
-from ..entities import Project, Issue, Exception_, HealthRow
+from ..config import Config, normalize_name
+from ..entities import Project, Issue, Exception_, HealthRow, MONTHS
+from .keys import segments
 from .load import DeptLoad
 
 EXEC_LIKE = re.compile(r"EVT|DVT|POC", re.I)
@@ -47,13 +48,80 @@ def task_description_gaps(projects: list[Project]) -> list[tuple[str, list[int]]
     return out
 
 
+def suspended_lists(susp: list[Project], m: int, min_fte: float) -> tuple[list[dict], list[dict], list[dict]]:
+    """把 Suspended 專案分三類：charging（本月仍掛帳）、wound（今年曾掛帳、現已歸零，附高峰月與歸零月）、
+    zero（全年無人力）。wound 的存在本身就是一種訊號：Stage 改了但沒人去把人力也停掉，或反過來。"""
+    charging, wound, zero = [], [], []
+    for p in susp:
+        if p.fte[m] > min_fte:
+            charging.append({"name": p.name, "code": p.code, "fte": round(p.fte[m], 2)})
+            continue
+        history = p.fte[:m]
+        active = [i for i, v in enumerate(history) if v > min_fte]
+        if active:
+            peak = max(history)
+            wound.append({"name": p.name, "code": p.code, "peak": round(peak, 2),
+                          "peak_month": MONTHS[history.index(peak)], "zero_since": MONTHS[active[-1] + 1]})
+        else:
+            zero.append({"name": p.name, "code": p.code})
+    return charging, wound, zero
+
+
+def find_second_identities(projects: list[Project], latest_month: int, cfg: Config) -> list[dict]:
+    """真實案例：Briefing 裡 KOS 已 Suspended、0 FTE，但 Control List 與 Resource Summary 用另一個
+    暫用代碼 TR_BU10_IPC_KOS 繼續掛帳——同一案兩個身分。比對規則：候選必須不在 Briefing 內，且名稱
+    段尾與停案專案相同（segments 比對，避免 OKOS 誤配 ..._KOS），或正規化全名互為子字串；
+    還要有實質存在（在某份 Control List 內，或今年曾掛過非零人力），純同名幽靈列不算。"""
+    if latest_month < 1:
+        return []
+    m = latest_month - 1
+    min_fte = cfg.thresholds["suspended_fte_min"]
+    susp = [p for p in projects if p.in_briefing and p.stage_cat == "Suspended"]
+    out = []
+    for p in susp:
+        p_segs = segments(p.name)
+        p_norm = normalize_name(p.name)
+        for q in projects:
+            if q is p or q.in_briefing or not p_segs:
+                continue
+            q_segs = segments(q.name)
+            suffix_hit = len(q_segs) >= len(p_segs) and q_segs[len(q_segs) - len(p_segs):] == p_segs
+            substr_hit = p_norm in normalize_name(q.name)
+            if not (suffix_hit or substr_hit):
+                continue
+            if not (q.in_control_list or sum(q.fte) > min_fte):
+                continue
+            out.append({"name": p.name, "code": p.code, "twin": q.name, "twin_code": q.code,
+                        "twin_fte": round(q.fte[m], 2), "twin_in_cl": q.in_control_list})
+    return out
+
+
+def second_identity_issues(projects: list[Project], latest_month: int, cfg: Config) -> list[Issue]:
+    return [Issue("decide", "suspended_second_identity",
+                  f"{t['name']} ({t['code']}) also booked as {t['twin']} ({t['twin_code']}), {t['twin_fte']:.2f} FTE",
+                  "cross", t["code"]) for t in find_second_identities(projects, latest_month, cfg)]
+
+
 def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_month: int, cfg: Config, today: str) -> list[Exception_]:
     th = cfg.thresholds
     m = latest_month - 1
     has_month = latest_month >= 1   # no non-zero month in Resource Summary -> treat FTE/util data as absent, never index with m
     passed = milestones_passed(projects, today)
     susp = [p for p in projects if p.in_briefing and p.stage_cat == "Suspended"]
-    susp_fte = [(p, p.fte[m]) for p in susp if p.fte[m] > th["suspended_fte_min"]] if has_month else []
+    if has_month:
+        charging, wound, zero = suspended_lists(susp, m, th["suspended_fte_min"])
+        twins = find_second_identities(projects, latest_month, cfg)
+    else:
+        charging, wound, zero, twins = [], [], [], []
+    # codes 收的是「這條例外要決定的代碼」：仍在掛帳的停案代碼，加上每個第二身分本身的代碼
+    # （要被併回主案的那個），所以用 twin_code 而不是 p.code——p.code 若也在 charging 早就收過了。
+    susp_codes: list[str] = []
+    for c in charging:
+        if c["code"] not in susp_codes:
+            susp_codes.append(c["code"])
+    for tw in twins:
+        if tw["twin_code"] not in susp_codes:
+            susp_codes.append(tw["twin_code"])
     cls = [p for p in projects if p.in_control_list]
     noplan = [p for p in cls if not p.has_plan]
     slipped = mp_slipped(projects, th["mp_slip_days"])
@@ -62,8 +130,8 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
     ex = [
         Exception_(1, "milestones_passed", "; ".join(f"{p.name} {k.upper()} {d} (+{n}d, stage {p.stage})" for p, k, d, n in passed),
                    "milestones_passed", "briefing", [p.code for p, *_ in passed]),
-        Exception_(2, "suspended_charging", ", ".join(f"{p.name} {v:.1f} FTE" for p, v in sorted(susp_fte, key=lambda x: -x[1])),
-                   "suspended_charging", "briefing_summary", [p.code for p, _ in susp_fte]),
+        Exception_(2, "suspended_charging", ", ".join(f"{c['name']} {c['fte']:.1f} FTE" for c in charging),
+                   "suspended_charging", "briefing_summary", susp_codes),
         Exception_(3, "budget_missing", ", ".join(sorted(p.name for p in noplan)),
                    "budget_missing", "control_list_pva", [p.code for p in noplan]),
         Exception_(4, "mp_slipped", "; ".join(f"{p.name} {p.dates['mp_orig']} -> {p.dates['mp']} ({n}d)" for p, n in slipped),
@@ -72,12 +140,15 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
                    "spare_capacity", "control_list_month", []),
     ]
     # By design: ex[1] (suspended_charging).count is the total number of suspended projects (len(susp)),
-    # while its codes/evidence list only those still charging (susp_fte) — the title template uses both
-    # numbers ("{n} projects suspended, {charging} still charging" via extra["charging"] below). Do not
-    # "fix" count to len(susp_fte); that would drop the total-suspended figure the template needs.
+    # while its codes/evidence list only those still charging (charging) plus any second-identity codes —
+    # the title template uses both numbers ("{n} projects suspended, {charging} still charging, {twins}
+    # booked under a second code" via extra below). Do not "fix" count to len(charging); that would drop
+    # the total-suspended figure the template needs.
     for e, n in zip(ex, (len(passed), len(susp), len(noplan), len(slipped), len(spare))):
         e.count = n
-    ex[1].extra = {"pct": round(len(susp) * 100 / max(1, len([p for p in projects if p.in_briefing]))), "charging": len(susp_fte)}
+    ex[1].extra = {"pct": round(len(susp) * 100 / max(1, len([p for p in projects if p.in_briefing]))),
+                    "charging": len(charging), "twins": len(twins), "charging_list": charging,
+                    "wound_list": wound, "zero_list": zero, "twin_list": twins}
     # 涵蓋率是數字，不是證據：走 extra 讓 render 直接取用，evidence 只留專案名。
     ex[2].extra = {"covered": len(cls) - len(noplan), "total": len(cls)}
     ex[4].ask_data = str(full)
@@ -87,6 +158,7 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
 # (check, level, source_key, from_issues)
 CHECKS = [
     ("budget_missing", "decide", "control_list", False), ("milestones_passed", "decide", "briefing", False),
+    ("suspended_second_identity", "decide", "cross", True),
     ("in_briefing_no_cl", "track", "cross", False), ("in_cl_no_briefing", "track", "cross", False),
     ("mp_typo", "track", "briefing", False), ("customer_blank", "track", "briefing", False),
     ("name_unresolved", "track", "cross", True), ("task_description_blank", "track", "control_list", False),

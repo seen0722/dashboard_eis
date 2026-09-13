@@ -3,7 +3,7 @@ from pathlib import Path
 from src.portfolio.config import load_config
 from src.portfolio.entities import Project, PlanVsActual, Task, Issue
 from src.portfolio.model.load import DeptLoad
-from src.portfolio.model.rules import CHECKS, DRIFT_CHECKS, milestones_passed, build_exceptions, build_health, task_description_gaps
+from src.portfolio.model.rules import CHECKS, DRIFT_CHECKS, milestones_passed, build_exceptions, build_health, task_description_gaps, second_identity_issues
 
 TODAY = "2026-09-12"
 
@@ -26,17 +26,38 @@ def test_milestones_passed_rules():
 
 def test_exceptions_five_fixed_entries():
     cfg = load_config()
-    ps = [proj("THORPE", mp="2026-07-31", plan=14.5), proj("KOS", "suspended", "Suspended", fte8=0.5, in_cl=False), proj("NOPLAN"),
+    kos = proj("KOS", "suspended", "Suspended", in_cl=False)
+    kos.fte[3] = 0.4; kos.fte[4] = 0.4   # charged Apr-May, zero since Jun -> "wound", not "still charging"
+    tr_kos = Project(code="TR_KOS", name="TR_BU10_IPC_KOS", in_control_list=True, has_plan=True)
+    tr_kos.fte[7] = 0.49                # same project, booked under a second (non-briefing) code
+    ps = [proj("THORPE", mp="2026-07-31", plan=14.5), kos, tr_kos, proj("NOPLAN"),
           proj("KILO12", "RFQ", "RFQ / RFI", mp="2028-08-12", mp_orig="2027-08-26", plan=1)]
     loads = [DeptLoad("D1", "研發三部", "BSP", keyed_in=[5] * 12, util=[100] * 12), DeptLoad("D2", "研發二課", "SW", keyed_in=[8] * 12, util=[68] * 12)]
     ex = build_exceptions(ps, loads, 8, cfg, TODAY)
     assert [e.title for e in ex] == ["milestones_passed", "suspended_charging", "budget_missing", "mp_slipped", "spare_capacity"]
     assert ex[0].codes == ["BRTHORPE"] and "43" in ex[0].evidence
-    assert ex[1].codes == ["BRKOS"] and "0.5" in ex[1].evidence
-    # THORPE、KILO12 有 plan，共 3 份 Control List（THORPE, NOPLAN, KILO12）。涵蓋率走 extra，不混進 evidence。
-    assert ex[2].codes == ["BRNOPLAN"] and ex[2].evidence == "NOPLAN" and ex[2].extra == {"covered": 2, "total": 3}
+    assert ex[1].count == 1 and ex[1].evidence == ""   # KOS is the only suspended project, and it isn't charging this month
+    assert ex[1].extra["twins"] == 1 and ex[1].extra["twin_list"][0]["twin_code"] == "TR_KOS"
+    assert ex[1].extra["wound_list"][0]["peak_month"] == "Apr" and ex[1].extra["wound_list"][0]["zero_since"] == "Jun"
+    assert "TR_KOS" in ex[1].codes
+    # THORPE、TR_KOS、KILO12 有 plan，共 4 份 Control List（THORPE, TR_KOS, NOPLAN, KILO12）。涵蓋率走 extra，不混進 evidence。
+    assert ex[2].codes == ["BRNOPLAN"] and ex[2].evidence == "NOPLAN" and ex[2].extra == {"covered": 3, "total": 4}
     assert ex[3].codes == ["BRKILO12"] and "352" in ex[3].evidence
     assert ex[4].codes == [] and "SW 研發二課" in ex[4].evidence and "1" in ex[4].ask_data
+
+
+def test_second_identity_issues_and_health_row():
+    cfg = load_config()
+    kos = proj("KOS", "suspended", "Suspended", in_cl=False)
+    kos.fte[3] = 0.4; kos.fte[4] = 0.4
+    tr_kos = Project(code="TR_KOS", name="TR_BU10_IPC_KOS", in_control_list=True)
+    tr_kos.fte[7] = 0.49
+    ps = [kos, tr_kos]
+    issues = second_identity_issues(ps, 8, cfg)
+    assert len(issues) == 1 and issues[0].check == "suspended_second_identity" and issues[0].code == "BRKOS"
+    assert "TR_BU10_IPC_KOS" in issues[0].detail and "0.49" in issues[0].detail
+    rows = {r.check: r for r in build_health(ps, [], issues, cfg, TODAY, "20260907")}
+    assert rows["suspended_second_identity"].count == 1
 
 
 def test_exceptions_when_no_latest_month():

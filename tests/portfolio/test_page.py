@@ -20,13 +20,19 @@ def snap():
     c.dates.update({"evt": "2026-09-10"})
     d = Project(code="BR4", name="AX200", stage="MP", stage_cat="MP", customer="Axelera", in_briefing=True)
     d.dates.update({"pvt": "2026-09-08"})
+    e = Project(code="BR5", name="KOS", stage="suspended", stage_cat="Suspended", customer="TBD", in_briefing=True)
+    f = Project(code="TR_KOS", name="TR_BU10_IPC_KOS", in_control_list=True)
+    f.fte[7] = 0.49   # same project as KOS, booked under a second (non-briefing) code
+    twin = {"name": "KOS", "code": "BR5", "twin": "TR_BU10_IPC_KOS", "twin_code": "TR_KOS", "twin_fte": 0.49, "twin_in_cl": True}
     ex = [Exception_(1, "milestones_passed", "THORPE MP 2026-07-31 (+43d, stage PVT)", "milestones_passed", "briefing", ["BR1"], count=1),
-          Exception_(2, "suspended_charging", "", "suspended_charging", "briefing_summary", [], count=0, extra={"pct": 0, "charging": 0}),
+          Exception_(2, "suspended_charging", "", "suspended_charging", "briefing_summary", ["TR_KOS"], count=1,
+                     extra={"pct": 20, "charging": 0, "twins": 1, "charging_list": [], "wound_list": [],
+                            "zero_list": [{"name": "KOS", "code": "BR5"}], "twin_list": [twin]}),
           Exception_(3, "budget_missing", "", "budget_missing", "control_list_pva", [], count=0, extra={"covered": 1, "total": 1}),
           Exception_(4, "mp_slipped", "THORPE 2025-10-13 -> 2026-07-31 (291d)", "mp_slipped", "briefing_mp", ["BR1"], count=1),
           Exception_(5, "spare_capacity", "", "spare_capacity", "control_list_month", [], count=0, ask_data="2")]
     hl = [HealthRow("decide", "budget_missing", "budget_missing", 0, [], "control_list"), HealthRow("ok", "names_masked", "names_masked", 3, [], "control_list")]
-    return build_snapshot("202609", 8, "20260907", "2026-09-12", [a, b, c, d], [DeptLoad("D", "x", "BSP", keyed_in=[5] * 12, util=[100] * 12)], [207] * 12, ex, hl, [])
+    return build_snapshot("202609", 8, "20260907", "2026-09-12", [a, b, c, d, e, f], [DeptLoad("D", "x", "BSP", keyed_in=[5] * 12, util=[100] * 12)], [207] * 12, ex, hl, [])
 
 
 def test_page_sections_and_strings():
@@ -42,6 +48,9 @@ def test_page_sections_and_strings():
     assert "Q11" not in html.split("Six-month timeline")[0]
     assert '<span class="dim">passed</span>' in html
     assert '<span class="sig">passed</span>' in html
+    assert "Second identity, likely the same project under another code" in html
+    assert "1 projects suspended (" in html and "1 booked under a second code" in html
+    assert re.search(r'<div class="sig">[^<]*TR_BU10_IPC_KOS[^<]*</div>', html)
 
 
 def test_render_refuses_a_snapshot_with_no_manpower_month():

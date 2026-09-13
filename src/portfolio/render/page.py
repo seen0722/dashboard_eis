@@ -22,14 +22,44 @@ def _title_block(m: dict, lang: str, n_cl: int, latest_month: int) -> str:
     return '<div class="tb">' + "".join(f"<div><span>{e(k)}</span><span>{e(v)}</span></div>" for k, v in rows) + "</div>"
 
 
+def _susp_twin_line(tw: dict, lang: str, mon: str) -> str:
+    cl = t(lang, "ex_susp_twin_cl") if tw["twin_in_cl"] else ""
+    return t(lang, "ex_susp_twin_line", name=tw["name"], code=tw["code"], twin=tw["twin"], twin_code=tw["twin_code"],
+              fte=f"{tw['twin_fte']:.2f}", mon=mon, cl=cl)
+
+
+def _suspended_charging_body(x: dict, lang: str, lm: int) -> str:
+    """例外 2 的細節：先亮橘色的「第二身分」（最需要決定），再列仍掛帳／今年曾掛帳現歸零／全年無人力
+    三段，任何一段沒資料就整段省略。"""
+    extra = x.get("extra", {})
+    twins, charging = extra.get("twin_list", []), extra.get("charging_list", [])
+    wound, zero = extra.get("wound_list", []), extra.get("zero_list", [])
+    mon = MONTHS[lm - 1]
+    blocks = []
+    if twins:
+        lines = "".join(f'<div class="sig">{e(_susp_twin_line(tw, lang, mon))}</div>' for tw in twins)
+        blocks.append(f'<div class="body"><b class="sig">{e(t(lang, "ex_susp_twin_h"))}</b>{lines}</div>')
+    if charging:
+        lines = "".join(f'<div>{e(f"{c["name"]} {c["fte"]:.1f} FTE")}</div>' for c in charging)
+        blocks.append(f'<div class="body"><b>{e(t(lang, "ex_susp_charging_h", mon=mon))}</b>{lines}</div>')
+    if wound:
+        lines = "".join(f'<div>{e(t(lang, "ex_susp_wound_line", name=w["name"], peak=f"{w["peak"]:.1f}", peak_month=w["peak_month"], zero_since=w["zero_since"]))}</div>' for w in wound)
+        blocks.append(f'<div class="body"><b>{e(t(lang, "ex_susp_wound_h"))}</b>{lines}</div>')
+    if zero:
+        blocks.append(f'<div class="body dim"><b>{e(t(lang, "ex_susp_zero_h", n=len(zero)))}</b> {e(", ".join(z["name"] for z in zero))}</div>')
+    return "".join(blocks) or f'<div class="body">{e(t(lang, "none"))}</div>'
+
+
 def _exceptions(snap: dict, lang: str, th: dict) -> str:
     out = []
+    lm = snap["meta"]["latest_month"]
     for x in snap["exceptions"]:
         k = x["title"]; kw = {"n": x["count"], "days": th["mp_slip_days"], "pct": th["spare_capacity_pct"], "full": x.get("ask_data", "")}
         kw.update(x.get("extra", {}))
         src_kw = {"date": f"{snap['meta']['snap_date'][4:6]}/{snap['meta']['snap_date'][6:]}"}
+        body = _suspended_charging_body(x, lang, lm) if k == "suspended_charging" else f'<div class="body">{e(x["evidence"]) or e(t(lang, "none"))}</div>'
         out.append(f'<li><div class="n">{x["rank"]}</div><div><b>{e(t(lang, f"ex_{k}_title", **kw))}</b>'
-                   f'<div class="body">{e(x["evidence"]) or e(t(lang, "none"))}</div>'
+                   f'{body}'
                    f'<div class="ask"><em>{e(t(lang, "decision_needed"))}</em> {e(t(lang, f"ex_{k}_ask", **kw))}</div>'
                    f'<div class="src">{e(t(lang, "source"))} {e(t(lang, f"src_{x["source"]}", **src_kw))}</div></div></li>')
     return f'<ol class="ex">{"".join(out)}</ol>'
