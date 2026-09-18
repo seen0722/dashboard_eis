@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import time
 from mcp.server.mcpserver import Context, MCPServer
-from mcp.server.mcpserver.exceptions import ResourceNotFoundError
+from mcp.server.mcpserver.exceptions import ResourceError, ResourceNotFoundError
+from ...portfolio.render.pii import find_pii
 from ..state import ServerState
 from ..store import UnknownMonth
 from ._common import principal
@@ -13,7 +14,12 @@ def register(mcp: MCPServer, state: ServerState) -> None:
     @mcp.resource("eis://months", mime_type="application/json")
     def months() -> str:
         """Every month the server knows, with status, uploads and last ingest (same as the list_months tool)."""
-        return json.dumps({"months": state.store.months()}, ensure_ascii=False)
+        text = json.dumps({"months": state.store.months()}, ensure_ascii=False)
+        hits = find_pii(text)
+        if hits:
+            raise ResourceError(f"rejected_pii: eis://months contained {len(hits)} PII-shaped fragment(s) and was withheld. "
+                                "Tell the server owner.")
+        return text
 
     @mcp.resource("eis://{month}/report.html", mime_type="text/html")
     def report(month: str, ctx: Context) -> str:

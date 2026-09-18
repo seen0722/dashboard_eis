@@ -145,6 +145,7 @@ audit(id, at, name, role, kind, action, args_json, status, duration_ms, detail)
 - 服務以專用系統帳號執行；`input/` 0700、`tokens.yaml` 0600，啟動時檢查權限，不符則拒絕啟動並印出修正指令。
 - 沒有任何 tool / resource 讀取 `input/`；`get_project` 的 tasks 沿用快照裡的 `description_masked`。
 - 所有 tool 回傳序列化後再過一次 `render/pii.find_pii()`，命中則改回 error 並寫 audit `status='rejected_pii'`（快照本身在 ingest 時已過檢，這是出口保險）。
+- 上傳檔名（含 PM 姓名）只出現在上傳者當下的 HTTP 回應與 server 端 `_upload.json`，不經 MCP 回傳。
 
 ## 5. 上傳與 ingest 流程
 
@@ -188,7 +189,7 @@ audit(id, at, name, role, kind, action, args_json, status, duration_ms, detail)
 | `get_capacity(month?)` | | 快照 `capacity` 全序列 | |
 | `diff_project(code, month_a, month_b)` | | `{code, changed: {field: {a, b}}}`；只列有差異的欄位，巢狀欄位（dates、fte、pva）逐鍵比較 | 新寫的純函式，放 `tools/diff.py`；數值差異門檻沿用 `diff.cross_month_corrections` 的 `tol=0.05` |
 | `get_corrections(month?)` | | `issues` 中 `check == "cross_month_correction"` 的列 | 名稱來自 `model/diff.py:cross_month_corrections()` |
-| `list_months()` | | `[{month, ingested_at, ingested_by, status, uploads: [{name, uploaded_by, uploaded_at}]}]`，含 `broken`（JSON 損壞）與 `uploaded_only`（有原檔未 ingest） | `_upload.json` + `ingest.json` |
+| `list_months()` | | `{month, status, uploads: [{category, size, sha256, uploaded_by, uploaded_at}], last_ingest: {at, by, status, ...} \| null}`，含 `broken`（JSON 損壞）與 `uploaded_only`（有原檔未 ingest）；`uploads` 不含原始檔名（Control List 檔名內嵌 PM 姓名） | `_upload.json` + `ingest.json` |
 | `ingest_month(report_month, today?)` | uploader 限定 | 見第 5 節 | |
 
 ### 6.3 resources

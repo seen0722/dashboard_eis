@@ -6,7 +6,18 @@ from tests.eis_mcp.conftest import call_tool, read_resource
 def test_months_resource(ingested):
     text, mime = read_resource(ingested, "tok-view", "eis://months")
     assert mime == "application/json"
-    assert json.loads(text)["months"][0]["month"] == "202609"
+    doc = json.loads(text)
+    assert doc["months"][0]["month"] == "202609"
+    uploads = doc["months"][0]["uploads"]
+    assert len(uploads) == 4 and all("name" not in u for u in uploads)
+    assert {u["category"] for u in uploads} == {"master", "briefing", "summary", "control_list"}
+
+
+def test_months_resource_rejects_pii(ingested, monkeypatch):
+    monkeypatch.setattr("src.eis_mcp.tools.resources.find_pii", lambda text, *a, **kw: ["LA0000001"])
+    with pytest.raises(Exception) as ex:
+        read_resource(ingested, "tok-view", "eis://months")
+    assert "rejected_pii" in str(ex.value)
 
 
 def test_report_resource_and_audit(ingested):

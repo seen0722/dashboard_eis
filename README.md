@@ -121,7 +121,7 @@ EIS_URL=http://eis-host:8765 EIS_TOKEN=<token> scripts/eis-upload.sh 202610 ./in
 | tool | 用途 |
 |---|---|
 | `ingest_month(report_month, today?)` | uploader 限定；跑管線、寫快照 |
-| `list_months()` | 已有月份、誰何時上傳、ingest 狀態 |
+| `list_months()` | 已有月份、上傳檔的 category/size/sha256/uploader/time（不含原始檔名）、ingest 狀態 |
 | `get_project(query, month?)` | 代碼 / 名稱 / alias 查單案 |
 | `search_projects(stage_cat?, group?, customer?, text?, month?)` | 篩選清單 |
 | `get_exceptions(month?)` / `get_health(month?)` | 第一屏 Decisions 與 Data health |

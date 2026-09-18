@@ -93,6 +93,7 @@ def test_write_result_then_load_and_months(store):
     assert [m["month"] for m in months] == ["202610", "202609", "202608"]
     assert {m["month"]: m["status"] for m in months} == {"202610": "uploaded_only", "202609": "ok", "202608": "broken"}
     assert months[0]["uploads"][0]["uploaded_by"] == "Alice" and months[1]["last_ingest"] is None
+    assert "name" not in months[0]["uploads"][0] and months[0]["uploads"][0]["category"] == "master"
     assert store.latest_month() == "202609"
 
 

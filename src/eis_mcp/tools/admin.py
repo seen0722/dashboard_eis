@@ -37,6 +37,7 @@ def register(mcp: MCPServer, state: ServerState) -> None:
 
     @mcp.tool()
     def list_months(ctx: Context) -> dict:
-        """List every month the server knows: status (ok | broken | uploaded_only), the uploaded files with uploader and time,
-        and the last ingest (by, at, status). Newest first. Use it to pick a month or to see whether an upload was ingested."""
+        """List every month the server knows: status (ok | broken | uploaded_only), the uploaded files (category, size,
+        sha256, uploader and time -- not the raw filename, which may embed a PM's name) and the last ingest (by, at,
+        status). Newest first. Use it to pick a month or to see whether an upload was ingested."""
         return guarded(state, ctx, "list_months", {}, lambda p: {"months": state.store.months()})

@@ -178,6 +178,10 @@ class Store:
             return "broken"
 
     def months(self) -> list[dict]:
+        """已有月份的清單。uploads 不含原始檔名（Control List 檔名內嵌 PM 姓名）——
+        只回 category/size/sha256/uploaded_by/uploaded_at；完整紀錄（含 name）只留在
+        server 端的 input/<month>/_upload.json，供 /upload 當下的 HTTP 回應與稽核用。
+        """
         names = set()
         for root in (self.input_root, self.snapshots_root):
             if root.exists():
@@ -185,7 +189,9 @@ class Store:
         out = []
         for m in sorted(names, reverse=True):
             ing = self.ingests(m)
-            out.append({"month": m, "status": self._status(m), "uploads": self.uploads(m), "last_ingest": ing[-1] if ing else None})
+            uploads = [{"category": classify_filename(u["name"]), "size": u["size"], "sha256": u["sha256"],
+                       "uploaded_by": u["uploaded_by"], "uploaded_at": u["uploaded_at"]} for u in self.uploads(m)]
+            out.append({"month": m, "status": self._status(m), "uploads": uploads, "last_ingest": ing[-1] if ing else None})
         return out
 
     def latest_month(self) -> str | None:

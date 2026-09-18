@@ -85,6 +85,9 @@ def test_list_months_shows_uploads_and_ingest(ingested):
     m = out["months"][0]
     assert m["month"] == "202609" and m["status"] == "ok" and len(m["uploads"]) == 4
     assert m["last_ingest"]["by"] == "Alice" and m["last_ingest"]["status"] == "ok"
+    assert all("name" not in u for u in m["uploads"])
+    assert {u["category"] for u in m["uploads"]} == {"master", "briefing", "summary", "control_list"}
+    assert all({"category", "size", "sha256", "uploaded_by", "uploaded_at"} == set(u) for u in m["uploads"])
 
 
 def test_rerun_appends_ingest_log(ingested):
