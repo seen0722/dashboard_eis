@@ -40,6 +40,12 @@ def test_get_project_not_found_and_unknown_month(ingested):
     assert err and "unknown_month" in text and "202609" in text
 
 
+def test_get_project_rejects_path_traversal_month(ingested):
+    err, text = call_tool(ingested, "tok-view", "get_project",
+                          {"query": "THORPE", "month": "../../data/snapshots/202608"})
+    assert err and "unknown_month" in text
+
+
 def test_get_project_before_any_ingest(app):
     err, text = call_tool(app, "tok-view", "get_project", {"query": "THORPE"})
     assert err and "no_snapshot" in text

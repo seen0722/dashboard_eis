@@ -8,7 +8,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from ...portfolio.render.pii import find_pii
 from ..auth import Principal, principal_from_headers
 from ..state import ServerState
-from ..store import SnapshotBroken, UnknownMonth
+from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
 
 
 def principal(state: ServerState, ctx: Context) -> Principal:
@@ -49,6 +49,9 @@ def resolve_month(state: ServerState, month: str | None) -> tuple[str, dict]:
         month = store.latest_month()
         if month is None:
             raise ToolError("no_snapshot: nothing has been ingested yet. An uploader must upload a month and call ingest_month first.")
+    elif not MONTH_RE.match(month):
+        avail = [m["month"] for m in store.months() if m["status"] == "ok"]
+        raise ToolError(f"unknown_month: {month} has no snapshot. Available: {', '.join(avail) or 'none'}. Call list_months for details.")
     try:
         return month, store.load_snapshot(month)
     except UnknownMonth:

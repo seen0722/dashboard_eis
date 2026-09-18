@@ -23,6 +23,11 @@ def test_report_resource_unknown_month(ingested):
     assert ingested.state.eis.audit.rows()[-1]["status"] == "error"
 
 
+def test_report_resource_rejects_path_traversal_month(ingested):
+    with pytest.raises(Exception):
+        read_resource(ingested, "tok-view", "eis://../x/report.html")
+
+
 def test_tool_output_pii_guard(ingested, monkeypatch):
     """出口保險：快照被塞入工號時，tool 要擋下並記 rejected_pii。"""
     store = ingested.state.eis.store

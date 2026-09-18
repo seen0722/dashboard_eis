@@ -46,6 +46,13 @@ class UnknownMonth(Exception):
     pass
 
 
+def _check_month(month: str) -> str:
+    """任何要把 month 拼進路徑之前都先過這關；擋掉 '../x' 這類 traversal。"""
+    if not MONTH_RE.match(month):
+        raise UnknownMonth(month)
+    return month
+
+
 class SnapshotBroken(Exception):
     pass
 
@@ -95,8 +102,8 @@ class Store:
                         problems.append(f"chmod 700 {d}")
         return problems
 
-    def input_dir(self, month: str) -> Path: return self.input_root / month
-    def snapshot_dir(self, month: str) -> Path: return self.snapshots_root / month
+    def input_dir(self, month: str) -> Path: return self.input_root / _check_month(month)
+    def snapshot_dir(self, month: str) -> Path: return self.snapshots_root / _check_month(month)
 
     # ---- 上傳 ----
     def register_upload(self, month: str, name: str, data: bytes, by: str) -> dict:

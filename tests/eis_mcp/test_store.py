@@ -1,5 +1,6 @@
 import json
 import stat
+import pytest
 from src.eis_mcp.store import Store, classify_filename, UnknownMonth, SnapshotBroken
 
 
@@ -68,6 +69,16 @@ def test_write_result_then_load_and_months(store):
     assert {m["month"]: m["status"] for m in months} == {"202610": "uploaded_only", "202609": "ok", "202608": "broken"}
     assert months[0]["uploads"][0]["uploaded_by"] == "Alice" and months[1]["last_ingest"] is None
     assert store.latest_month() == "202609"
+
+
+def test_month_path_traversal_rejected(store):
+    for bad in ("../x", "../../etc/passwd", "202609/../../x", "abc"):
+        with pytest.raises(UnknownMonth):
+            store.load_snapshot(bad)
+        with pytest.raises(UnknownMonth):
+            store.report_html(bad)
+        with pytest.raises(UnknownMonth):
+            store.uploads(bad)
 
 
 def test_load_snapshot_errors_and_cache_invalidation(store):
