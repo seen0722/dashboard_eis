@@ -57,11 +57,23 @@ class _AppLifespan:
 
 async def _ensure_lifespan(app):
     key = id(app)
-    if key not in _started:
-        lc = _AppLifespan(app)
-        task = asyncio.ensure_future(lc.run())
-        await lc.ready.wait()
-        _started[key] = (app, lc, task)
+    if key in _started:
+        return
+    lc = _AppLifespan(app)
+    task = asyncio.ensure_future(lc.run())
+    ready_f = asyncio.ensure_future(lc.ready.wait())
+    # 等 ready 與 task 兩者其一先完成：如果 lifespan __aenter__ 直接丟例外，run()
+    # 這個 task 會先結束（而 ready 永遠不會被設），這裡要把例外浮出去，而不是讓
+    # 呼叫方在 `await lc.ready.wait()` 上永遠卡住（進而讓整個 pytest 行程掛住）。
+    done, _ = await asyncio.wait({ready_f, task}, return_when=asyncio.FIRST_COMPLETED)
+    if task in done and not ready_f.done():
+        ready_f.cancel()
+        try:
+            await ready_f
+        except asyncio.CancelledError:
+            pass
+        task.result()  # 重新丟出讓 lifespan 啟動失敗的例外
+    _started[key] = (app, lc, task)
 
 
 async def _teardown_lifespan(app):

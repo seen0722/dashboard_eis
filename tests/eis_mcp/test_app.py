@@ -1,3 +1,5 @@
+import contextlib
+import pytest
 from tests.eis_mcp.conftest import post_raw, post_upload
 
 
@@ -44,3 +46,17 @@ def test_uploader_stores_pack_and_registry(app, input_pack):
     assert len(store.uploads("202609")) == 5
     row = store.audit_db and app.state.eis.audit.rows()[-1]
     assert row["kind"] == "upload" and row["action"] == "upload:202609" and row["status"] == "ok" and row["name"] == "Alice"
+
+
+def test_lifespan_startup_error_surfaces_instead_of_hanging(app, monkeypatch):
+    """如果 app 的 lifespan __aenter__ 直接丟例外，test helper 要立刻把例外浮出去，
+    而不是永遠卡在等 ready 事件上（讓整個 pytest process 掛住、看不到任何 traceback）。"""
+
+    @contextlib.asynccontextmanager
+    async def boom(_app):
+        raise RuntimeError("boom")
+        yield  # pragma: no cover - never reached, keeps this an async generator
+
+    monkeypatch.setattr(app.router, "lifespan_context", boom)
+    with pytest.raises(RuntimeError, match="boom"):
+        post_raw(app, "tok-up", "/upload/202609", data={})
