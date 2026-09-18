@@ -12,6 +12,7 @@ def test_write_and_read_previous(tmp_path):
     path = write_snapshot(d, tmp_path)
     assert path == tmp_path / "202608" / "portfolio.json"
     assert json.loads(path.read_text())["projects"][0]["fte"][6] == 17.0
+    assert list(path.parent.glob("*.tmp")) == []
     assert read_previous(tmp_path, "202609")["meta"]["report_month"] == "202608"
     assert read_previous(tmp_path, "202608") is None
 

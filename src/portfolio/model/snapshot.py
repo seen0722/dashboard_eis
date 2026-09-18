@@ -1,6 +1,7 @@
 """每月一份正規化 JSON。跨月比較與 render 都只吃這個檔。"""
 from __future__ import annotations
 import json
+import os
 from dataclasses import asdict
 from pathlib import Path
 
@@ -24,7 +25,9 @@ def build_snapshot(report_month: str, latest_month: int, snap_date: str, generat
 def write_snapshot(d: dict, snapshots_dir: str | Path) -> Path:
     out = Path(snapshots_dir) / d["meta"]["report_month"] / "portfolio.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp = out.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, out)
     return out
 
 

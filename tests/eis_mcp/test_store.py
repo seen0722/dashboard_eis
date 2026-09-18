@@ -53,6 +53,7 @@ def test_write_result_and_append_write_owner_only_files(store):
     store.write_result("202609", snap, "<html></html>")
     assert stat.S_IMODE((store.snapshot_dir("202609") / "portfolio.json").stat().st_mode) == 0o600
     assert stat.S_IMODE((store.snapshot_dir("202609") / "report_en.html").stat().st_mode) == 0o600
+    assert list(store.snapshot_dir("202609").glob("*.tmp")) == []
     store.record_ingest("202609", {"at": "t1", "by": "Alice", "status": "ok"})
     assert stat.S_IMODE((store.snapshot_dir("202609") / "ingest.json").stat().st_mode) == 0o600
     store.register_upload("202609", "Project List-202609.xlsx", b"x", "Alice")

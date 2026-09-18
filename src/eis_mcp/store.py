@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import os
 import re
 import stat
 from dataclasses import dataclass, field
@@ -135,8 +136,10 @@ class Store:
         snap_path = write_snapshot(snap, self.snapshots_root)
         snap_path.chmod(0o600)
         html_path = self.snapshot_dir(month) / "report_en.html"
-        html_path.write_text(html, encoding="utf-8")
-        html_path.chmod(0o600)
+        html_tmp = html_path.with_suffix(".html.tmp")
+        html_tmp.write_text(html, encoding="utf-8")
+        html_tmp.chmod(0o600)
+        os.replace(html_tmp, html_path)
         self.invalidate(month)
 
     # ---- 快照 ----
