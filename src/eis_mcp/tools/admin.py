@@ -6,7 +6,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from ...portfolio.pipeline import INPUT_GLOBS, InputUnreadable, MissingInput, NoManpowerMonth
 from ..ingest import IngestBusy, run_ingest
 from ..state import ServerState
-from ._common import guarded
+from ._common import check_date, guarded
 
 
 def register(mcp: MCPServer, state: ServerState) -> None:
@@ -19,8 +19,9 @@ def register(mcp: MCPServer, state: ServerState) -> None:
         status "rejected_pii" (nothing written) with the offending fragments. Errors name what to do next.
         """
         def go(p):
+            ref_date = check_date(today) if today else dt.date.today().isoformat()
             try:
-                return run_ingest(state, report_month, today or dt.date.today().isoformat(), p.name)
+                return run_ingest(state, report_month, ref_date, p.name)
             except ValueError as ex:
                 raise ToolError(str(ex)) from None
             except IngestBusy:

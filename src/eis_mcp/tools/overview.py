@@ -2,10 +2,9 @@
 from __future__ import annotations
 import datetime as dt
 from mcp.server.mcpserver import Context, MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
 from ...portfolio.model.rules import days_between
 from ..state import ServerState
-from ._common import guarded, resolve_month, with_meta
+from ._common import check_date, guarded, resolve_month, with_meta
 
 MILESTONES = ("evt", "dvt", "pvt", "mp")
 
@@ -25,14 +24,6 @@ def upcoming_milestones(snap: dict, today: str, weeks: int) -> list[dict]:
             if -span <= left <= span:
                 out.append({"code": p["code"], "name": p["name"], "stage_cat": p["stage_cat"], "milestone": ms, "date": d, "days_left": left})
     return sorted(out, key=lambda r: (r["days_left"], r["code"]))
-
-
-def _check_date(s: str) -> str:
-    try:
-        dt.date.fromisoformat(s)
-    except ValueError:
-        raise ToolError(f"bad_date: '{s}' must be YYYY-MM-DD") from None
-    return s
 
 
 def register(mcp: MCPServer, state: ServerState) -> None:
@@ -62,6 +53,6 @@ def register(mcp: MCPServer, state: ServerState) -> None:
         milestone, date, days_left}]} sorted by days_left. today "YYYY-MM-DD" defaults to the server date."""
         def go(p):
             _, snap = resolve_month(state, month)
-            t = _check_date(today) if today else dt.date.today().isoformat()
+            t = check_date(today) if today else dt.date.today().isoformat()
             return with_meta(snap, today=t, weeks=weeks, milestones=upcoming_milestones(snap, t, weeks))
         return guarded(state, ctx, "get_upcoming_milestones", {"weeks": weeks, "month": month, "today": today}, go)

@@ -1,5 +1,6 @@
-"""所有 tool 共用：取呼叫者、角色檢查、稽核、PII 出口保險、月份解析。"""
+"""所有 tool 共用：取呼叫者、角色檢查、稽核、PII 出口保險、月份解析、日期驗證。"""
 from __future__ import annotations
+import datetime as dt
 import json
 import time
 from collections.abc import Callable
@@ -63,3 +64,11 @@ def resolve_month(state: ServerState, month: str | None) -> tuple[str, dict]:
 
 def with_meta(snap: dict, **payload) -> dict:
     return {"meta": snap["meta"], **payload}
+
+
+def check_date(s: str) -> str:
+    try:
+        dt.date.fromisoformat(s)
+    except ValueError:
+        raise ToolError(f"bad_date: '{s}' must be YYYY-MM-DD") from None
+    return s

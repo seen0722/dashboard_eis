@@ -30,6 +30,11 @@ def test_ingest_bad_month(app):
     assert err and "bad_month" in text
 
 
+def test_ingest_bad_today(app):
+    err, text = call_tool(app, "tok-up", "ingest_month", {"report_month": "202609", "today": "12/09/2026"})
+    assert err and "bad_date" in text
+
+
 def test_ingest_ok_writes_snapshot_and_log(uploaded):
     err, out = call_tool(uploaded, "tok-up", "ingest_month", {"report_month": "202609", "today": TODAY})
     assert not err, out
