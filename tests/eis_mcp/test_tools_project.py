@@ -58,3 +58,13 @@ def test_search_projects_filters(ingested):
     assert not err and out["count"] == 1
     err, out = call_tool(ingested, "tok-view", "search_projects", {"group": "trenton"})
     assert not err and out["count"] == 1
+
+
+def test_get_project_resolves_alias(ingested, monkeypatch):
+    from src.portfolio.config import normalize_name
+    cfg = ingested.state.eis.cfg
+    monkeypatch.setitem(cfg.aliases, normalize_name("Thorpy-Old"), normalize_name("THORPE"))
+    err, out = call_tool(ingested, "tok-view", "get_project", {"query": "thorpy old"})
+    assert not err and out["project"]["code"] == CODE
+    err, text = call_tool(ingested, "tok-view", "get_project", {"query": "thorpy"})
+    assert err and "not_found" in text   # alias is a whole-value match, not a prefix
