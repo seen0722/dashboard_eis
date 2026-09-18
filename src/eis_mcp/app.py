@@ -11,6 +11,7 @@ from ..portfolio.config import Config, load_config
 from .auth import Audit, BearerAuthMiddleware, Principal
 from .state import ServerState
 from .store import ALLOWED_DESCRIPTIONS, MONTH_RE, Store, classify_filename
+from .tools import register_all
 
 INSTRUCTIONS = (
     "EIS project status for BU10, built from the monthly EIS Excel export. Every tool response carries "
@@ -66,6 +67,7 @@ def build_app(store: Store, tokens: dict[str, Principal], *, cfg: Config | None 
     state = ServerState(store, tokens, Audit(store.audit_db), cfg or load_config())
     mcp = MCPServer("eis", instructions=INSTRUCTIONS)
     register_upload_route(mcp, state)
+    register_all(mcp, state)
     if allowed_hosts:
         ts = TransportSecuritySettings(enable_dns_rebinding_protection=True, allowed_hosts=list(allowed_hosts), allowed_origins=[])
     else:
