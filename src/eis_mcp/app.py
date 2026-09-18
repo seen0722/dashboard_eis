@@ -19,7 +19,9 @@ INSTRUCTIONS = (
     "snapshot; never infer or fill numbers the tools did not return. Uploaders upload the monthly pack over "
     "HTTP (scripts/eis-upload.sh) and then call ingest_month; everyone else queries with get_project, "
     "search_projects, get_exceptions, get_health, get_upcoming_milestones, get_dept_loads, get_capacity, "
-    "diff_project, get_corrections and list_months."
+    "diff_project, get_corrections and list_months. "
+    "meta.latest_month is a 1-12 calendar-month index (the last month with reported manpower), not YYYYMM; "
+    "meta.report_month is the YYYYMM the snapshot was built for."
 )
 
 

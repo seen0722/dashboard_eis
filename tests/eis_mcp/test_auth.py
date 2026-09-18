@@ -25,6 +25,16 @@ def test_load_tokens_ok_and_errors(tmp_path):
         load_tokens(f)
 
 
+def test_load_tokens_rejects_placeholder_tokens(tmp_path):
+    f = tmp_path / "tokens.yaml"
+    f.write_text("tokens:\n  - token: REPLACE_ME\n    name: Alice\n    role: uploader\n")
+    with pytest.raises(ValueError, match="placeholder"):
+        load_tokens(f)
+    f.write_text('tokens:\n  - token: "<python3 -c \'x\'>"\n    name: Alice\n    role: uploader\n')
+    with pytest.raises(ValueError, match="placeholder"):
+        load_tokens(f)
+
+
 def test_load_tokens_rejects_invalid_types(tmp_path):
     f = tmp_path / "tokens.yaml"
     f.write_text("tokens:\n  - token: 0\n    name: Alice\n    role: uploader\n")

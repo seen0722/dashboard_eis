@@ -13,6 +13,7 @@ def test_classify_filename_accepts_the_four_kinds_and_rejects_the_rest():
     for bad in ("~$Project List-202609.xlsx", "../Project List-202609.xlsx", "x/Project List-202609.xlsx",
                 "evil.exe", "Project List-202609.xlsx.bak", ".hidden.xlsx", ""):
         assert classify_filename(bad) is None, bad
+    assert classify_filename("Project List-202609.xlsx\n") is None
 
 
 def test_init_layout_and_permissions(store):

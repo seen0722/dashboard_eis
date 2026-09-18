@@ -82,11 +82,19 @@ python -m pytest tests/portfolio -q
 
 ### 7.1 伺服器端（做一次）
 
+先產生一個 token（不要用範例裡的字面值，那只是佔位符，啟動時會被拒絕）：
+
+```bash
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+把輸出貼進 `token:` 那一行：
+
 ```bash
 mkdir -p server_data
 cat > server_data/tokens.yaml <<'EOF'
 tokens:
-  - token: <python3 -c "import secrets;print(secrets.token_urlsafe(32))">
+  - token: "REPLACE_ME"
     name: Alice
     role: uploader        # uploader | viewer
 EOF
@@ -97,6 +105,11 @@ python -m src.eis_mcp --data server_data --host 0.0.0.0 --port 8765
 - 原檔落在 `server_data/input/<YYYYMM>/`（0700），快照在 `server_data/snapshots/<YYYYMM>/`，稽核在 `server_data/audit.sqlite`。整個 `server_data/` 不進版控。
 - 權限不對（`input/` 非 0700、`tokens.yaml` 非 0600）會拒絕啟動並印出 `chmod` 指令。
 - 改 `tokens.yaml` 後要重啟。
+
+營運注意事項：
+- `audit.sqlite` 與 `snapshots/*/ingest.json` 含被判定為 PII 的原始片段，備份與權限比照原檔。
+- 上傳無大小上限（內網、uploader 限定）。
+- 建議一律設 `--allowed-host`。
 - 若要防 DNS rebinding，加 `--allowed-host eis-host:8765`（可重複）。TLS 由前置 nginx 處理。
 
 ### 7.2 client 端設定

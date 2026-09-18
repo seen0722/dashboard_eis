@@ -20,10 +20,10 @@ from ..portfolio.model.snapshot import write_snapshot
 
 MONTH_RE = re.compile(r"^\d{6}$")
 PATTERNS: list[tuple[str, re.Pattern]] = [
-    ("master", re.compile(r"^Project List-\d{6}\.xlsx$")),
-    ("briefing", re.compile(r"^BU10_Project_Briefing_\d{8}\.xlsx$")),
-    ("summary", re.compile(r"^.+Resource Summary\.xlsx$")),
-    ("control_list", re.compile(r"^.+Resource Control List-.+\.(xlsx|xlsb)$")),
+    ("master", re.compile(r"^Project List-\d{6}\.xlsx\Z")),
+    ("briefing", re.compile(r"^BU10_Project_Briefing_\d{8}\.xlsx\Z")),
+    ("summary", re.compile(r"^.+Resource Summary\.xlsx\Z")),
+    ("control_list", re.compile(r"^.+Resource Control List-.+\.(xlsx|xlsb)\Z")),
 ]
 ALLOWED_DESCRIPTIONS = ["Project List-YYYYMM.xlsx", "BU10_Project_Briefing_YYYYMMDD.xlsx",
                         "<year> EIS Resource Summary.xlsx", "<year> EIS Resource Control List-<project> (<pm>).xlsx|.xlsb"]

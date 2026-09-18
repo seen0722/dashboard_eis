@@ -33,6 +33,8 @@ def load_tokens(path: Path) -> dict[str, Principal]:
         if not (isinstance(tok, str) and tok.strip()) or not (isinstance(name, str) and name.strip()) or role not in ROLES:
             raise ValueError(f"tokens.yaml entry {i}: token and name must be non-empty strings and role in {ROLES}")
         tok_key = tok.strip()
+        if tok_key == "REPLACE_ME" or "<" in tok_key or ">" in tok_key:
+            raise ValueError(f"tokens.yaml entry {i}: token looks like a placeholder; generate one with secrets.token_urlsafe(32)")
         if tok_key in out:
             raise ValueError(f"tokens.yaml: duplicate token used by {out[tok_key].name} and {name.strip()}")
         out[tok_key] = Principal(name.strip(), role)
