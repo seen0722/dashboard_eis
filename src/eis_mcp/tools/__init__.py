@@ -2,7 +2,7 @@
 from __future__ import annotations
 from mcp.server.mcpserver import MCPServer
 from ..state import ServerState
-from . import admin, load, overview, project
+from . import admin, diff, load, overview, project
 
 
 def register_all(mcp: MCPServer, state: ServerState) -> None:
@@ -10,3 +10,4 @@ def register_all(mcp: MCPServer, state: ServerState) -> None:
     project.register(mcp, state)
     overview.register(mcp, state)
     load.register(mcp, state)
+    diff.register(mcp, state)
