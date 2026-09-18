@@ -76,7 +76,72 @@ python -m pytest tests/portfolio -q
 
 全部用合成的小 xlsx 跑，不需要真實資料。改任何規則或版面後都跑一次。
 
-## 7. 已知限制
+## 7. MCP server（內網共用查詢）
+
+`src/eis_mcp` 把同一條管線包成 Streamable HTTP MCP server：uploader 上傳每月 Excel 包並執行 `ingest_month`，其他人用 Claude Desktop / Claude Code 查詢。設計文件：`docs/superpowers/specs/2026-09-18-eis-mcp-server-design.md`。
+
+### 7.1 伺服器端（做一次）
+
+```bash
+mkdir -p server_data
+cat > server_data/tokens.yaml <<'EOF'
+tokens:
+  - token: <python3 -c "import secrets;print(secrets.token_urlsafe(32))">
+    name: Alice
+    role: uploader        # uploader | viewer
+EOF
+chmod 600 server_data/tokens.yaml
+python -m src.eis_mcp --data server_data --host 0.0.0.0 --port 8765
+```
+
+- 原檔落在 `server_data/input/<YYYYMM>/`（0700），快照在 `server_data/snapshots/<YYYYMM>/`，稽核在 `server_data/audit.sqlite`。整個 `server_data/` 不進版控。
+- 權限不對（`input/` 非 0700、`tokens.yaml` 非 0600）會拒絕啟動並印出 `chmod` 指令。
+- 改 `tokens.yaml` 後要重啟。
+- 若要防 DNS rebinding，加 `--allowed-host eis-host:8765`（可重複）。TLS 由前置 nginx 處理。
+
+### 7.2 client 端設定
+
+```json
+{"mcpServers": {"eis": {"url": "http://eis-host:8765/mcp",
+                         "headers": {"Authorization": "Bearer <token>"}}}}
+```
+
+### 7.3 每月流程（uploader）
+
+```bash
+EIS_URL=http://eis-host:8765 EIS_TOKEN=<token> scripts/eis-upload.sh 202610 ./input-10
+```
+
+然後在 Claude 裡說「ingest 202610」（呼叫 `ingest_month("202610")`）。回傳 `rejected_pii` 代表原檔含姓名工號形狀的字串，什麼都不會寫；修好原檔重傳再跑。
+
+端到端實測：真實的 8 月包（41 個檔案、38 份 Control List、62 個專案）ingest 約 1.5 秒。
+
+### 7.4 可用的 tools
+
+| tool | 用途 |
+|---|---|
+| `ingest_month(report_month, today?)` | uploader 限定；跑管線、寫快照 |
+| `list_months()` | 已有月份、誰何時上傳、ingest 狀態 |
+| `get_project(query, month?)` | 代碼 / 名稱 / alias 查單案 |
+| `search_projects(stage_cat?, group?, customer?, text?, month?)` | 篩選清單 |
+| `get_exceptions(month?)` / `get_health(month?)` | 第一屏 Decisions 與 Data health |
+| `get_upcoming_milestones(weeks=8, month?, today?)` | 前後 N 週的 EVT/DVT/PVT/MP |
+| `get_dept_loads(month?, min_util?)` / `get_capacity(month?)` | 部門負載與產能；`min_util` 是百分比（例如 85），`util` 為 `null` 的部門排最後、被 `min_util` 排除 |
+| `diff_project(code, month_a, month_b)` / `get_corrections(month?)` | 跨月差異、歷史數字被改 |
+
+`diff_project` 回傳 `meta_a` / `meta_b`（兩個月份各自的 meta），沒有單一 `meta`；其他 tool 一律有 `meta`。
+
+Resources：`eis://months`、`eis://<YYYYMM>/report.html`（月報 HTML）。
+
+所有回傳都帶 `meta.report_month`；每個 tool 回傳出口都再過一次 PII 檢查。
+
+### 7.5 測試
+
+```bash
+python -m pytest tests -q
+```
+
+## 8. 已知限制
 
 - 每人每月填報上限 1.0 FTE，超載不會出現在數字裡；報告頁尾有註明。
 - 部門負載的分母是「有填報的人數」，不是編制。

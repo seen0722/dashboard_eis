@@ -158,7 +158,7 @@ audit(id, at, name, role, kind, action, args_json, status, duration_ms, detail)
    - 取 `ingest_lock/{month}` 檔案鎖（`fcntl.flock`），同月份並發 ingest 第二個立即回 error `busy`。
    - 檔案齊全檢查：缺 master / briefing / summary 任一 → error，訊息列出缺哪一類與期望檔名樣式；Control List 為 0 份時允許但在回傳 `warnings` 提示。
    - 呼叫 `build_month()`。同步等待（實測數十秒，在 SDK 預設 timeout 內）。
-   - `pii_hits` 非空 → 不寫快照、不寫 HTML；回 `{status: "rejected_pii", hits: pii_hits[:5]}`；`ingest.json` 記一筆；原檔保留。
+   - `pii_hits` 非空 → 不寫快照、不寫 HTML；回 `{status: "rejected_pii", hits, hits_count}`，`hits` 為遮罩後片段（保留前 2 字元，其餘 `*`），`hits_count` 為總命中數；未遮罩的原始片段只留在 server 端的 `ingest.json`；`ingest.json` 記一筆；原檔保留。
    - 成功 → `write_snapshot()`、寫 `report_en.html`、`ingest.json` 追加；清除該月份的記憶體快取；回 `{status: "ok", summary, health: [level, check, count], issues_count}`。
 4. 重跑同月份直接覆蓋快照，`ingest.json` 保留歷次紀錄。
 
@@ -173,6 +173,7 @@ audit(id, at, name, role, kind, action, args_json, status, duration_ms, detail)
 - 未知月份 → error `unknown_month`，訊息附 `list_months()` 的可用清單。
 - 快照載入採記憶體快取（以檔案 mtime 為 key），ingest 成功後清除。
 - 每個 tool 的 docstring 即 MCP description，用英文寫，說明參數與回傳欄位，因為 client 端的模型靠它決定何時呼叫。
+- 例外：`diff_project` 比較兩個月份，回傳 `meta_a` 與 `meta_b` 而非單一 `meta`。
 
 ### 6.2 tool 清單
 
@@ -183,7 +184,7 @@ audit(id, at, name, role, kind, action, args_json, status, duration_ms, detail)
 | `get_exceptions(month?)` | | 快照 `exceptions` 原樣 | |
 | `get_health(month?)` | | 快照 `health` 原樣 | |
 | `get_upcoming_milestones(weeks=8, month?, today?)` | | `[{code, name, stage_cat, milestone, date, days_left}]`，`milestone` ∈ evt/dvt/pvt/mp；範圍為 `today - weeks*7` 到 `today + weeks*7`，已過期者 `days_left` 為負 | 新寫純函式，放 `tools/overview.py`：只看 `in_briefing` 且 `stage_cat != Suspended` 的專案（與 `rules._active()` 同條件），日期差用 `rules.days_between()`；不重用 `milestones_passed()`，它只回逾期的 MP/PVT |
-| `get_dept_loads(month?, min_util?)` | `min_util` 為 0–1 的比例 | `loads` 過濾後，依 `util` 降冪 | |
+| `get_dept_loads(month?, min_util?)` | `min_util` 為百分比（`util` 是整數百分比或 `null`；`null` 排最後且被 `min_util` 排除） | `loads` 過濾後，依 `util` 降冪 | |
 | `get_capacity(month?)` | | 快照 `capacity` 全序列 | |
 | `diff_project(code, month_a, month_b)` | | `{code, changed: {field: {a, b}}}`；只列有差異的欄位，巢狀欄位（dates、fte、pva）逐鍵比較 | 新寫的純函式，放 `tools/diff.py`；數值差異門檻沿用 `diff.cross_month_corrections` 的 `tol=0.05` |
 | `get_corrections(month?)` | | `issues` 中 `check == "cross_month_correction"` 的列 | 名稱來自 `model/diff.py:cross_month_corrections()` |
