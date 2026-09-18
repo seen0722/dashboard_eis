@@ -29,6 +29,11 @@ from src.eis_mcp.auth import Principal
 from src.eis_mcp.store import Store
 from tests.portfolio.test_cli import build_input
 
+try:
+    from builtins import BaseExceptionGroup
+except ImportError:
+    BaseExceptionGroup = Exception  # type: ignore
+
 TOKENS = {"tok-up": Principal("Alice", "uploader"), "tok-view": Principal("Bob", "viewer")}
 TODAY = "2026-09-12"
 
@@ -135,13 +140,23 @@ def call_tool(app, token, name, args=None):
     return _run(go())
 
 
+def _leaf(exc: BaseException) -> BaseException:
+    """anyio/mcp 包成 ExceptionGroup；測試要看的是最裡面那個錯。"""
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+        exc = exc.exceptions[0]
+    return exc
+
+
 def read_resource(app, token, uri):
-    """回 (text, mime_type)；讀不到時 raise。"""
+    """回 (text, mime_type)；讀不到時 raise 最內層的例外。"""
     async def go():
         await _ensure_lifespan(app)
-        async with Client(streamable_http_client("http://test/mcp", http_client=http(app, token))) as cl:
-            r = await cl.read_resource(uri)
-            return r.contents[0].text, r.contents[0].mime_type
+        try:
+            async with Client(streamable_http_client("http://test/mcp", http_client=http(app, token))) as cl:
+                r = await cl.read_resource(uri)
+                return r.contents[0].text, r.contents[0].mime_type
+        except BaseExceptionGroup as eg:
+            raise _leaf(eg) from eg
     return _run(go())
 
 
