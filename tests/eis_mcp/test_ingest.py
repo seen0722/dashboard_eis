@@ -1,7 +1,17 @@
 import fcntl
+import json
 import pytest
-from src.eis_mcp.ingest import IngestBusy, run_ingest
+from src.eis_mcp.ingest import IngestBusy, mask_hit, run_ingest
 from tests.eis_mcp.conftest import TODAY, call_tool
+
+
+@pytest.mark.parametrize("raw, masked", [
+    ("LA0000001", "LA*******"),
+    ("Ab", "**"),
+    ("Ab(王小明)", "Ab*****"),
+])
+def test_mask_hit(raw, masked):
+    assert mask_hit(raw) == masked
 
 
 def test_viewer_cannot_ingest(uploaded):
@@ -45,10 +55,13 @@ def test_ingest_warns_when_no_control_list(app, input_pack):
 def test_ingest_rejected_pii_writes_nothing(uploaded, monkeypatch):
     monkeypatch.setattr("src.eis_mcp.ingest.find_pii", lambda text, *a, **kw: ["LA0000001"])
     err, out = call_tool(uploaded, "tok-up", "ingest_month", {"report_month": "202609", "today": TODAY})
-    assert not err and out["status"] == "rejected_pii" and out["hits"] == ["LA0000001", "LA0000001"] and "next" in out
+    assert not err and out["status"] == "rejected_pii" and "next" in out
+    assert out["hits"] == ["LA*******", "LA*******"] and out["hits_count"] == 2
+    assert "LA0000001" not in json.dumps(out)
     store = uploaded.state.eis.store
     assert not (store.snapshot_dir("202609") / "portfolio.json").exists()
     assert store.ingests("202609")[-1]["status"] == "rejected_pii"
+    assert store.ingests("202609")[-1]["pii_hits"] == ["LA0000001", "LA0000001"]   # 伺服器端保留未遮蔽版本
     assert (store.input_dir("202609") / "Project List-202609.xlsx").exists()   # 原檔保留
     assert uploaded.state.eis.audit.rows()[-1]["status"] == "ok"                # tool 本身正常結束
 

@@ -34,10 +34,7 @@ def guarded(state: ServerState, ctx: Context, action: str, args: dict, fn: Calla
         state.audit.record(p, "tool", action, args, "error", ms(), str(ex)); raise
     except Exception as ex:
         state.audit.record(p, "tool", action, args, "error", ms(), repr(ex)); raise
-    # A tool that already self-reports "rejected_pii" (e.g. ingest_month) deliberately surfaces the
-    # offending fragments so the uploader can locate them; nothing was written to disk for that path,
-    # so re-scanning its own declared fragments here would just override that contract with a generic error.
-    hits = [] if isinstance(out, dict) and out.get("status") == "rejected_pii" else find_pii(json.dumps(out, ensure_ascii=False))
+    hits = find_pii(json.dumps(out, ensure_ascii=False))
     if hits:
         state.audit.record(p, "tool", action, args, "rejected_pii", ms(), "; ".join(hits[:5]))
         raise ToolError(f"rejected_pii: the {action} response contained {len(hits)} PII-shaped fragment(s) and was withheld. "

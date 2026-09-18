@@ -11,6 +11,13 @@ class IngestBusy(Exception):
     pass
 
 
+def mask_hit(s: str) -> str:
+    """遮蔽一個 PII 命中片段：只留前 2 字元，其餘換成 '*'；不足 3 字元就整段遮掉。"""
+    if len(s) < 3:
+        return "**"
+    return s[:2] + "*" * (len(s) - 2)
+
+
 def run_ingest(state: ServerState, month: str, today: str, by: str) -> dict:
     if not MONTH_RE.match(month):
         raise ValueError(f"bad_month: '{month}' must be YYYYMM")
@@ -35,8 +42,10 @@ def _ingest_locked(state: ServerState, month: str, today: str, by: str) -> dict:
     base = {"at": now_iso(), "by": by, "today": today, "summary": res.summary, "issues_count": len(res.issues)}
     if res.pii_hits:
         store.record_ingest(month, {**base, "status": "rejected_pii", "pii_hits": res.pii_hits[:5]})
-        return {"status": "rejected_pii", "hits": res.pii_hits[:5], "summary": res.summary, "warnings": warnings,
-                "next": "nothing was written; fix the source file (usually a Control List task description), re-upload it and call ingest_month again"}
+        return {"status": "rejected_pii", "hits": [mask_hit(h) for h in res.pii_hits[:5]], "hits_count": len(res.pii_hits),
+                "summary": res.summary, "warnings": warnings,
+                "next": "nothing was written; fix the source file (usually a Control List task description), re-upload it and call "
+                        "ingest_month again; the unmasked fragments are in the server-side ingest log for this month"}
     store.write_result(month, res.snap, res.html)
     store.record_ingest(month, {**base, "status": "ok"})
     return {"status": "ok", "summary": res.summary,
