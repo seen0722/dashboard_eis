@@ -21,15 +21,20 @@ class Principal:
 
 
 def load_tokens(path: Path) -> dict[str, Principal]:
-    doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(doc, dict):
+        raise ValueError("tokens.yaml must be a mapping with a 'tokens' list")
     out: dict[str, Principal] = {}
     for i, row in enumerate(doc.get("tokens") or []):
+        if not isinstance(row, dict):
+            raise ValueError(f"tokens.yaml entry {i}: must be a mapping with token, name, role")
         tok, name, role = row.get("token"), row.get("name"), row.get("role")
-        if not tok or not name or role not in ROLES:
-            raise ValueError(f"tokens.yaml entry {i}: need token, name and role in {ROLES}")
-        if str(tok) in out:
-            raise ValueError(f"tokens.yaml: duplicate token used by {out[str(tok)].name} and {name}")
-        out[str(tok)] = Principal(str(name), role)
+        if not (isinstance(tok, str) and tok.strip()) or not (isinstance(name, str) and name.strip()) or role not in ROLES:
+            raise ValueError(f"tokens.yaml entry {i}: token and name must be non-empty strings and role in {ROLES}")
+        tok_key = tok.strip()
+        if tok_key in out:
+            raise ValueError(f"tokens.yaml: duplicate token used by {out[tok_key].name} and {name.strip()}")
+        out[tok_key] = Principal(name.strip(), role)
     if not out:
         raise ValueError("tokens.yaml has no tokens")
     return out

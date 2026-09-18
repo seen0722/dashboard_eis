@@ -24,12 +24,38 @@ def test_load_tokens_ok_and_errors(tmp_path):
         load_tokens(f)
 
 
+def test_load_tokens_rejects_invalid_types(tmp_path):
+    f = tmp_path / "tokens.yaml"
+    f.write_text("tokens:\n  - token: 0\n    name: Alice\n    role: uploader\n")
+    with pytest.raises(ValueError, match="non-empty strings"):
+        load_tokens(f)
+    f.write_text("tokens:\n  - token: ''\n    name: Alice\n    role: uploader\n")
+    with pytest.raises(ValueError, match="non-empty strings"):
+        load_tokens(f)
+
+
+def test_load_tokens_rejects_non_mapping(tmp_path):
+    f = tmp_path / "tokens.yaml"
+    f.write_text("- token: abc\n  name: Alice\n  role: uploader\n")
+    with pytest.raises(ValueError, match="mapping"):
+        load_tokens(f)
+
+
+def test_load_tokens_rejects_non_mapping_entry(tmp_path):
+    f = tmp_path / "tokens.yaml"
+    f.write_text("tokens:\n  - - invalid\n")
+    with pytest.raises(ValueError, match="must be a mapping"):
+        load_tokens(f)
+
+
 def test_principal_from_headers():
     assert principal_from_headers({"authorization": "Bearer tok-up"}, TOKENS) == Principal("Alice", "uploader")
     assert principal_from_headers({"authorization": "bearer tok-view "}, TOKENS) == Principal("Bob", "viewer")
     assert principal_from_headers({"authorization": "Basic tok-up"}, TOKENS) is None
     assert principal_from_headers({}, TOKENS) is None
     assert principal_from_headers({"authorization": "Bearer nope"}, TOKENS) is None
+    assert principal_from_headers({"authorization": "Bearer "}, TOKENS) is None
+    assert principal_from_headers({"authorization": "Bearer"}, TOKENS) is None
 
 
 def _app():
