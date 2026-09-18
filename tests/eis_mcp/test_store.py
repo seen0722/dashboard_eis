@@ -25,6 +25,14 @@ def test_init_layout_and_permissions(store):
     assert any(p == f"chmod 600 {store.tokens_file}" for p in problems)
 
 
+def test_check_permissions_detects_per_month_dir_issues(store):
+    store.register_upload("202609", "Project List-202609.xlsx", b"x", "Alice")
+    assert store.check_permissions() == []
+    store.input_dir("202609").chmod(0o755)
+    problems = store.check_permissions()
+    assert any(p == f"chmod 700 {store.input_dir('202609')}" for p in problems)
+
+
 def test_register_upload_appends_registry_and_overwrites_file(store):
     r1 = store.register_upload("202609", "Project List-202609.xlsx", b"one", "Alice")
     r2 = store.register_upload("202609", "Project List-202609.xlsx", b"three", "Bob")
@@ -33,6 +41,9 @@ def test_register_upload_appends_registry_and_overwrites_file(store):
     regs = store.uploads("202609")
     assert [r["uploaded_by"] for r in regs] == ["Alice", "Bob"] and all("uploaded_at" in r for r in regs)
     assert store.uploads("202610") == []
+    # Verify per-month dir is 0700 and file is 0600
+    assert stat.S_IMODE(store.input_dir("202609").stat().st_mode) == 0o700
+    assert stat.S_IMODE((store.input_dir("202609") / "Project List-202609.xlsx").stat().st_mode) == 0o600
 
 
 def test_ingest_log_roundtrip(store):

@@ -87,6 +87,12 @@ class Store:
             problems.append(f"chmod 700 {self.input_root}")
         if self.tokens_file.exists() and stat.S_IMODE(self.tokens_file.stat().st_mode) & 0o077:
             problems.append(f"chmod 600 {self.tokens_file}")
+        # Check per-month input directories
+        if self.input_root.exists():
+            for d in self.input_root.iterdir():
+                if d.is_dir() and MONTH_RE.match(d.name):
+                    if stat.S_IMODE(d.stat().st_mode) & 0o077:
+                        problems.append(f"chmod 700 {d}")
         return problems
 
     def input_dir(self, month: str) -> Path: return self.input_root / month
@@ -94,8 +100,8 @@ class Store:
 
     # ---- 上傳 ----
     def register_upload(self, month: str, name: str, data: bytes, by: str) -> dict:
-        d = self.input_dir(month); d.mkdir(parents=True, exist_ok=True)
-        (d / name).write_bytes(data)
+        d = self.input_dir(month); d.mkdir(parents=True, exist_ok=True); d.chmod(0o700)
+        f = d / name; f.write_bytes(data); f.chmod(0o600)
         rec = {"name": name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(), "uploaded_by": by, "uploaded_at": now_iso()}
         _append(d / "_upload.json", rec)
         return rec
