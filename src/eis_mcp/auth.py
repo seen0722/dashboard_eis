@@ -70,6 +70,7 @@ class Audit:
         with closing(sqlite3.connect(self.db)) as c, c:
             c.execute("CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, at TEXT, name TEXT, role TEXT, kind TEXT, "
                       "action TEXT, args_json TEXT, status TEXT, duration_ms INTEGER, detail TEXT)")
+        self.db.chmod(0o600)
 
     def record(self, principal: Principal | None, kind: str, action: str, args: dict, status: str, duration_ms: int, detail: str = "") -> None:
         with closing(sqlite3.connect(self.db)) as c, c:

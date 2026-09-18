@@ -1,4 +1,5 @@
 import asyncio
+import stat
 import httpx
 import pytest
 from starlette.applications import Starlette
@@ -78,6 +79,12 @@ def test_middleware_401_without_token_and_sets_principal():
     r = _get(app, {}); assert r.status_code == 401 and r.json()["error"] == "unauthorized"
     r = _get(app, {"Authorization": "Bearer nope"}); assert r.status_code == 401
     r = _get(app, {"Authorization": "Bearer tok-view"}); assert r.status_code == 200 and r.json() == {"name": "Bob", "role": "viewer"}
+
+
+def test_audit_db_created_owner_only(tmp_path):
+    db = tmp_path / "audit.sqlite"
+    Audit(db)
+    assert stat.S_IMODE(db.stat().st_mode) == 0o600
 
 
 def test_audit_records_rows(tmp_path):

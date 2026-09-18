@@ -65,6 +65,7 @@ def _append(path: Path, rec: dict) -> None:
     rows = _read_list(path); rows.append(rec)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
+    path.chmod(0o600)
 
 
 @dataclass
@@ -86,20 +87,27 @@ class Store:
     def init_layout(self) -> None:
         for d in (self.input_root, self.snapshots_root, self.locks_root):
             d.mkdir(parents=True, exist_ok=True)
-        self.input_root.chmod(0o700)
+            d.chmod(0o700)
 
     def check_permissions(self) -> list[str]:
         problems = []
         if stat.S_IMODE(self.input_root.stat().st_mode) & 0o077:
             problems.append(f"chmod 700 {self.input_root}")
+        if self.snapshots_root.exists() and stat.S_IMODE(self.snapshots_root.stat().st_mode) & 0o077:
+            problems.append(f"chmod 700 {self.snapshots_root}")
         if self.tokens_file.exists() and stat.S_IMODE(self.tokens_file.stat().st_mode) & 0o077:
             problems.append(f"chmod 600 {self.tokens_file}")
-        # Check per-month input directories
+        if self.audit_db.exists() and stat.S_IMODE(self.audit_db.stat().st_mode) & 0o077:
+            problems.append(f"chmod 600 {self.audit_db}")
+        # Check per-month input directories and the raw files inside them (may carry PII fragments)
         if self.input_root.exists():
             for d in self.input_root.iterdir():
                 if d.is_dir() and MONTH_RE.match(d.name):
                     if stat.S_IMODE(d.stat().st_mode) & 0o077:
                         problems.append(f"chmod 700 {d}")
+                    for f in d.iterdir():
+                        if f.is_file() and stat.S_IMODE(f.stat().st_mode) & 0o077:
+                            problems.append(f"chmod 600 {f}")
         return problems
 
     def input_dir(self, month: str) -> Path: return self.input_root / _check_month(month)
@@ -124,8 +132,11 @@ class Store:
         return _read_list(self.snapshot_dir(month) / "ingest.json")
 
     def write_result(self, month: str, snap: dict, html: str) -> None:
-        write_snapshot(snap, self.snapshots_root)
-        (self.snapshot_dir(month) / "report_en.html").write_text(html, encoding="utf-8")
+        snap_path = write_snapshot(snap, self.snapshots_root)
+        snap_path.chmod(0o600)
+        html_path = self.snapshot_dir(month) / "report_en.html"
+        html_path.write_text(html, encoding="utf-8")
+        html_path.chmod(0o600)
         self.invalidate(month)
 
     # ---- 快照 ----

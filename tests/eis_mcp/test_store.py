@@ -18,6 +18,8 @@ def test_classify_filename_accepts_the_four_kinds_and_rejects_the_rest():
 def test_init_layout_and_permissions(store):
     assert store.input_root.is_dir() and store.snapshots_root.is_dir() and store.locks_root.is_dir()
     assert stat.S_IMODE(store.input_root.stat().st_mode) == 0o700
+    assert stat.S_IMODE(store.snapshots_root.stat().st_mode) == 0o700
+    assert stat.S_IMODE(store.locks_root.stat().st_mode) == 0o700
     assert store.check_permissions() == []
     store.input_root.chmod(0o755)
     store.tokens_file.write_text("tokens: []"); store.tokens_file.chmod(0o644)
@@ -32,6 +34,29 @@ def test_check_permissions_detects_per_month_dir_issues(store):
     store.input_dir("202609").chmod(0o755)
     problems = store.check_permissions()
     assert any(p == f"chmod 700 {store.input_dir('202609')}" for p in problems)
+
+
+def test_check_permissions_detects_snapshots_root_audit_db_and_input_files(store):
+    store.snapshots_root.chmod(0o755)
+    store.audit_db.write_text("x"); store.audit_db.chmod(0o644)
+    store.register_upload("202609", "Project List-202609.xlsx", b"x", "Alice")
+    (store.input_dir("202609") / "Project List-202609.xlsx").chmod(0o644)
+    problems = store.check_permissions()
+    assert f"chmod 700 {store.snapshots_root}" in problems
+    assert f"chmod 600 {store.audit_db}" in problems
+    assert f"chmod 600 {store.input_dir('202609') / 'Project List-202609.xlsx'}" in problems
+
+
+def test_write_result_and_append_write_owner_only_files(store):
+    snap = {"meta": {"version": "1", "report_month": "202609", "latest_month": 8, "snap_date": "20260907", "generated": "2026-09-12"},
+            "projects": [], "loads": [], "capacity": [0] * 12, "exceptions": [], "health": [], "issues": []}
+    store.write_result("202609", snap, "<html></html>")
+    assert stat.S_IMODE((store.snapshot_dir("202609") / "portfolio.json").stat().st_mode) == 0o600
+    assert stat.S_IMODE((store.snapshot_dir("202609") / "report_en.html").stat().st_mode) == 0o600
+    store.record_ingest("202609", {"at": "t1", "by": "Alice", "status": "ok"})
+    assert stat.S_IMODE((store.snapshot_dir("202609") / "ingest.json").stat().st_mode) == 0o600
+    store.register_upload("202609", "Project List-202609.xlsx", b"x", "Alice")
+    assert stat.S_IMODE((store.input_dir("202609") / "_upload.json").stat().st_mode) == 0o600
 
 
 def test_register_upload_appends_registry_and_overwrites_file(store):
