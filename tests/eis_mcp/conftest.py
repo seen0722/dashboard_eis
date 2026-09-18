@@ -3,8 +3,19 @@
 mcp 2.2.0 的 StreamableHTTPSessionManager.run() 只能對同一個 instance 呼叫一次
 （_has_started 一設就不會重置）；一個真正的 server 也只在啟動時進入一次 lifespan，
 然後在裡面服務所有請求。因此這裡的 helper 不是每次呼叫都重新進出 lifespan，而是
-把每個 app 的 lifespan 懶啟動一次、放到一個共用的背景 event loop 上長駐，之後所有
-呼叫都在同一個 loop 上執行——對外的 fixture／函式簽章與回傳值都維持原樣。
+把每個 app 的 lifespan 懶啟動一次、放到一個共用的背景 event loop 上執行，之後所有
+呼叫都在同一個 loop 上執行；`app` fixture 在測試結束時會請求把該 app 的 lifespan
+退出並從 `_started` 移除，避免每個測試留下的 Store／Audit／task group 累積一整個
+pytest process 的生命週期。
+
+anyio 的 CancelScope／TaskGroup 要求 enter 與 exit 發生在同一個 asyncio Task 裡，
+所以「進入 lifespan」與「退出 lifespan」不能是分別獨立提交到 loop 的兩個 coroutine
+（那樣會落在兩個不同的 Task 上，__aexit__ 時會拿到
+「Attempted to exit cancel scope in a different task than it was entered in」）。
+因此改成單一常駐 Task（`_AppLifespan.run`）從頭到尾包住整個
+`async with app.router.lifespan_context(app):` 區塊，靠 `ready`／`stop` 兩個
+asyncio.Event 對外面的呼叫方發訊號；啟動與收尾都只是設訊號、等訊號，不會跨 Task
+去動 CancelScope。對外的 fixture／函式簽章與回傳值都維持原樣。
 """
 import asyncio
 import json
@@ -23,19 +34,42 @@ TODAY = "2026-09-12"
 
 _loop = asyncio.new_event_loop()
 threading.Thread(target=_loop.run_forever, name="eis-mcp-test-loop", daemon=True).start()
-_started: dict[int, tuple] = {}  # id(app) -> (app, cm)；保留 app 的強參照避免 id() 被回收重用
+_started: dict[int, tuple] = {}  # id(app) -> (app, _AppLifespan, task)；保留 app 的強參照避免 id() 被回收重用
 
 
 def _run(coro):
     return asyncio.run_coroutine_threadsafe(coro, _loop).result()
 
 
+class _AppLifespan:
+    """把一個 app 的 lifespan 包成單一常駐 task：enter/exit 都在這個 task 裡發生。"""
+
+    def __init__(self, app):
+        self.app = app
+        self.ready = asyncio.Event()
+        self.stop = asyncio.Event()
+
+    async def run(self):
+        async with self.app.router.lifespan_context(self.app):
+            self.ready.set()
+            await self.stop.wait()
+
+
 async def _ensure_lifespan(app):
     key = id(app)
     if key not in _started:
-        cm = app.router.lifespan_context(app)
-        await cm.__aenter__()
-        _started[key] = (app, cm)
+        lc = _AppLifespan(app)
+        task = asyncio.ensure_future(lc.run())
+        await lc.ready.wait()
+        _started[key] = (app, lc, task)
+
+
+async def _teardown_lifespan(app):
+    entry = _started.pop(id(app), None)
+    if entry is not None:
+        _, lc, task = entry
+        lc.stop.set()
+        await task
 
 
 @pytest.fixture
@@ -52,7 +86,9 @@ def input_pack(tmp_path):
 
 @pytest.fixture
 def app(store):
-    return build_app(store, TOKENS)
+    a = build_app(store, TOKENS)
+    yield a
+    _run(_teardown_lifespan(a))
 
 
 @pytest.fixture

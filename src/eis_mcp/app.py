@@ -40,22 +40,25 @@ def register_upload_route(mcp: MCPServer, state: ServerState) -> None:
             done("forbidden")
             return JSONResponse({"error": "forbidden", "detail": f"token '{p.name}' has role '{p.role}'; uploads need an uploader token"}, status_code=403)
         form = await request.form()
-        files = [f for f in form.getlist("file") if isinstance(f, UploadFile)]
-        if not files:
-            done("error", "no_files")
-            return JSONResponse({"error": "no_files", "detail": "send one or more multipart fields named 'file'"}, status_code=400)
-        rejected = [f.filename or "" for f in files if classify_filename(f.filename or "") is None]
-        if rejected:
-            done("error", "bad_filename: " + ", ".join(rejected))
-            return JSONResponse({"error": "bad_filename", "rejected": rejected, "allowed": ALLOWED_DESCRIPTIONS,
-                                 "detail": "nothing was stored; rename or drop the rejected files and resend the whole pack"}, status_code=400)
-        stored = []
-        for f in files:
-            rec = state.store.register_upload(month, f.filename, await f.read(), p.name)
-            rec["category"] = classify_filename(f.filename)
-            stored.append(rec)
-        done("ok", ", ".join(s["name"] for s in stored))
-        return JSONResponse({"month": month, "stored": stored})
+        try:
+            files = [f for f in form.getlist("file") if isinstance(f, UploadFile)]
+            if not files:
+                done("error", "no_files")
+                return JSONResponse({"error": "no_files", "detail": "send one or more multipart fields named 'file'"}, status_code=400)
+            rejected = [f.filename or "" for f in files if classify_filename(f.filename or "") is None]
+            if rejected:
+                done("error", "bad_filename: " + ", ".join(rejected))
+                return JSONResponse({"error": "bad_filename", "rejected": rejected, "allowed": ALLOWED_DESCRIPTIONS,
+                                     "detail": "nothing was stored; rename or drop the rejected files and resend the whole pack"}, status_code=400)
+            stored = []
+            for f in files:
+                rec = state.store.register_upload(month, f.filename, await f.read(), p.name)
+                rec["category"] = classify_filename(f.filename)
+                stored.append(rec)
+            done("ok", ", ".join(s["name"] for s in stored))
+            return JSONResponse({"month": month, "stored": stored})
+        finally:
+            await form.close()
 
 
 def build_app(store: Store, tokens: dict[str, Principal], *, cfg: Config | None = None,

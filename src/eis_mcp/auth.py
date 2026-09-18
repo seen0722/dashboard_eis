@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Mapping
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 import yaml
@@ -66,16 +67,16 @@ class Audit:
 
     def __init__(self, db: Path):
         self.db = Path(db)
-        with sqlite3.connect(self.db) as c:
+        with closing(sqlite3.connect(self.db)) as c, c:
             c.execute("CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, at TEXT, name TEXT, role TEXT, kind TEXT, "
                       "action TEXT, args_json TEXT, status TEXT, duration_ms INTEGER, detail TEXT)")
 
     def record(self, principal: Principal | None, kind: str, action: str, args: dict, status: str, duration_ms: int, detail: str = "") -> None:
-        with sqlite3.connect(self.db) as c:
+        with closing(sqlite3.connect(self.db)) as c, c:
             c.execute("INSERT INTO audit(at, name, role, kind, action, args_json, status, duration_ms, detail) VALUES (?,?,?,?,?,?,?,?,?)",
                       (now_iso(), principal.name if principal else None, principal.role if principal else None, kind, action,
                        json.dumps(args, ensure_ascii=False), status, duration_ms, detail))
 
     def rows(self) -> list[dict]:
-        with sqlite3.connect(self.db) as c:
+        with closing(sqlite3.connect(self.db)) as c, c:
             return [dict(zip(self.COLUMNS, r)) for r in c.execute("SELECT " + ", ".join(self.COLUMNS) + " FROM audit ORDER BY id")]
