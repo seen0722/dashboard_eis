@@ -56,7 +56,20 @@ sudo apt-get install -y python3.12 python3.12-venv
 PYTHON=python3.12 sudo -E deploy/install.sh
 ```
 
-主機連不到 PPA 時，在能上網的同版本 Ubuntu 機器上 `apt-get download python3.12 python3.12-venv python3.12-minimal libpython3.12-stdlib libpython3.12-minimal` 把 .deb 抓下來，scp 過去 `sudo dpkg -i *.deb`。
+主機連不到 PPA 時（或不想動系統套件），用 **python-build-standalone**：單一 tarball、解壓即用、不需 apt（實測 Ubuntu 20.04/22.04 x86_64 可行）：
+
+```bash
+# Mac（能上網）：抓 3.12 的 x86_64 Linux 版（gh 已登入）
+TAG=$(gh api repos/astral-sh/python-build-standalone/releases/latest -q .tag_name)
+ASSET=$(gh api "repos/astral-sh/python-build-standalone/releases/tags/$TAG" -q '.assets[].name' | grep -E '^cpython-3\.12\.[0-9]+\+.*-x86_64-unknown-linux-gnu-install_only\.tar\.gz$' | head -1)
+curl -sSL -o "/tmp/$ASSET" "https://github.com/astral-sh/python-build-standalone/releases/download/$TAG/$ASSET"
+scp "/tmp/$ASSET" <user>@<host>:/tmp/
+
+# 主機：解到 /opt/python3.12，之後安裝時指定 PYTHON=
+sudo mkdir -p /opt/python3.12 && sudo tar -xzf /tmp/cpython-3.12.*-install_only.tar.gz -C /opt/python3.12 --strip-components=1
+/opt/python3.12/bin/python3.12 --version
+PYTHON=/opt/python3.12/bin/python3.12 sudo -E deploy/install.sh
+```
 
 ### 3.0 主機連不到 PyPI / GitHub（公司內網常見）→ 離線安裝
 
