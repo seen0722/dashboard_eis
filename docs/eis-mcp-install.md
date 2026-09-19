@@ -1,0 +1,222 @@
+# EIS MCP Server 安裝手冊
+
+版本：2026-09-19（repo `seen0722/dashboard_eis`，main 8517857 之後）
+適用：內網 Linux 主機（Ubuntu 22.04+ / Debian 12+ / RHEL 9+，需 systemd）；client 端 OpenCode、Claude Code、Claude Desktop。
+
+---
+
+## 1. 這是什麼
+
+一個內網 HTTP 服務，把每月 EIS 匯出的 Excel 包轉成專案狀態快照，讓同仁用 AI client（OpenCode / Claude）以自然語言查詢 BU10 專案的 stage、里程碑、人力、例外事項。
+
+- **server 端不需要任何 LLM、API key 或 AI 帳號**，只是一個 Python 服務。模型在使用者的 client 端。
+- 真相來源是 EIS 匯出檔；server 不接受人工填寫的狀態，回傳只有快照既有的欄位。
+- 兩級權限：`uploader`（可上傳、可 ingest、可查）與 `viewer`（只能查）。
+- PII 零容忍：原檔含姓名工號，只落在 server 端 0700 目錄，不經任何 tool 回傳；ingest 命中 PII 形狀就拒絕寫檔；每個 tool 回傳出口再掃一次。
+
+## 2. 主機需求
+
+| 項目 | 要求 |
+|---|---|
+| OS | Linux + systemd |
+| Python | 3.12 以上（`python3 --version`；太舊就另裝 3.12 並用 `PYTHON=` 指定） |
+| 工具 | `git`、`rsync`、`curl` |
+| 網路 | 開放一個 TCP port 給內網（預設 8765） |
+| 磁碟 | 每月一包約 50–100 MB（原檔 + 快照），一年 2 GB 內 |
+| 記憶體 | 服務本身 < 200 MB；ingest 瞬間可能到 500 MB |
+
+不需要 root 執行服務（安裝腳本會建 `eis` 系統帳號），但安裝需要 sudo。
+
+## 3. 安裝（server 端，約 5 分鐘）
+
+```bash
+git clone git@github.com:seen0722/dashboard_eis.git
+cd dashboard_eis
+sudo deploy/install.sh
+```
+
+腳本是冪等的，做這些事：
+
+1. 建系統帳號 `eis`（無登入 shell）。
+2. 程式碼 rsync 到 `/opt/eis-mcp`（只帶 `src/ config/ scripts/ requirements.txt README.md`，不帶任何資料檔）。
+3. 建 venv、裝 `requirements.txt`。
+4. 建資料目錄 `/var/lib/eis-mcp`（0700，owner `eis`）。
+5. **首次執行**自動產生 `/var/lib/eis-mcp/tokens.yaml`（一把 uploader、一把 viewer，0600）。
+6. 寫 `/etc/eis-mcp/env`（監聽位址、port、`--allowed-host <主機名>:8765`）。
+7. 安裝 `eis-mcp.service`、`systemctl enable --now`，並打 `/mcp` 確認回 401。
+
+結束時會印出 token 位置、client 設定片段、上傳指令與 log 指令。
+
+若 Python 太舊：
+
+```bash
+PYTHON=/usr/bin/python3.12 sudo -E deploy/install.sh
+```
+
+### 3.1 驗證安裝
+
+```bash
+systemctl status eis-mcp
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8765/mcp   # 期待 401
+journalctl -u eis-mcp -n 20
+sudo -u eis cat /var/lib/eis-mcp/tokens.yaml
+```
+
+### 3.2 設定檔
+
+| 檔案 | 內容 | 改完要 |
+|---|---|---|
+| `/etc/eis-mcp/env` | `EIS_BIND_HOST`（0.0.0.0）、`EIS_PORT`（8765）、`EIS_ALLOWED_HOST_ARG`（client 會打的 Host，例如 `--allowed-host eis-host:8765`，可多個） | `sudo systemctl restart eis-mcp` |
+| `/var/lib/eis-mcp/tokens.yaml` | `tokens: [{token, name, role}]`；token 用 `python3 -c 'import secrets;print(secrets.token_urlsafe(32))'` 產生；role 是 `uploader` 或 `viewer` | `sudo systemctl restart eis-mcp` |
+
+tokens.yaml 範例：
+
+```yaml
+tokens:
+  - token: "REPLACE_WITH_token_urlsafe_OUTPUT"
+    name: "Billy"
+    role: uploader
+  - token: "REPLACE_WITH_token_urlsafe_OUTPUT"
+    name: "PM-Karen"
+    role: viewer
+```
+
+server 啟動時會拒絕：空 token、`REPLACE_ME`、含 `<` `>` 的 token、重複 token、`input/` 非 0700、`tokens.yaml` 非 0600（會印出該下的 chmod 指令）。
+
+### 3.3 發 token 給同仁（一人一把）
+
+```bash
+sudo deploy/eis-token.sh add <名字> viewer      # 只查詢
+sudo deploy/eis-token.sh add <名字> uploader    # 負責每月上傳的人
+sudo deploy/eis-token.sh list                   # 名字與角色（不顯示 token）
+sudo deploy/eis-token.sh rotate <名字>          # 換新，舊的立即失效
+sudo deploy/eis-token.sh revoke <名字>          # 離職／撤銷
+```
+
+`add` 會產生 token、寫進 `tokens.yaml`、重啟服務，並**只印出一次**（連同 client 設定片段）。管理者用一對一私訊交給本人，不要群組、不要 email 列表。名字要唯一，稽核表（`audit.sqlite`）就是靠它對到人。
+
+### 3.4 TLS（選用）
+
+第一版走 HTTP。要 https 就在前面放 nginx 反向代理到 `127.0.0.1:8765`，並把 `/etc/eis-mcp/env` 的 `EIS_BIND_HOST` 改成 `127.0.0.1`。
+
+## 4. 每月流程（uploader）
+
+1. 從 EIS / PM 拿到當月四類檔案放進一個目錄（檔名不用改）：
+   - `Project List-YYYYMM.xlsx`
+   - `BU10_Project_Briefing_YYYYMMDD.xlsx`
+   - `2026 EIS Resource Summary.xlsx`
+   - `2026  EIS Resource Control List-<專案> (<PM>).xlsx` × N（`.xlsb` 也可）
+2. 上傳（腳本在 repo 的 `scripts/`，也已複製到主機 `/opt/eis-mcp/scripts/`）：
+
+```bash
+EIS_URL=http://eis-host:8765 EIS_TOKEN=<uploader token> scripts/eis-upload.sh 202610 ./input-10
+```
+
+3. 在 AI client 裡說「ingest 202610」（呼叫 `ingest_month("202610")`）。回傳：
+   - `status: ok` + summary（案數、Control List 份數、latest_month）+ health 摘要。
+   - `status: rejected_pii`：原檔含姓名工號形狀的字串，**什麼都不會寫**；回傳只有遮罩片段，原文在主機 `/var/lib/eis-mcp/snapshots/202610/ingest.json`。修好原檔重傳再跑。
+   - `missing_input` / `input_unreadable` / `no_manpower_month` / `busy`：訊息裡會說下一步。
+4. 同月份可重跑，會覆蓋快照並在 `ingest.json` 留紀錄。
+
+## 5. Client 設定
+
+三種 client 都只需要 URL 與 token。以下 `<host>` 換成主機名或 IP，`<token>` 由管理者從 `tokens.yaml` 發給你。建議把 token 存成檔案而不是寫死在設定裡。
+
+### 5.1 OpenCode
+
+`~/.config/opencode/opencode.json`（或 `.jsonc`）：
+
+```json
+{
+  "mcp": {
+    "eis": {
+      "type": "remote",
+      "url": "http://<host>:8765/mcp",
+      "headers": { "Authorization": "Bearer {file:~/.secrets/eis_mcp_token}" }
+    }
+  }
+}
+```
+
+```bash
+mkdir -p ~/.secrets && chmod 700 ~/.secrets
+printf '%s' '<token>' > ~/.secrets/eis_mcp_token && chmod 600 ~/.secrets/eis_mcp_token
+opencode mcp list        # 期待 ✓ eis connected
+```
+
+Windows 若 `~` 不展開，改絕對路徑或直接寫 `"Bearer <token>"`。
+
+### 5.2 Claude Code
+
+```bash
+claude mcp add --transport http eis http://<host>:8765/mcp --header "Authorization: Bearer <token>"
+claude mcp list
+```
+
+### 5.3 Claude Desktop
+
+設定檔的 `mcpServers` 加：
+
+```json
+{"mcpServers": {"eis": {"url": "http://<host>:8765/mcp",
+                         "headers": {"Authorization": "Bearer <token>"}}}}
+```
+
+### 5.4 連線前先用 curl 驗證
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://<host>:8765/mcp        # 401 = 通了、只是沒 token
+curl -s -H "Authorization: Bearer <token>" http://<host>:8765/mcp -o /dev/null -w '%{http_code}\n'   # 非 401 = token 正確
+```
+
+## 6. 可以問什麼
+
+| tool | 例句 |
+|---|---|
+| `list_months` | 「有哪些月份的資料」 |
+| `get_project` | 「THORPE 現在什麼 stage、MP 是哪天」 |
+| `search_projects` | 「列出所有 Execution 階段的案子」「AMD 的案子有哪些」 |
+| `get_exceptions` / `get_health` | 「這個月要決定的事」「資料健康度」 |
+| `get_upcoming_milestones` | 「未來八週有哪些里程碑」「有哪些已經逾期」 |
+| `get_dept_loads` / `get_capacity` | 「哪些部門負載超過 100%」「產能曲線」 |
+| `diff_project` / `get_corrections` | 「THORPE 9 月和 8 月差在哪」「有哪些歷史數字被改過」 |
+
+resources：`eis://months`、`eis://YYYYMM/report.html`（該月的單頁月報 HTML）。
+
+每個回傳都帶 `meta.report_month`（快照月份 YYYYMM）與 `meta.latest_month`（1–12，最後一個有人力資料的月份）。`get_dept_loads` 的 `util` 是整數百分比，`min_util=85` 代表 85%。`diff_project` 回 `meta_a` / `meta_b`。
+
+## 7. 營運與維護
+
+- **Log**：`journalctl -u eis-mcp -f`。
+- **稽核**：`/var/lib/eis-mcp/audit.sqlite`，每次上傳、tool 呼叫、resource 讀取一列（誰、何時、哪個 tool、參數、結果、耗時）。查法：`sudo -u eis sqlite3 /var/lib/eis-mcp/audit.sqlite 'select at,name,action,status from audit order by id desc limit 20;'`
+- **敏感資料位置**（備份與權限比照原檔）：`input/`（原檔）、`snapshots/*/ingest.json`（被判定為 PII 的原始片段）、`audit.sqlite`、`tokens.yaml`。整個 `/var/lib/eis-mcp` 是 0700，服務以 `UMask=0077` 執行。
+- **加人 / 撤銷**：`sudo deploy/eis-token.sh add|rotate|revoke <名字>`（見 3.3），腳本會自動重啟服務。
+- **更新程式**：`cd dashboard_eis && git pull && sudo deploy/install.sh`（資料、tokens、env 都保留）。
+- **上傳無大小上限**（內網、uploader 限定）。
+- **DNS-rebinding 防護**：`EIS_ALLOWED_HOST_ARG` 建議一律設定，值要等於 client 實際打的 Host。
+
+## 8. 疑難排解
+
+| 症狀 | 原因 / 處理 |
+|---|---|
+| `systemctl status` 顯示 failed，log 有 `refusing to start; fix permissions` | 照 log 印出的 `chmod` 指令做，再 restart |
+| log 有 `tokens.yaml entry N: ...` | token 格式錯：空字串、placeholder、含 `<>`、role 不是 uploader/viewer、重複 |
+| client 回 401 | token 錯或沒帶 header；用 5.4 的 curl 分辨 |
+| client 連不上 | 防火牆沒開 port、`EIS_BIND_HOST` 是 127.0.0.1、或 `--allowed-host` 與 client 打的 Host 不一致（log 會有 rebinding 相關拒絕） |
+| `ingest_month` 回 `forbidden` | 用的是 viewer token |
+| `missing_input` | 四類檔案沒齊或檔名不合樣式（回應會列出允許的樣式） |
+| `rejected_pii` | 原檔（通常是 Control List 的任務描述）含工號或「Name(中文)」形狀；修好重傳 |
+| `snapshot_broken` | 快照檔損毀；重跑 `ingest_month` 該月 |
+| `unknown_month` | 該月沒 ingest 過；回應會列可用月份 |
+
+## 9. 開發機快速試跑（不裝 systemd）
+
+```bash
+python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
+mkdir -p server_data
+# 建 server_data/tokens.yaml（見 3.2），chmod 600
+.venv/bin/python -m src.eis_mcp --data server_data --host 0.0.0.0 --port 8765
+.venv/bin/python -m pytest tests -q      # 173 tests，不需啟動 server
+```
+
+設計文件：`docs/superpowers/specs/2026-09-18-eis-mcp-server-design.md`；操作說明：README §7；專案守則與資料語意：`AGENTS.md`。
