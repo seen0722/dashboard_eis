@@ -112,7 +112,7 @@ sudo -u eis cat /var/lib/eis-mcp/tokens.yaml
 | 檔案 | 內容 | 改完要 |
 |---|---|---|
 | `/etc/eis-mcp/env` | `EIS_BIND_HOST`（0.0.0.0）、`EIS_PORT`（8765）、`EIS_ALLOWED_HOST_ARG`（client 會打的 Host，例如 `--allowed-host eis-host:8765`，可多個） | `sudo systemctl restart eis-mcp` |
-| `/var/lib/eis-mcp/tokens.yaml` | `tokens: [{token, name, role}]`；token 用 `python3 -c 'import secrets;print(secrets.token_urlsafe(32))'` 產生；role 是 `uploader` 或 `viewer` | `sudo systemctl restart eis-mcp` |
+| `/var/lib/eis-mcp/tokens.yaml` | 每人一把 token 與角色；用 `deploy/eis-token.sh` 管理，見 §3.3 | 腳本自動重啟 |
 
 tokens.yaml 範例：
 
@@ -143,17 +143,49 @@ printf 'EIS_BIND_HOST=0.0.0.0\nEIS_PORT=8765\nEIS_ALLOWED_HOST_ARG=--allowed-hos
 - 過渡期不想管：把最後一行改成 `EIS_ALLOWED_HOST_ARG=`（空值）就關掉這道檢查，仍有 Bearer token 防護。
 - `/etc/eis-mcp` 目錄是 `750 root:eis`，一般帳號會 Permission denied，看或改都要 `sudo`；`sudo vim` 開到空白代表檔案不存在，用上面那行建。
 
-### 3.3 發 token 給同仁（一人一把）
+### 3.3 Token 管理（一人一把）
+
+**存放位置**：VM 的 `/var/lib/eis-mcp/tokens.yaml`（擁有者 `eis`、權限 600；一般帳號讀不到，要 `sudo`）。
 
 ```bash
-sudo deploy/eis-token.sh add <名字> viewer      # 只查詢
-sudo deploy/eis-token.sh add <名字> uploader    # 負責每月上傳的人
-sudo deploy/eis-token.sh list                   # 名字與角色（不顯示 token）
-sudo deploy/eis-token.sh rotate <名字>          # 換新，舊的立即失效
-sudo deploy/eis-token.sh revoke <名字>          # 離職／撤銷
+sudo cat /var/lib/eis-mcp/tokens.yaml
 ```
 
-`add` 會產生 token、寫進 `tokens.yaml`、重啟服務，並**只印出一次**（連同 client 設定片段）。管理者用一對一私訊交給本人，不要群組、不要 email 列表。名字要唯一，稽核表（`audit.sqlite`）就是靠它對到人。
+```yaml
+tokens:
+  - token: "xxxxxxxx…"        # 43 字元，secrets.token_urlsafe(32) 產生
+    name: "uploader-1"        # 稽核表用這個名字對人，必須唯一
+    role: uploader            # uploader | viewer
+  - token: "yyyyyyyy…"
+    name: "viewer-1"
+    role: viewer
+```
+
+**兩種角色**（包含關係：uploader 擁有 viewer 的全部權限，再加上傳與 ingest）：
+
+| 動作 | viewer | uploader |
+|---|---|---|
+| 所有查詢 tools 與 resources（`get_project`、`search_projects`、`get_exceptions`、`get_health`、`get_upcoming_milestones`、`get_dept_loads`、`get_capacity`、`diff_project`、`get_corrections`、`list_months`、`eis://…`） | ✓ | ✓ |
+| `POST /upload/{month}` 上傳 Excel 包 | 403 | ✓ |
+| `ingest_month` | forbidden | ✓ |
+
+原則：只查詢的人給 viewer；負責每月送資料的人（通常 SW PM）才給 uploader。自己一把 uploader 就夠，不需再拿 viewer。
+
+**日常操作一律用腳本**（在 repo 目錄，需 sudo）：
+
+```bash
+sudo deploy/eis-token.sh list                   # 名字與角色（不顯示 token）
+sudo deploy/eis-token.sh add <名字> viewer      # 新增，token 只印這一次（連 client 設定片段）
+sudo deploy/eis-token.sh add <名字> uploader
+sudo deploy/eis-token.sh rotate <名字>          # 換新，舊的立即失效
+sudo deploy/eis-token.sh revoke <名字>          # 離職／外洩時撤銷
+```
+
+腳本會寫回檔案、維持擁有者 `eis` 與 600、自動重啟服務（約 1 秒，client 下次呼叫自動重連）。
+
+**不要手動編輯 `tokens.yaml`**：以 root 存檔會把擁有者改成 root，服務重啟後讀不到（`PermissionError`）。真的手改了就 `sudo chown eis:eis /var/lib/eis-mcp/tokens.yaml && sudo systemctl restart eis-mcp`。
+
+**發放流程**：同仁私訊申請 → 管理者 `add` → 一對一私訊交付（不進群組、不進 email 列表、不上 wiki）→ 同仁存到 `~/.secrets/eis_mcp_token` 照 `docs/eis-mcp-client-setup.md` 設定。server 啟動時會拒絕：空 token、`REPLACE_ME`、含 `<` `>`、重複、role 不是 uploader/viewer。
 
 ### 3.4 TLS（選用）
 
