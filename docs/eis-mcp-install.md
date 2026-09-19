@@ -73,6 +73,17 @@ PYTHON=/opt/python3.12/bin/python3.12 sudo -E deploy/install.sh
 
 ### 3.0 主機連不到 PyPI / GitHub（公司內網常見）→ 離線安裝
 
+**最簡單的做法：repo 裡已經帶著全部離線檔案**（`deploy/offline/`：40 個 wheel 約 12 MB + Python 3.12 stripped 版約 32 MB）。主機只要能 `git clone`／`git pull` 這個 repo，就不需要再傳任何檔案：
+
+```bash
+cd dashboard_eis
+sudo mkdir -p /opt/python3.12                       # 主機 python3 < 3.12 時才需要這兩行
+sudo tar -xzf deploy/offline/cpython-3.12.*-install_only_stripped.tar.gz -C /opt/python3.12 --strip-components=1
+PYTHON=/opt/python3.12/bin/python3.12 sudo -E deploy/install.sh   # 自動偵測 deploy/offline/wheels，--no-index 安裝
+```
+
+以下兩種是連 GitHub 也連不到時的替代做法。
+
 在能上網的電腦（你的 Mac）打一個自足的安裝包，裡面有程式碼與全部 wheel（約 12 MB），主機端完全不需要網路：
 
 ```bash

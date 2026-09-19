@@ -34,10 +34,13 @@ chown -R root:root "$APP_DIR"; chmod -R a+rX "$APP_DIR"
 
 echo "== venv"
 [ -x "$APP_DIR/.venv/bin/python" ] || "$PY" -m venv "$APP_DIR/.venv"
-if [ -d "$SRC/wheels" ]; then
-  # 離線包（deploy/bundle-offline.sh 產出）：只用同層 wheels/，不碰 PyPI，也不升級 pip
-  echo "   offline: installing from $SRC/wheels ($(ls "$SRC/wheels" | wc -l | tr -d ' ') wheels)"
-  "$APP_DIR/.venv/bin/python" -m pip install -q --no-index --find-links "$SRC/wheels" -r "$APP_DIR/requirements.txt"
+WHEELS=""
+[ -d "$SRC/wheels" ] && WHEELS="$SRC/wheels"                                    # deploy/bundle-offline.sh 產出的包
+[ -z "$WHEELS" ] && [ -d "$SRC/deploy/offline/wheels" ] && WHEELS="$SRC/deploy/offline/wheels"   # 直接進版控的 wheel
+if [ -n "$WHEELS" ]; then
+  # 離線：只用本機 wheel，不碰 PyPI，也不升級 pip
+  echo "   offline: installing from $WHEELS ($(ls "$WHEELS" | wc -l | tr -d ' ') wheels)"
+  "$APP_DIR/.venv/bin/python" -m pip install -q --no-index --find-links "$WHEELS" -r "$APP_DIR/requirements.txt"
 else
   "$APP_DIR/.venv/bin/python" -m pip install -q --upgrade pip
   "$APP_DIR/.venv/bin/python" -m pip install -q -r "$APP_DIR/requirements.txt"
