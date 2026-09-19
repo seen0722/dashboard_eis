@@ -154,6 +154,25 @@ Resources：`eis://months`、`eis://<YYYYMM>/report.html`（月報 HTML）。
 python -m pytest tests -q
 ```
 
+### 7.6 內網主機部署（systemd）
+
+`deploy/` 有一組可直接用的部署檔：
+
+| 檔案 | 用途 |
+|---|---|
+| `deploy/install.sh` | 冪等安裝腳本：建 `eis` 服務帳號、程式碼 rsync 到 `/opt/eis-mcp`、建 venv、資料目錄 `/var/lib/eis-mcp`（0700）、首次產生 `tokens.yaml`、寫 `/etc/eis-mcp/env`、裝 unit 並啟動 |
+| `deploy/eis-mcp.service` | systemd unit：非 root、`UMask=0077`、程式碼唯讀、只允許寫資料目錄、失敗自動重啟、log 進 journald |
+| `deploy/env.example` | 監聽位址、port、`--allowed-host` 設定；安裝時複製到 `/etc/eis-mcp/env` |
+
+```bash
+git clone <repo> && cd dashboard_eis
+sudo deploy/install.sh              # 需 python3.12+；其他版本用 PYTHON=/usr/bin/python3.12 sudo -E deploy/install.sh
+sudo -u eis cat /var/lib/eis-mcp/tokens.yaml   # 發 token 給同仁
+journalctl -u eis-mcp -f
+```
+
+更新程式：`git pull && sudo deploy/install.sh`（資料、tokens、env 都保留）。加人或改 token：編輯 `/var/lib/eis-mcp/tokens.yaml` 後 `sudo systemctl restart eis-mcp`。
+
 ## 8. 已知限制
 
 - 每人每月填報上限 1.0 FTE，超載不會出現在數字裡；報告頁尾有註明。

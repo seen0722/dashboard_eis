@@ -1,0 +1,49 @@
+# EIS MCP server — systemd unit
+# 安裝：sudo cp deploy/eis-mcp.service /etc/systemd/system/ && sudo systemctl daemon-reload
+# 設定：/etc/eis-mcp/env（見 deploy/env.example）
+[Unit]
+Description=EIS MCP server (BU10 portfolio status over MCP)
+Documentation=file:///opt/eis-mcp/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=eis
+Group=eis
+WorkingDirectory=/opt/eis-mcp
+EnvironmentFile=/etc/eis-mcp/env
+# --allowed-host 由 env 的 EIS_ALLOWED_HOST 提供；留空則關閉 DNS-rebinding 防護
+ExecStart=/opt/eis-mcp/.venv/bin/python -m src.eis_mcp \
+    --data /var/lib/eis-mcp \
+    --host ${EIS_BIND_HOST} \
+    --port ${EIS_PORT} \
+    ${EIS_ALLOWED_HOST_ARG}
+Restart=on-failure
+RestartSec=5
+# 所有新建檔案一律 owner-only（tokens、原檔、快照、稽核都含敏感資料）
+UMask=0077
+
+# ---- 加固：程式碼唯讀，只允許寫資料目錄 ----
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/eis-mcp
+# 服務只需要對外聽 TCP，不需要其他 socket 家族
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+# stdout/stderr 進 journald：journalctl -u eis-mcp -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=eis-mcp
+
+[Install]
+WantedBy=multi-user.target

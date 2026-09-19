@@ -26,3 +26,7 @@ data/snapshots/
 
 # MCP server 資料根目錄：原檔、快照、token、稽核，全部不進版控
 server_data/
+
+# 本機開發雜物
+.claude/worktrees/
+.superpowers/
