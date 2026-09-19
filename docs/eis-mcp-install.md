@@ -20,7 +20,7 @@
 |---|---|
 | OS | Linux + systemd |
 | Python | 3.12 以上（`python3 --version`；太舊就另裝 3.12 並用 `PYTHON=` 指定） |
-| 工具 | `git`、`rsync`、`curl` |
+| 工具 | `rsync`、`curl`（線上安裝另需 `git`；離線安裝見 §3.0） |
 | 網路 | 開放一個 TCP port 給內網（預設 8765） |
 | 磁碟 | 每月一包約 50–100 MB（原檔 + 快照），一年 2 GB 內 |
 | 記憶體 | 服務本身 < 200 MB；ingest 瞬間可能到 500 MB |
@@ -47,11 +47,32 @@ sudo deploy/install.sh
 
 結束時會印出 token 位置、client 設定片段、上傳指令與 log 指令。
 
-若 Python 太舊：
+若 Python 太舊（Ubuntu 22.04 內建 3.10，實測過的做法）：
 
 ```bash
-PYTHON=/usr/bin/python3.12 sudo -E deploy/install.sh
+# 主機能連 apt 時（deadsnakes PPA；不動系統的 python3）
+sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt-get update
+sudo apt-get install -y python3.12 python3.12-venv
+PYTHON=python3.12 sudo -E deploy/install.sh
 ```
+
+主機連不到 PPA 時，在能上網的同版本 Ubuntu 機器上 `apt-get download python3.12 python3.12-venv python3.12-minimal libpython3.12-stdlib libpython3.12-minimal` 把 .deb 抓下來，scp 過去 `sudo dpkg -i *.deb`。
+
+### 3.0 主機連不到 PyPI / GitHub（公司內網常見）→ 離線安裝
+
+在能上網的電腦（你的 Mac）打一個自足的安裝包，裡面有程式碼與全部 wheel（約 12 MB），主機端完全不需要網路：
+
+```bash
+# Mac 上（預設打 Python 3.12 / x86_64 的 wheel；主機版本不同就帶參數）
+deploy/bundle-offline.sh              # 或 deploy/bundle-offline.sh 3.11 aarch64
+scp /tmp/eis-mcp-offline-<rev>.tar.gz <user>@<host>:/tmp/
+
+# 主機上
+cd /tmp && tar -xzf eis-mcp-offline-<rev>.tar.gz && cd eis-mcp-offline-<rev>
+sudo deploy/install.sh                # 看到同層 wheels/ 就自動 --no-index 安裝
+```
+
+先在主機確認 `python3 --version`，wheel 的 Python 版本必須一致（3.12 的包在 3.11 上裝不起來）。之後更新程式也是同樣流程：Mac 重打包、scp、`sudo deploy/install.sh`（資料與 tokens 保留）。
 
 ### 3.1 驗證安裝
 
@@ -200,6 +221,8 @@ resources：`eis://months`、`eis://YYYYMM/report.html`（該月的單頁月報 
 | 症狀 | 原因 / 處理 |
 |---|---|
 | `systemctl status` 顯示 failed，log 有 `refusing to start; fix permissions` | 照 log 印出的 `chmod` 指令做，再 restart |
+| log 有 `PermissionError: ... tokens.yaml` | 檔案擁有者不是 `eis`（手動以 root 編輯過）：`sudo chown eis:eis /var/lib/eis-mcp/tokens.yaml && sudo systemctl restart eis-mcp`；用 `deploy/eis-token.sh` 改就不會發生 |
+| `install.sh` 最後印 `WARN: /mcp returned '000'` 但 `systemctl is-active` 是 active | 主機啟動較慢；等 5 秒再 `curl` 一次。腳本已改為最多等 15 秒 |
 | log 有 `tokens.yaml entry N: ...` | token 格式錯：空字串、placeholder、含 `<>`、role 不是 uploader/viewer、重複 |
 | client 回 401 | token 錯或沒帶 header；用 5.4 的 curl 分辨 |
 | client 連不上 | 防火牆沒開 port、`EIS_BIND_HOST` 是 127.0.0.1、或 `--allowed-host` 與 client 打的 Host 不一致（log 會有 rebinding 相關拒絕） |

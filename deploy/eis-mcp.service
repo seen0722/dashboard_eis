@@ -13,12 +13,12 @@ User=eis
 Group=eis
 WorkingDirectory=/opt/eis-mcp
 EnvironmentFile=/etc/eis-mcp/env
-# --allowed-host 由 env 的 EIS_ALLOWED_HOST 提供；留空則關閉 DNS-rebinding 防護
+# $EIS_ALLOWED_HOST_ARG 不加大括號：systemd 對 $VAR 做字詞切割（可含多個 --allowed-host），${VAR} 則整串當一個參數
 ExecStart=/opt/eis-mcp/.venv/bin/python -m src.eis_mcp \
     --data /var/lib/eis-mcp \
     --host ${EIS_BIND_HOST} \
     --port ${EIS_PORT} \
-    ${EIS_ALLOWED_HOST_ARG}
+    $EIS_ALLOWED_HOST_ARG
 Restart=on-failure
 RestartSec=5
 # 所有新建檔案一律 owner-only（tokens、原檔、快照、稽核都含敏感資料）

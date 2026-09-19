@@ -40,7 +40,10 @@ else:
 tmp = path + ".tmp"
 with open(tmp, "w", encoding="utf-8") as f:
     yaml.safe_dump({"tokens": rows}, f, allow_unicode=True, sort_keys=False)
-import os; os.chmod(tmp, 0o600); os.replace(tmp, path)
+import os, shutil
+os.chmod(tmp, 0o600)
+st = os.stat(path); shutil.chown(tmp, st.st_uid, st.st_gid)   # 以 root 執行時，擁有者要維持服務帳號，否則服務讀不到
+os.replace(tmp, path)
 EOF
 }
 
@@ -55,7 +58,7 @@ restart() {
 case "$cmd" in
   list)   edit list "" "" ;;
   add)    [ -n "$name" ] && [ -n "$role" ] || { echo "usage: add <name> <uploader|viewer>" >&2; exit 2; }
-          tok=$(edit add "$name" "$role"); chown --reference="$DATA" "$FILE" 2>/dev/null || true; restart
+          tok=$(edit add "$name" "$role"); restart
           printf '\n%s (%s) token — shown once, deliver privately:\n\n  %s\n\nclient snippet:\n  {"mcpServers":{"eis":{"url":"http://<host>:8765/mcp","headers":{"Authorization":"Bearer %s"}}}}\n' "$name" "$role" "$tok" "$tok" ;;
   rotate) [ -n "$name" ] || { echo "usage: rotate <name>" >&2; exit 2; }
           tok=$(edit rotate "$name" ""); restart; printf '\n%s new token — shown once:\n\n  %s\n' "$name" "$tok" ;;

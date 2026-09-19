@@ -163,6 +163,7 @@ python -m pytest tests -q
 | `deploy/install.sh` | 冪等安裝腳本：建 `eis` 服務帳號、程式碼 rsync 到 `/opt/eis-mcp`、建 venv、資料目錄 `/var/lib/eis-mcp`（0700）、首次產生 `tokens.yaml`、寫 `/etc/eis-mcp/env`、裝 unit 並啟動 |
 | `deploy/eis-mcp.service` | systemd unit：非 root、`UMask=0077`、程式碼唯讀、只允許寫資料目錄、失敗自動重啟、log 進 journald |
 | `deploy/env.example` | 監聽位址、port、`--allowed-host` 設定；安裝時複製到 `/etc/eis-mcp/env` |
+| `deploy/bundle-offline.sh` | 主機連不到 PyPI 時：在 Mac 打包程式碼＋全部 wheel（約 12 MB），scp 到主機後 `sudo deploy/install.sh` 自動離線安裝 |
 | `deploy/eis-token.sh` | 發放／列出／輪換／撤銷 token：`sudo deploy/eis-token.sh add <名字> viewer`，產生後只印一次並自動重啟服務 |
 
 ```bash

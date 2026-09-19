@@ -34,8 +34,14 @@ chown -R root:root "$APP_DIR"; chmod -R a+rX "$APP_DIR"
 
 echo "== venv"
 [ -x "$APP_DIR/.venv/bin/python" ] || "$PY" -m venv "$APP_DIR/.venv"
-"$APP_DIR/.venv/bin/python" -m pip install -q --upgrade pip
-"$APP_DIR/.venv/bin/python" -m pip install -q -r "$APP_DIR/requirements.txt"
+if [ -d "$SRC/wheels" ]; then
+  # 離線包（deploy/bundle-offline.sh 產出）：只用同層 wheels/，不碰 PyPI，也不升級 pip
+  echo "   offline: installing from $SRC/wheels ($(ls "$SRC/wheels" | wc -l | tr -d ' ') wheels)"
+  "$APP_DIR/.venv/bin/python" -m pip install -q --no-index --find-links "$SRC/wheels" -r "$APP_DIR/requirements.txt"
+else
+  "$APP_DIR/.venv/bin/python" -m pip install -q --upgrade pip
+  "$APP_DIR/.venv/bin/python" -m pip install -q -r "$APP_DIR/requirements.txt"
+fi
 ( cd "$APP_DIR" && .venv/bin/python -c 'from mcp.server.mcpserver import MCPServer; import src.eis_mcp' )
 
 echo "== data dir $DATA_DIR (owner-only)"
@@ -72,11 +78,15 @@ echo "== systemd unit"
 install -m 644 "$SRC/deploy/eis-mcp.service" /etc/systemd/system/eis-mcp.service
 systemctl daemon-reload
 systemctl enable --now eis-mcp
-sleep 2
-systemctl --no-pager --lines=5 status eis-mcp || true
-
+systemctl restart eis-mcp      # 重跑安裝時程式碼可能已更新，一律重啟載入新版
 PORT=$(sed -n 's/^EIS_PORT=//p' "$ENV_DIR/env")
-CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT:-8765}/mcp" || true)
+CODE=000
+for i in $(seq 1 15); do        # 小型主機啟動要 3–5 秒，最多等 15 秒
+  sleep 1
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT:-8765}/mcp" || true)
+  [ "$CODE" = "401" ] && break
+done
+systemctl --no-pager --lines=3 status eis-mcp || true
 if [ "$CODE" = "401" ]; then
   echo "== OK: /mcp answers 401 without a token (auth is on)"
 else
