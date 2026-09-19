@@ -23,6 +23,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # 允許從任何目錄執行
 from i18n import strings  # noqa: E402
 from themes import THEMES, theme_css  # noqa: E402
+import reconcile  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "data" / "raw"
@@ -168,9 +169,16 @@ def read_actual(path, yyyymm, cfg, norm, disp):
     actual = defaultdict(lambda: dict.fromkeys(ROLES, 0.0))
     by_dept = defaultdict(lambda: defaultdict(float))
     dept_name = {}
+    # people：僅 D 組（人力明細）有工號/姓名。
+    # ⚠ 含個人資料 —— 只在 --with-names 時才會輸出到 HTML（見 render）。
+    #   Y 組（FU 百分比分攤）沒有到個人，故 FU RD 這裡永遠是空的。
+    people = defaultdict(lambda: defaultdict(list))   # key → (dept, role) → [(name, emp_id, fte, func)]
+    # dept_projects：部門檢視／碎片化用。部門 → 人 → 逐專案分佈。
+    # ⚠ 僅 D 組、僅 BU10。碎片化只對逐人資料有意義（見 AGENTS.md、設計 §5.3）。
+    dept_projects = defaultdict(lambda: defaultdict(list))  # dept → (emp_id, member) → [(project, fte, func)]
 
     for r in find_sheet(wb, r"\d{6}-人力明細").iter_rows(min_row=2, values_only=True):
-        dept, func, fte, name, bu = r[0], r[5], r[6], r[10], r[13]
+        dept, emp_id, member, func, fte, name, bu = r[0], r[2], r[3], r[5], r[6], r[10], r[13]
         if not name or not isinstance(fte, (int, float)):
             continue
         if str(dept).startswith(bad_prefix) or bu != "BU10":
@@ -181,6 +189,11 @@ def read_actual(path, yyyymm, cfg, norm, disp):
         role = "FU RD" if is_external(dept, bu) else ("BU PM" if func in PM_FUNCTIONS else "BU RD")
         actual[key][role] += fte
         by_dept[key][(dept, role)] += fte
+        people[key][(dept, role)].append((str(member), str(emp_id), fte, str(func)))
+        # 碎片化只看「BU10 內部」部門 —— 外部支援（FU RD）的填報只含其 BU10 切片，
+        # 據以算 focus 會把他們誤判成碎片（見設計 §5.3）。故排除 FU RD。
+        if role != "FU RD":
+            dept_projects[dept][(str(emp_id), str(member))].append((disp[key], fte, str(func)))
 
     for r in find_sheet(wb, r"\d{6}-ProjectCode人力").iter_rows(min_row=2, values_only=True):
         dept, fte, flag, name, bu = r[0], r[3], r[6], r[7], r[10]
@@ -196,7 +209,7 @@ def read_actual(path, yyyymm, cfg, norm, disp):
         by_dept[key][(dept, role)] += fte
 
     wb.close()
-    return actual, by_dept, dept_name
+    return actual, by_dept, dept_name, people, dept_projects
 
 
 def classify(plan, actual, disp, cfg):
@@ -251,14 +264,72 @@ def build_month(yyyymm, cfg, norm):
     review_file = find_file(f"{yyyymm}*.xlsx")
     disp = {}
     plan, disp, headcount = read_plan(plan_file, yyyymm, cfg, norm)
-    actual, by_dept, dept_name = read_actual(review_file, yyyymm, cfg, norm, disp)
+    actual, by_dept, dept_name, people, dept_projects = read_actual(review_file, yyyymm, cfg, norm, disp)
     over, other, skipped, all_projects = classify(plan, actual, disp, cfg)
-    return {
+
+    # 對照人工樞紐用：樞紐是「原始專案名 → FU 側 FTE（含 RFQ、不套別名）」，
+    # 故此處必須用 actual 端的原始名重算，不可用正規化後的 key。
+    fu_raw = raw_fu_by_project(review_file, cfg)
+
+    d = {
         "yyyymm": yyyymm, "over": over, "other": other, "skipped": skipped,
-        "all": all_projects, "by_dept": by_dept, "dept_name": dept_name,
+        "all": all_projects, "by_dept": by_dept, "dept_name": dept_name, "people": people,
+        "dept_projects": dept_projects,
         "headcount": headcount, "review_file": review_file.name,
         "excluded_mfg": mfg_total(review_file, cfg),
     }
+    d["checks"], d["recon_md"] = reconcile.run(
+        review_file, plan_file, yyyymm,
+        {"fu_by_project": fu_raw, "bu": "BU10", "over": over, "other": other,
+         "skipped": skipped, "candidates": cfg["aliases"].get("candidates") or {},
+         "excluded_mfg": d["excluded_mfg"]})
+    return d
+
+
+def raw_fu_by_project(review_file, cfg):
+    """用**與 dashboard 相同的 unit_role 規則**算 FU RD，但口徑對齊人工樞紐。
+
+    ⚠ 這裡不可偷懶去讀 `FU Project Code` 的原始加總 —— 那只驗證「我讀不讀得對那張表」，
+      並未驗證 dashboard 真正使用的判定規則（`dept_org != project_bu`，跨兩個資料源）。
+      會出錯的是規則，不是讀取。
+
+    口徑對齊（樞紐是 `FU Project Code` 的原始樞紐）：
+      - 用原始專案名，不套別名
+      - 不排除 RFQ
+      - 不排除製造
+      - 資料源用 `人力明細` + `FU Project Code`，以 (部門,專案) 去重
+        （全公司僅 16 組重疊，數值一致）
+    """
+    wb = openpyxl.load_workbook(review_file, data_only=True, read_only=True)
+    pct = list(find_sheet(wb, r"\d{6}-百分比分攤").iter_rows(values_only=True))
+    ibu = list(pct[0]).index("BU")
+    dept_org = {r[1]: r[ibu] for r in pct[1:] if r[1]}
+
+    def is_external(dept, project_bu):
+        org = dept_org.get(dept)
+        return str(dept)[0] == "F" if org is None else org != project_bu
+
+    fu = defaultdict(float)
+    seen = set()
+    for r in find_sheet(wb, r"\d{6}-人力明細").iter_rows(min_row=2, values_only=True):
+        dept, fte, name, bu = r[0], r[6], r[10], r[13]
+        if not name or not isinstance(fte, (int, float)):
+            continue
+        seen.add((dept, r[4]))
+        if is_external(dept, bu):
+            fu[str(name).strip()] += fte
+    try:
+        ws = find_sheet(wb, r"FU Project Code$")
+    except KeyError:
+        wb.close()
+        return {}
+    hdr = list(next(ws.iter_rows(max_row=1, values_only=True)))
+    ci = next((i for i, h in enumerate(hdr) if h and str(h).endswith("月")), 5)
+    for r in ws.iter_rows(min_row=2, values_only=True):
+        if r[4] and isinstance(r[ci], (int, float)) and (r[0], r[3]) not in seen:
+            fu[str(r[4]).strip()] += r[ci]
+    wb.close()
+    return dict(fu)
 
 
 # ---------- HTML ----------
@@ -271,17 +342,77 @@ def fmt(v, dp=2):
     return f"{v:.{dp}f}"
 
 
-def dept_rows(by_dept, key, dept_name, top_n, S):
+def dept_rows(by_dept, key, dept_name, top_n, S, people=None):
+    """部門下鑽。people 非 None（--with-names）時，在 BU RD/BU PM 部門底下再列人名。
+
+    ⚠ FU RD 不列人名 —— Y 組（百分比分攤）沒有到個人，只有部門攤提比例。
+    """
     rows = sorted(by_dept[key].items(), key=lambda x: -x[1])
     out = []
     for (dept, role), fte in rows[:top_n]:
         out.append(f'<tr><td class="mono">{esc(dept)}</td><td>{esc(dept_name.get(dept,"?"))}</td>'
                    f'<td class="mono dim">{role}</td><td class="num">{fmt(fte)}</td></tr>')
+        if people is not None and role in ("BU RD", "BU PM"):
+            for member, emp_id, pfte, func in sorted(people[key].get((dept, role), []),
+                                                     key=lambda x: -x[2]):
+                fn = f' · {esc(func)}' if func and func != "None" else ""
+                out.append(
+                    f'<tr class="person"><td class="mono dim">{esc(emp_id)}</td>'
+                    f'<td>{esc(member)}<span class="pfn">{fn}</span></td>'
+                    f'<td></td><td class="num dim">{fmt(pfte)}</td></tr>')
     if len(rows) > top_n:
         rest = sum(v for _, v in rows[top_n:])
         out.append(f'<tr class="rest"><td></td><td>{S["dept_rest"].format(n=len(rows)-top_n)}</td><td></td>'
                    f'<td class="num">{fmt(rest)}</td></tr>')
     return "".join(out)
+
+
+# ---------- 部門檢視 / 碎片化 ----------
+
+def herfindahl(shares):
+    """focus = Σ(share²)。1.0 = 全心單一；越低越碎。"""
+    tot = sum(shares)
+    return sum((s / tot) ** 2 for s in shares) if tot else 1.0
+
+
+def analyse_dept(dept_projects, frag_cfg):
+    """把 dept_projects 整理成部門檢視需要的結構，並算碎片化標記。
+
+    回傳 [{dept, people:[{name, emp_id, fte, focus, main_func, wide, flagged,
+                          projects:[(proj, fte, func)]}], n_flagged, total_fte}]
+    """
+    wide = set(frag_cfg["wide_functions"])
+    trivial = frag_cfg["trivial_share_fte"]
+    out = []
+    for dept, persons in dept_projects.items():
+        plist = []
+        for (emp_id, member), items in persons.items():
+            fte = sum(f for _, f, _ in items)
+            focus = herfindahl([f for _, f, _ in items])
+            # 主職能 = FTE 最大那筆的職能
+            main_func = max(items, key=lambda x: x[1])[2]
+            main_func = "" if main_func == "None" else main_func
+            is_wide = main_func in wide
+            # 非微量的專案數（打雜的 0.07 不算切換成本）
+            n_real = sum(1 for _, f, _ in items if f >= trivial)
+            limit = frag_cfg["wide_focus_max"] if is_wide else frag_cfg["deep_focus_max"]
+            flagged = focus < limit and n_real >= frag_cfg["min_projects"]
+            plist.append({
+                "name": member, "emp_id": emp_id, "fte": fte, "focus": focus,
+                "main_func": main_func, "wide": is_wide, "flagged": flagged,
+                "n_real": n_real,
+                "projects": sorted(items, key=lambda x: -x[1]),
+            })
+        plist.sort(key=lambda p: (not p["flagged"], p["focus"]))   # 碎片的排前面
+        out.append({
+            "dept": dept,
+            "people": plist,
+            "n_flagged": sum(1 for p in plist if p["flagged"]),
+            "total_fte": sum(p["fte"] for p in plist),
+        })
+    # 部門排序：先照碎片人數，再照總 FTE
+    out.sort(key=lambda d: (-d["n_flagged"], -d["total_fte"]))
+    return out
 
 
 # ---------- 圖表（inline SVG，無外部依賴） ----------
@@ -423,7 +554,9 @@ def chart_trend(months, series, S):
     if len(months) < 2 or not series:
         return ""
     W = 900
-    pad_l, pad_r, pad_t, pad_b = 92, 92, 34, 34
+    # pad_l/pad_r 要容得下兩端的「名稱 +值」標籤 —— 太窄時 "Foxtrot +21.5" 會被 viewBox
+    # 左緣切掉（實測 THORPE 被裁成 HORPE）。左標籤 x=pad_l-16 靠右延伸，需 ~100px 空間。
+    pad_l, pad_r, pad_t, pad_b = 124, 108, 34, 34
     H = max(320, 68 + len(series) * 30)
     iw, ih = W - pad_l - pad_r, H - pad_t - pad_b
     vals = [v for s in series for _, v in s["values"] if v is not None]
@@ -441,21 +574,30 @@ def chart_trend(months, series, S):
 
         ⚠ 必要而非美化 —— 未處理時 D5K2 +1.6 / AF900 +1.5 / AON100 +1.4
           三條標籤完全疊死，圖表等於讀不出來。
+
+        ⚠ 溢出用「鏈式回推 + 兩端夾住」，不可整體平移 ——
+          後者會把孤懸在頂端的離群標籤（如 202607 THORPE，其他 9 條擠在底部）
+          連坐往上拖出 canvas（實測拖到 y=-18，標籤消失、引線飛到右上角）。
         """
         GAP = 14.0
+        top = pad_t + 6
+        bot = pad_t + ih + 6
         order = sorted(items, key=lambda t: t[1])          # (idx, y) 由上而下
-        placed = {}
-        prev = -1e9
-        for idx, yy in order:
-            ny = max(yy, prev + GAP)
-            placed[idx] = ny
-            prev = ny
-        # 若整體被推超出下緣，整體上移
-        overflow = max(placed.values(), default=0) - (pad_t + ih + 6)
-        if overflow > 0:
-            for k in placed:
-                placed[k] -= overflow
-        return placed
+        placed = [[idx, yy] for idx, yy in order]
+        # 前推：由上而下，太近就往下擠
+        for i in range(1, len(placed)):
+            placed[i][1] = max(placed[i][1], placed[i - 1][1] + GAP)
+        # 回推：若最底超出下緣，改從底部往上推（只沿碰撞鏈傳播，孤懸標籤不受影響）
+        if placed and placed[-1][1] > bot:
+            placed[-1][1] = bot
+            for i in range(len(placed) - 2, -1, -1):
+                placed[i][1] = min(placed[i][1], placed[i + 1][1] - GAP)
+            # 頂端夾住：回推若把最上一條擠出上緣，再往下重排一次
+            if placed[0][1] < top:
+                placed[0][1] = top
+                for i in range(1, len(placed)):
+                    placed[i][1] = max(placed[i][1], placed[i - 1][1] + GAP)
+        return {idx: y for idx, y in placed}
 
     parts = []
     parts.append(f'<line class="zero" x1="{pad_l}" y1="{y(0):.1f}" x2="{W-pad_r}" y2="{y(0):.1f}"/>')
@@ -619,6 +761,8 @@ h3.sub { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; 
 .excess__u { font-size: 0.7rem; color: var(--ink-3); }
 .excess__pct { font-size: 0.74rem; color: var(--ink-3); margin-left: 0.55rem; font-family: var(--mono); }
 .card__body { padding: 0 1.35rem 1rem; }
+.roles-line { font-family: var(--mono); font-size: 0.76rem; color: var(--ink-2);
+  margin: 0.1rem 0 0.7rem; letter-spacing: -0.01em; }
 
 .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(172px, 1fr)); gap: 1px;
   background: var(--rule); border: 1px solid var(--rule); border-radius: var(--radius-sm); overflow: hidden;
@@ -651,6 +795,18 @@ summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; b
 .depts td { padding: 0.34rem 0.5rem; border-bottom: 1px solid var(--rule); }
 .depts tr:last-child td { border-bottom: none; }
 .depts tr.rest td { color: var(--ink-3); font-style: italic; }
+/* 人名列（--with-names）：縮排、淡色，視覺上從屬於上方部門列 */
+.depts tr.person td { border-bottom: none; padding-top: 0.15rem; padding-bottom: 0.15rem;
+  font-size: 0.94em; }
+.depts tr.person td:nth-child(2) { padding-left: 1.4rem; position: relative; }
+.depts tr.person td:nth-child(2)::before { content: "└"; position: absolute; left: 0.5rem;
+  color: var(--rule-2); }
+.depts tr.person .pfn { color: var(--ink-3); font-size: 0.85em; }
+/* 含個資警示 banner —— 常駐頁首，列印時也保留 */
+.pii-banner { position: sticky; top: 0; z-index: 50; background: var(--accent);
+  color: #fff; text-align: center; padding: 0.5rem 1rem; font-size: 0.8rem;
+  font-weight: 600; letter-spacing: 0.03em; font-family: var(--sans); }
+@media print { .pii-banner { position: static; } }
 .mono { font-family: var(--mono); font-size: 0.92em; }
 .dim { color: var(--ink-3); }
 .num { text-align: right; font-family: var(--serif); font-variant-numeric: tabular-nums; }
@@ -792,6 +948,60 @@ footer b { color: var(--ink-2); }
 """
 
 
+CSS_DEPT = """
+/* 部門碎片化頁專用 —— 逐人一列 + 堆疊 share bar */
+.pers { padding: 0.7rem 0 0.75rem; border-top: 1px solid var(--rule); }
+.pers:first-child { border-top: none; }
+.pers--flag .pers__who { font-weight: 600; }
+.pers__top { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+  flex-wrap: wrap; margin-bottom: 0.4rem; }
+.pers__who { font-size: 0.92rem; }
+.pers__fn { color: var(--ink-3); font-size: 0.74rem; margin-left: 0.4rem; font-family: var(--mono); }
+.pers__meta { display: flex; align-items: baseline; gap: 0.45rem; font-size: 0.78rem; color: var(--ink-3); }
+.pers__foc { font-family: var(--mono); }
+.pers__meta .num { font-family: var(--serif); color: var(--ink); font-size: 0.95rem; }
+.pers__u { font-size: 0.62rem; }
+.flag { background: var(--accent); color: #fff; font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; padding: 0.12rem 0.42rem; border-radius: 3px;
+  font-family: var(--sans); }
+/* 堆疊 share bar：分段越平均＝越碎，一眼可讀 */
+.pers__bar { display: flex; height: 20px; border-radius: 3px; overflow: hidden;
+  background: var(--rule); border: 1px solid var(--rule); }
+.seg { position: relative; display: flex; align-items: center; min-width: 2px; overflow: hidden;
+  border-right: 1px solid var(--surface); }
+.seg:last-child { border-right: none; }
+.seg--a { background: var(--accent-2); }
+.seg--b { background: var(--bar-neutral); }
+.pers--flag .seg--a { background: var(--accent); }
+.seg--triv { background: repeating-linear-gradient(45deg, var(--rule-2) 0 3px, transparent 3px 6px); }
+.seg__l { font-size: 0.66rem; color: var(--surface); padding: 0 0.4rem; white-space: nowrap;
+  font-family: var(--sans); mix-blend-mode: difference; }
+.seg--b .seg__l { color: var(--ink-2); mix-blend-mode: normal; }
+/* 部門選單 —— 選一個部門只顯示該卡，避免 53 張卡疊成超長頁 */
+.dept-nav { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap;
+  margin: 2.2rem 0 1.3rem; padding-bottom: 0.9rem; border-bottom: 1px solid var(--rule); }
+.dept-pick__l { font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
+  font-family: var(--sans); font-weight: 700; color: var(--ink-3); }
+.dept-pick { flex: 1; min-width: 0; max-width: 560px; appearance: none;
+  font-family: var(--serif); font-size: 1rem; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--rule-2); border-radius: var(--radius-sm); padding: 0.55rem 2.2rem 0.55rem 0.85rem;
+  cursor: pointer; letter-spacing: -0.01em;
+  background-image: linear-gradient(45deg, transparent 50%, var(--accent) 50%),
+                    linear-gradient(135deg, var(--accent) 50%, transparent 50%);
+  background-position: right 1rem center, right 0.72rem center;
+  background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; }
+.dept-pick:hover { border-color: var(--accent); }
+.dept-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.d-none { color: var(--ink-3); font-size: 0.82rem; font-style: italic; margin: 0.3rem 0; }
+.card__body details { margin-top: 0.6rem; }
+.card__body details .pers { padding-top: 0.55rem; padding-bottom: 0.55rem; }
+@media (max-width: 720px) {
+  .seg__l { display: none; }        /* 窄螢幕分段太細，標籤反而擋視線 → 只留 title */
+  .pers__bar { height: 16px; }
+}
+"""
+
+
 def mfg_total(review_file, cfg):
     """被排除的製造人力總量 —— 必須明示，不可靜默過濾。"""
     bad = tuple(cfg["plan_exclusions"]["exclude_dept_prefix"])
@@ -804,10 +1014,53 @@ def mfg_total(review_file, cfg):
     return total
 
 
-def render_month(d, cfg, S, lang):
+def render_unplanned_detail(unplanned, d, top_n, S, with_names=False):
+    """非計畫內專案的逐案明細：每案投入的部門與人力（下鑽複用 dept_rows）。
+
+    ⚠ 只呈現事實（誰／哪個部門／多少 FTE）。「為什麼不在計畫內」屬判斷，不在此臆測。
+    """
+    if not unplanned:
+        return ""
+    by_dept, dept_name, people = d["by_dept"], d["dept_name"], (d["people"] if with_names else None)
+    cards = ""
+    for i, o in enumerate(unplanned):
+        key = o["key"]
+        # 角色小計由 by_dept 反推（other 項不帶 actual_roles）
+        roles = defaultdict(float)
+        for (_, role), fte in by_dept[key].items():
+            roles[role] += fte
+        n_depts = len({dept for (dept, _) in by_dept[key]})
+        a = o["actual"]
+        sev = "sev--high" if a >= 3 else ("sev--mid" if a >= 1 else "sev--low")
+        cards += f"""
+      <article class="card {sev}">
+        <header class="card__head">
+          <div class="card__title"><span class="rank">{i+1:02d}</span><h3>{esc(o['name'])}</h3></div>
+          <div class="card__excess">
+            <span class="excess">{fmt(a)}</span><span class="excess__u">FTE</span>
+            <span class="excess__pct">{n_depts} {esc(S['u_depts'])}</span>
+          </div>
+        </header>
+        <div class="card__body">
+          <p class="roles-line">{esc(S['roles_line'].format(
+              rd=fmt(roles.get('BU RD', 0.0)), pm=fmt(roles.get('BU PM', 0.0)),
+              fu=fmt(roles.get('FU RD', 0.0))))}</p>
+          <details open><summary>{esc(S['depts'])}{' · ' + esc(S['with_names_hint']) if with_names else ''}</summary>
+            <table class="depts"><tbody>{dept_rows(by_dept, key, dept_name, top_n, S, people)}</tbody></table>
+          </details>
+        </div>
+      </article>"""
+    return f"""
+    <h3 class="sub">{esc(S['unplanned_detail_h'])}</h3>
+    <p class="src">{esc(S['unplanned_detail_src'])}</p>
+    {cards}"""
+
+
+def render_month(d, cfg, S, lang, with_names=False):
     """單月區塊：編制曲線 + 超配 + plan=0。"""
     th = cfg["thresholds"]
     top_n = th["display"]["top_depts"]
+    people = d["people"] if with_names else None
     yyyymm = d["yyyymm"]
     year, mon = int(yyyymm[:4]), int(yyyymm[4:6])
     ym = S["ym"](year, mon)
@@ -862,8 +1115,8 @@ def render_month(d, cfg, S, lang):
         </header>
         <div class="card__body">
           <div class="roles">{chart_roles(it['plan_roles'], it['actual_roles'])}</div>
-          <details><summary>{esc(S['depts'])}</summary>
-            <table class="depts"><tbody>{dept_rows(d['by_dept'], it['key'], d['dept_name'], top_n, S)}</tbody></table>
+          <details><summary>{esc(S['depts'])}{' · ' + esc(S['with_names_hint']) if with_names else ''}</summary>
+            <table class="depts"><tbody>{dept_rows(d['by_dept'], it['key'], d['dept_name'], top_n, S, people)}</tbody></table>
           </details>
         </div>
       </article>"""
@@ -920,6 +1173,7 @@ def render_month(d, cfg, S, lang):
         <p>{S['total_pending'].format(v=fmt(sum(o['actual'] for o in unplanned)), n=len(cands))}</p>
       </div>
     </div>
+    {render_unplanned_detail(unplanned, d, top_n, S, with_names)}
   </section>
   </div>"""
 
@@ -978,13 +1232,17 @@ def render_trend(months_data, S):
   </section>"""
 
 
-def render_all(months_data, cfg, lang, theme="editorial"):
+def render_all(months_data, cfg, lang, theme="editorial", with_names=False):
     S = strings(lang)
     cur = months_data[-1]
     year, mon = int(cur["yyyymm"][:4]), int(cur["yyyymm"][4:6])
     ym = S["ym"](year, mon)
     cands = cfg["aliases"].get("candidates") or {}
     norm_n = len({k.lower() for k in (cfg["aliases"].get("confirmed") or {})})
+
+    # 含個資版：頁首常駐紅色警示 banner，且列印時也保留（不像月份列會被隱藏）
+    pii_banner = (f'<div class="pii-banner">{esc(S["pii_warn"])}</div>'
+                  if with_names else "")
 
     rail = "".join(
         f'<button role="tab" aria-selected="{"true" if d is cur else "false"}" '
@@ -1004,6 +1262,7 @@ def render_all(months_data, cfg, lang, theme="editorial"):
 /* ── theme: {theme} ── */{theme_css(theme)}</style>
 </head>
 <body>
+{pii_banner}
 <div class="wrap">
   <header class="masthead reveal">
     <div class="kicker">{esc(S['kicker'])}</div>
@@ -1021,7 +1280,7 @@ def render_all(months_data, cfg, lang, theme="editorial"):
 
   {render_trend(months_data, S)}
 
-  {"".join(render_month(d, cfg, S, lang) for d in months_data)}
+  {"".join(render_month(d, cfg, S, lang, with_names) for d in months_data)}
 
   <footer>
     <h4>{esc(S['method_h'])}</h4>
@@ -1104,6 +1363,381 @@ def render_all(months_data, cfg, lang, theme="editorial"):
 """
 
 
+def render_dept_person(p, S):
+    """一位員工：工號姓名 + 主職能 + focus/FTE + 偏碎片標記 + 堆疊 share bar。"""
+    total = p["fte"] or 1.0
+    segs = ""
+    for j, (proj, fte, func) in enumerate(p["projects"]):
+        w = fte / total * 100
+        cls = "seg--triv" if fte < 0.1 else ("seg--a" if j % 2 == 0 else "seg--b")
+        lbl = f'<span class="seg__l">{esc(proj)}</span>' if w >= 16 else ""
+        segs += (f'<span class="seg {cls}" style="width:{w:.2f}%" '
+                 f'title="{esc(proj)} · {fmt(fte)} FTE">{lbl}</span>')
+    flag = f'<span class="flag">{esc(S["d_flagged_badge"])}</span>' if p["flagged"] else ""
+    breadth = f' · {esc(S["d_breadth"])}' if p["wide"] else ""
+    fn = esc(p["main_func"]) if p["main_func"] else "—"
+    return f"""
+      <div class="pers{' pers--flag' if p['flagged'] else ''}">
+        <div class="pers__top">
+          <div class="pers__who"><span class="mono dim">{esc(p['emp_id'])}</span> {esc(p['name'])}
+            <span class="pers__fn">{fn}{breadth}</span></div>
+          <div class="pers__meta">
+            <span class="pers__foc">{esc(S['d_focus'])} {fmt(p['focus'], 2)}</span>
+            <span class="num">{fmt(p['fte'])}</span><span class="pers__u">FTE</span>{flag}
+          </div>
+        </div>
+        <div class="pers__bar">{segs}</div>
+      </div>"""
+
+
+def render_dept_month(d, cfg, S):
+    """單月的部門碎片化區塊（一個 data-month pane）。"""
+    frag = cfg["thresholds"]["fragmentation"]
+    depts = analyse_dept(d["dept_projects"], frag)
+    dept_name = d["dept_name"]
+    n_people = sum(len(dp["people"]) for dp in depts)
+    n_flag = sum(dp["n_flagged"] for dp in depts)
+    tot_fte = sum(dp["total_fte"] for dp in depts)
+
+    cards = ""
+    options = ""
+    for i, dp in enumerate(depts):
+        sev = ("sev--high" if dp["n_flagged"] >= 2
+               else "sev--mid" if dp["n_flagged"] == 1 else "sev--low")
+        flagged = [p for p in dp["people"] if p["flagged"]]
+        focused = [p for p in dp["people"] if not p["flagged"]]
+        body = "".join(render_dept_person(p, S) for p in flagged) or \
+            f'<p class="d-none">{esc(S["d_none"])}</p>'
+        more = ""
+        if focused:
+            more = (f'<details><summary>{esc(S["d_more"].format(n=len(focused)))}</summary>'
+                    + "".join(render_dept_person(p, S) for p in focused) + "</details>")
+        name = dept_name.get(dp["dept"], "?")
+        # 選單選項：碎片優先（＝enumerate 順序），標註偏碎片數／人數，方便直接挑最該看的
+        opt_lbl = S["d_opt"].format(name=name, f=dp["n_flagged"], p=len(dp["people"]))
+        options += f'<option value="{i}">{esc(opt_lbl)}</option>'
+        cards += f"""
+      <article class="card deptcard {sev}" data-idx="{i}">
+        <header class="card__head">
+          <div class="card__title"><span class="rank mono">{esc(dp['dept'])}</span>
+            <h3>{esc(name)}</h3></div>
+          <div class="card__excess">
+            <span class="excess">{dp['n_flagged']}</span>
+            <span class="excess__u">{esc(S['d_flagged_badge'])}</span>
+            <span class="excess__pct">{len(dp['people'])} · {fmt(dp['total_fte'], 1)} FTE</span>
+          </div>
+        </header>
+        <div class="card__body">{body}{more}</div>
+      </article>"""
+
+    return f"""
+  <div data-month="{d['yyyymm']}">
+    <section>
+      <div class="sec__h"><span class="sec__n">01</span><h2>{esc(S['d_title'])}</h2></div>
+      <p class="src">{esc(S['d_src'])}</p>
+      <div class="kpis kpis--flat">
+        <div class="kpi"><span class="kpi__k">{esc(S['d_k_depts'])}</span>
+          <span class="kpi__v">{len(depts)}</span></div>
+        <div class="kpi"><span class="kpi__k">{esc(S['d_k_people'])}</span>
+          <span class="kpi__v">{n_people}</span></div>
+        <div class="kpi kpi--neg"><span class="kpi__k">{esc(S['d_k_flagged'])}</span>
+          <span class="kpi__v">{n_flag}</span></div>
+        <div class="kpi"><span class="kpi__k">{esc(S['d_k_fte'])}</span>
+          <span class="kpi__v">{fmt(tot_fte, 1)}</span><span class="kpi__u">FTE</span></div>
+      </div>
+      <div class="dept-nav">
+        <label class="dept-pick__l">{esc(S['d_pick'])}</label>
+        <select class="dept-pick">
+          {options}
+          <option value="all">{esc(S['d_all'])}</option>
+        </select>
+      </div>
+      {cards}
+    </section>
+  </div>"""
+
+
+def render_dept_all(months_data, cfg, lang, theme="editorial"):
+    """部門碎片化整頁 —— 逐人含個資，永遠 _internal + PII banner。"""
+    S = strings(lang)
+    cur = months_data[-1]
+    year, mon = int(cur["yyyymm"][:4]), int(cur["yyyymm"][4:6])
+    ym = S["ym"](year, mon)
+
+    rail = "".join(
+        f'<button role="tab" aria-selected="{"true" if d is cur else "false"}" '
+        f'data-go="{d["yyyymm"]}">{S["month"](int(d["yyyymm"][4:6]))}</button>'
+        for d in months_data)
+
+    return f"""<!doctype html>
+<html lang="{S['html_lang']}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{esc(S['d_doc_title'].format(ym=ym))}</title>
+<style>{CSS_BASE}{CSS_DEPT}
+/* ── theme: {theme} ── */{theme_css(theme)}</style>
+</head>
+<body>
+<div class="pii-banner">{esc(S['pii_warn'])}</div>
+<div class="wrap">
+  <header class="masthead reveal">
+    <div class="kicker">{esc(S['d_kicker'])}</div>
+    <h1>{esc(S['d_title'])}<em id="ym"> · {esc(ym)}</em></h1>
+    <p class="masthead__sub">{esc(S['source'])} {esc(cur['review_file'])} · 人力明細</p>
+  </header>
+
+  <nav class="rail reveal" role="tablist" aria-label="{esc(S['d_title'])}" style="animation-delay:60ms">
+    <span class="rail__y">{esc(S['rail_y'])}</span>
+    {rail}
+    <span class="rail__gap"></span>
+    <span class="rail__note">{esc(S['rail_note'].format(n=len(months_data)))}</span>
+  </nav>
+
+  {"".join(render_dept_month(d, cfg, S) for d in months_data)}
+
+  <footer>
+    <h4>{esc(S['method_h'])}</h4>
+    <ul><li>{esc(S['d_src'])}</li></ul>
+    <p style="margin-top:1.4rem"><code>src/build_review.py --lang {lang} --dept</code></p>
+  </footer>
+</div>
+<script>
+(function () {{
+  var rail = document.querySelector('.rail');
+  var panes = document.querySelectorAll('[data-month]');
+  function railHeight() {{
+    return getComputedStyle(rail).position === 'sticky' ? rail.offsetHeight : 0;
+  }}
+  function show(m, scroll) {{
+    panes.forEach(function (p) {{ p.classList.toggle('is-on', p.dataset.month === m); }});
+    rail.querySelectorAll('button').forEach(function (b) {{
+      b.setAttribute('aria-selected', String(b.dataset.go === m));
+    }});
+    var ym = document.getElementById('ym');
+    var btn = rail.querySelector('[data-go="' + m + '"]');
+    if (ym && btn) ym.textContent = ' · ' + btn.textContent + ' ' + m.slice(0, 4);
+    try {{ history.replaceState(null, '', '#' + m); }} catch (e) {{}}
+    if (scroll) {{
+      var pane = document.querySelector('[data-month="' + m + '"]');
+      if (pane) {{
+        var top = pane.getBoundingClientRect().top + window.pageYOffset - railHeight() - 8;
+        try {{ window.scrollTo({{ top: top, behavior: 'smooth' }}); }}
+        catch (e) {{ window.scrollTo(0, top); }}
+      }}
+    }}
+  }}
+  rail.addEventListener('click', function (e) {{
+    var b = e.target.closest('[data-go]');
+    if (b) show(b.dataset.go, true);
+  }});
+  var init = location.hash.slice(1);
+  show(document.querySelector('[data-month="' + init + '"]') ? init
+       : panes[panes.length - 1].dataset.month, false);
+
+  // 選單選部門 —— 每個月份 pane 各自 wiring，預設只顯示第一個（最碎的）部門，避免整頁很長。
+  // 漸進增強：若這段沒跑（JS 關閉），所有卡片維持顯示 → fallback 成完整長頁，不會空白。
+  panes.forEach(function (pane) {{
+    var sel = pane.querySelector('.dept-pick');
+    var cards = pane.querySelectorAll('.deptcard');
+    if (!sel || !cards.length) return;
+    function apply() {{
+      var v = sel.value;
+      cards.forEach(function (c) {{
+        c.style.display = (v === 'all' || c.dataset.idx === v) ? '' : 'none';
+      }});
+    }}
+    sel.addEventListener('change', apply);
+    sel.value = '0';        // 最碎的部門
+    apply();
+  }});
+}})();
+</script>
+</body>
+</html>
+"""
+
+
+def chart_project_bars(values, S):
+    """單一專案的 plan vs actual 逐月分組長條。
+
+    values: [(yyyymm, plan, actual)]，已依月份排序。
+    每月一組：plan（灰）+ actual（accent；超 plan 時深色）。
+    """
+    W, H = 900, 320
+    pad_l, pad_r, pad_t, pad_b = 46, 16, 26, 46
+    iw, ih = W - pad_l - pad_r, H - pad_t - pad_b
+    n = len(values)
+    hi = max([max(p, a) for _, p, a in values] + [0.5]) * 1.15
+    gw = iw / n                        # 每月群組寬
+    bw = gw * 0.30                     # 單根長條寬
+
+    def y(v):
+        return pad_t + ih - v / hi * ih
+
+    def gx(i):
+        return pad_l + gw * (i + 0.5)
+
+    # y 軸格線（動態級距）
+    step = 5 if hi <= 30 else (10 if hi <= 80 else 20)
+    parts = []
+    v = 0
+    while v <= hi:
+        parts.append(f'<line class="grid" x1="{pad_l}" y1="{y(v):.1f}" x2="{W-pad_r}" y2="{y(v):.1f}"/>'
+                     f'<text class="ax" x="{pad_l-8}" y="{y(v)+4:.1f}" text-anchor="end">{v}</text>')
+        v += step
+
+    for i, (m, p, a) in enumerate(values):
+        cx = gx(i)
+        over = a > p + 0.001
+        # plan（左）
+        parts.append(f'<rect class="b-plan" x="{cx-bw-1:.1f}" y="{y(p):.1f}" width="{bw:.1f}" '
+                     f'height="{max(pad_t+ih-y(p),0):.1f}" rx="1.5"/>')
+        # actual（右）—— 超 plan 用深 accent，否則 accent-2
+        acls = "b-ex" if over else "b-act"
+        parts.append(f'<rect class="{acls}" x="{cx+1:.1f}" y="{y(a):.1f}" width="{bw:.1f}" '
+                     f'height="{max(pad_t+ih-y(a),0):.1f}" rx="1.5"/>')
+        # 數值標籤
+        parts.append(f'<text class="bv" x="{cx-bw/2-1:.1f}" y="{y(p)-5:.1f}" text-anchor="middle">{p:.1f}</text>')
+        parts.append(f'<text class="bv bv--a{" val--over" if over else ""}" x="{cx+bw/2+1:.1f}" '
+                     f'y="{y(a)-5:.1f}" text-anchor="middle">{a:.1f}</text>')
+        parts.append(f'<text class="tick" x="{cx:.1f}" y="{H-pad_b+18:.1f}" text-anchor="middle">'
+                     f'{S["month"](int(str(m)[4:6]))}</text>')
+    # 圖例
+    parts.append(f'<rect class="b-plan" x="{pad_l}" y="8" width="12" height="10" rx="1.5"/>'
+                 f'<text class="lg" x="{pad_l+18}" y="17">{esc(S["pj_lg_plan"])}</text>')
+    parts.append(f'<rect class="b-act" x="{pad_l+90}" y="8" width="12" height="10" rx="1.5"/>'
+                 f'<text class="lg lg--a" x="{pad_l+108}" y="17">{esc(S["pj_lg_act"])}</text>')
+    return scrollable(f'<svg class="chart" viewBox="0 0 {W} {H}" role="img" '
+                      f'aria-label="{esc(S["pj_title"])}">{"".join(parts)}</svg>')
+
+
+def build_projects(months_data):
+    """把每月 d['all'] 攤成 逐專案時間序列。
+
+    回傳 [{key, name, values:[(yyyymm, plan, actual)], latest_a, peak_a}]，依最新月 actual 排序。
+    """
+    months = [d["yyyymm"] for d in months_data]
+    keys = {k for d in months_data for k in d["all"]}
+    out = []
+    for k in keys:
+        vals = []
+        name = k
+        for d in months_data:
+            rec = d["all"].get(k)
+            if rec:
+                name = rec["name"]
+            vals.append((d["yyyymm"], rec["plan"] if rec else 0.0, rec["actual"] if rec else 0.0))
+        acts = [a for _, _, a in vals]
+        out.append({"key": k, "name": name, "values": vals,
+                    "latest_a": vals[-1][2], "peak_a": max(acts) if acts else 0.0,
+                    "avg_a": sum(acts) / len(acts) if acts else 0.0})
+    # 有意義的排前面：最新月 actual 大者優先，其次全期高峰
+    out.sort(key=lambda p: (-p["latest_a"], -p["peak_a"]))
+    return out
+
+
+def render_project_all(months_data, cfg, lang, theme="editorial"):
+    """逐專案專頁 —— 下拉選一個專案，看它 plan vs actual 逐月長條。無個資，可外流。"""
+    S = strings(lang)
+    cur = months_data[-1]
+    year, mon = int(cur["yyyymm"][:4]), int(cur["yyyymm"][4:6])
+    ym = S["ym"](year, mon)
+    projects = build_projects(months_data)
+    nmax = len(months_data)
+
+    options, cards = "", ""
+    for i, pj in enumerate(projects):
+        vals = pj["values"]
+        last_p, last_a = vals[-1][1], vals[-1][2]
+        gap = last_a - last_p
+        peak = max(vals, key=lambda t: t[2])
+        options += f'<option value="{i}">{esc(S["pj_opt"].format(name=pj["name"], a=fmt(pj["latest_a"],1)))}</option>'
+        gap_cls = "kpi--neg" if gap > 0.05 else ""
+        cards += f"""
+      <article class="card pjcard sev--low" data-idx="{i}">
+        <header class="card__head">
+          <div class="card__title"><span class="rank mono">{i+1:02d}</span><h3>{esc(pj['name'])}</h3></div>
+          <div class="card__excess">
+            <span class="excess">{fmt(last_a,1)}</span><span class="excess__u">FTE</span>
+            <span class="excess__pct">plan {fmt(last_p,1)} · {ym}</span>
+          </div>
+        </header>
+        <div class="card__body">
+          {chart_project_bars(vals, S)}
+          <div class="kpis kpis--flat">
+            <div class="kpi"><span class="kpi__k">{esc(S['pj_k_latplan'])}</span>
+              <span class="kpi__v">{fmt(last_p,1)}</span><span class="kpi__u">FTE</span></div>
+            <div class="kpi"><span class="kpi__k">{esc(S['pj_k_latest'].format(ym=ym))}</span>
+              <span class="kpi__v">{fmt(last_a,1)}</span><span class="kpi__u">FTE</span></div>
+            <div class="kpi {gap_cls}"><span class="kpi__k">{esc(S['pj_k_gap'].format(ym=ym))}</span>
+              <span class="kpi__v">{gap:+.1f}</span><span class="kpi__u">FTE</span></div>
+            <div class="kpi"><span class="kpi__k">{esc(S['pj_k_peak'])}</span>
+              <span class="kpi__v">{fmt(peak[2],1)}</span>
+              <span class="kpi__u">{S['month'](int(str(peak[0])[4:6]))}</span></div>
+            <div class="kpi"><span class="kpi__k">{esc(S['pj_k_avg'])}</span>
+              <span class="kpi__v">{fmt(pj['avg_a'],1)}</span><span class="kpi__u">FTE</span></div>
+          </div>
+        </div>
+      </article>"""
+
+    return f"""<!doctype html>
+<html lang="{S['html_lang']}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{esc(S['pj_doc_title'].format(ym=ym))}</title>
+<style>{CSS_BASE}{CSS_DEPT}
+/* ── theme: {theme} ── */{theme_css(theme)}</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead reveal">
+    <div class="kicker">{esc(S['pj_kicker'])}</div>
+    <h1>{esc(S['pj_title'])}<em id="ym"> · {esc(ym)}</em></h1>
+    <p class="masthead__sub">{esc(S['source'])} {esc(cur['review_file'])} · 2026_plan.xlsx</p>
+  </header>
+
+  <section>
+    <div class="sec__h"><span class="sec__n">00</span><h2>{esc(S['pj_title'])}</h2></div>
+    <p class="src">{esc(S['pj_src'].format(n=nmax))}</p>
+    <div class="dept-nav">
+      <label class="dept-pick__l">{esc(S['pj_pick'])}</label>
+      <select class="dept-pick">{options}</select>
+    </div>
+    {cards}
+  </section>
+
+  <footer>
+    <h4>{esc(S['method_h'])}</h4>
+    <ul><li>{esc(S['pj_src'].format(n=nmax))}</li></ul>
+    <p style="margin-top:1.4rem"><code>src/build_review.py --lang {lang} --project</code></p>
+  </footer>
+</div>
+<script>
+(function () {{
+  var sel = document.querySelector('.dept-pick');
+  var cards = document.querySelectorAll('.pjcard');
+  if (!sel || !cards.length) return;
+  function apply() {{
+    var v = sel.value;
+    cards.forEach(function (c) {{ c.style.display = (c.dataset.idx === v) ? '' : 'none'; }});
+    // 圖表在隱藏時 scrollWidth 為 0，顯示後補捲到最右（近月）
+    var on = document.querySelector('.pjcard[data-idx="' + v + '"]');
+    if (on) on.querySelectorAll('.chart-wrap').forEach(function (w) {{
+      if (w.scrollWidth > w.clientWidth + 4) w.scrollLeft = w.scrollWidth;
+    }});
+  }}
+  sel.addEventListener('change', apply);
+  sel.value = '0';
+  apply();
+}})();
+</script>
+</body>
+</html>
+"""
+
+
 def main():
     ap = argparse.ArgumentParser(description="BU10 人力執行 review — 實際 vs 計畫")
     ap.add_argument("months", nargs="*", help="要納入的月份（預設：data/raw 裡全部）")
@@ -1111,6 +1745,13 @@ def main():
     ap.add_argument("--theme", default="editorial", choices=list(THEMES),
                     help="; ".join(f'{k}: {v["label"]}' for k, v in THEMES.items()))
     ap.add_argument("--all-themes", action="store_true", help="產出全部主題供比較")
+    ap.add_argument("--with-names", action="store_true",
+                    help="⚠ 在 BU RD／PM 部門下鑽列出員工姓名工號（含個資，輸出檔名標記 _internal，勿外流）")
+    ap.add_argument("--dept", action="store_true",
+                    help="⚠ 產出部門碎片化頁（逐人、含個資，檔名 _dept_internal，勿外流）"
+                         "而非實際 vs 計畫報表")
+    ap.add_argument("--project", action="store_true",
+                    help="產出逐專案專頁（下拉選專案看 plan vs actual 逐月長條；無個資，可外流）")
     a = ap.parse_args()
 
     cfg = load_config()
@@ -1126,17 +1767,65 @@ def main():
     lang_sfx = "" if lang == "zh" else f"_{lang}"
     themes = list(THEMES) if a.all_themes else [a.theme]
     dests = []
+
+    # --dept：獨立的部門碎片化頁（逐人、含個資），不產一般報表
+    if a.dept:
+        for t in themes:
+            t_sfx = "" if t == "editorial" and not a.all_themes else f"_{t}"
+            dest = OUT / f"review{lang_sfx}_dept_internal{t_sfx}.html"
+            dest.write_text(render_dept_all(months_data, cfg, lang, t), encoding="utf-8")
+            dests.append(dest)
+        for d in months_data:
+            frag = cfg["thresholds"]["fragmentation"]
+            depts = analyse_dept(d["dept_projects"], frag)
+            nf = sum(dp["n_flagged"] for dp in depts)
+            print(f"[{d['yyyymm']}] dept fragmentation: {len(depts)} depts, {nf} flagged")
+        for d in dests:
+            print(f"→ {d}")
+        return
+
+    # --project：獨立的逐專案專頁（plan vs actual 逐月長條；無個資）
+    if a.project:
+        projects = build_projects(months_data)
+        for t in themes:
+            t_sfx = "" if t == "editorial" and not a.all_themes else f"_{t}"
+            dest = OUT / f"review{lang_sfx}_project{t_sfx}.html"
+            dest.write_text(render_project_all(months_data, cfg, lang, t), encoding="utf-8")
+            dests.append(dest)
+        print(f"逐專案：{len(projects)} 個專案　·　最新月前五："
+              + "、".join(f"{p['name']} {p['latest_a']:.1f}" for p in projects[:5]))
+        for d in dests:
+            print(f"→ {d}")
+        return
+
+    name_sfx = "_internal" if a.with_names else ""
     for t in themes:
         t_sfx = "" if t == "editorial" and not a.all_themes else f"_{t}"
-        dest = OUT / f"review{lang_sfx}{t_sfx}.html"
-        dest.write_text(render_all(months_data, cfg, lang, t), encoding="utf-8")
+        dest = OUT / f"review{lang_sfx}{name_sfx}{t_sfx}.html"
+        dest.write_text(render_all(months_data, cfg, lang, t, a.with_names), encoding="utf-8")
         dests.append(dest)
+
+    for d in months_data:
+        rp = OUT / f"recon_{d['yyyymm']}.md"
+        rp.write_text(d["recon_md"], encoding="utf-8")
+        dests.append(rp)
 
     for d in months_data:
         tot = sum(o["excess"] for o in d["over"])
         print(f"[{d['yyyymm']}] over-plan {len(d['over'])} projects, total +{tot:.2f} FTE")
         for o in d["over"]:
             print(f"     {o['name']:<16}{o['plan']:6.1f} → {o['actual']:6.2f}  ({o['excess']:+.2f})")
+    print()
+    for d in months_data:
+        bad = [c for c in d["checks"] if c.status != reconcile.PASS]
+        n = len(d["checks"])
+        if bad:
+            print(f"[{d['yyyymm']}] 驗證：{n-len(bad)}/{n} 通過 —— 需注意：")
+            for c in bad:
+                print(f"     {c.icon} {c.name}")
+        else:
+            print(f"[{d['yyyymm']}] 驗證：{n}/{n} 全部通過")
+
     if len(months_data) >= 2:
         a, b = months_data[0], months_data[-1]
         print(f"\n{a['yyyymm']} → {b['yyyymm']} 超出合計 "

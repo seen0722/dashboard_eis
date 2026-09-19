@@ -22,6 +22,22 @@ own_departments:
   - BA80710R01   # 研發三部-研發一課
   - BA80720R01   # 研發三部-研發二課
 
+# 碎片化（部門檢視 review_dept）
+# focus = Σ(share²)，越低越碎。⚠ 實測：單一門檻會誤報 —— BSP 深度職能 focus<0.7 就是警訊，
+#         PM/QTC 廣度職能 focus 0.2 是常態。故按職能分級（見設計 §5.3）。
+fragmentation:
+  # 廣度職能：天生跨案，門檻放寬。EIS_FUNCTION 屬這些的人，focus 低不標記
+  wide_functions: [PM, "ME PM", "RD PM", RDPM, "RE PM", "NPI PM", "SYSTEM PM",
+                   "Sales PM", QTC, SQA, "ME Test", NPI, "NPI MC"]
+  # 深度職能的碎片門檻（focus 低於此且專案數 ≥ min_projects 才標記）
+  deep_focus_max: 0.7
+  # 廣度職能的碎片門檻（更寬鬆；低於此才值得一看）
+  wide_focus_max: 0.3
+  min_projects: 3
+  # 微量支援不計入「專案數」的門檻：< 此 FTE 的專案視為打雜，不算切換成本
+  #   例：0.93/0.07 兩案，0.07 是打雜 → 實質專責，不該標碎片
+  trivial_share_fte: 0.1
+
 # ---- BU10 Portfolio Review（src/portfolio）----
 portfolio:
   mp_slip_days: 60            # MP 較 Original MP 延後超過此天數 → 例外

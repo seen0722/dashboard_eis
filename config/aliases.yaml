@@ -16,12 +16,13 @@ confirmed:
   kilo10: 'tablet 10" - new project'      # plan 用佔位名，實際執行有正式代號
   kilo12: 'tablet 12" - new project'
   mania_s: 'mania-s'                       # 底線 vs 連字號。注意 Mania-C 與 Mania-S 是兩個不同專案
+  # 需求方確認 2026-07-16（原為 candidates，已驗證撞名安全：三個目標都在 plan、
+  #   三個 actual 名本身都不在 plan，不會蓋掉現有專案）
+  af310: 'af130'                          # AF130 plan 有 actual 無、AF310 actual 有 plan 無，各缺一邊 → plan 打錯字
+  mania: 'mania-c'                        # Mania → Mania-C（BD/Aopen）。與 Mania-S 是兩個不同專案
+  pickle: 'pickle ball'                   # PICKLE → Pickle Ball（Trenton）
 
 # 演算法推測，需求方尚未確認 → 只列出、不生效（僅 confirmed 會被套用）
 # ⚠ 這些必須真的列在這裡而不是被註解掉——報告會顯示「尚有 N 條未確認」，
 #   註解掉會讓 N 變成 0，把未知顯示成「沒有問題」。
-candidates:
-  af310: 'af130'          # 字串 0.80、量級 0.86、都是 EMS。AF110/AF210/AF900 兩邊都對得上，
-                          # 只有 AF130（plan 有 actual 無）與 AF310（actual 有 plan 無）各缺一邊，像打錯字
-  mania: 'mania-c'        # 字串 0.83、都是 BD/Aopen。注意 Mania-C 與 Mania-S 是兩個不同專案
-  pickle: 'pickle ball'   # 字串 0.71、都是 Trenton
+candidates: {}

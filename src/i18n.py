@@ -30,6 +30,8 @@ STRINGS = {
         "k_count": "專案數", "k_plan_tot": "plan 合計", "k_act_tot": "actual 合計", "k_ex_tot": "超出合計",
         "by_project": "逐專案明細",
         "depts": "人力來自哪些單位",
+        "with_names_hint": "含成員（BU RD／PM）",
+        "pii_warn": "⚠ 含個人資料（員工姓名／工號）· 限內部使用 · 請勿轉寄或公開",
         "dept_rest": "其餘 {n} 個部門",
         "skipped": "超出低於 {t} FTE 未列入圖表：{items}",
 
@@ -38,6 +40,12 @@ STRINGS = {
                     "plan 與 actual 以專案名稱比對",
         "zeroed_h": "plan 有此列但已編為 0",
         "unplanned_h": "plan 無此專案",
+        "unplanned_detail_h": "非計畫內專案 · 逐案明細",
+        "unplanned_detail_src": "「非計畫內」＝ plan 分頁查無此案 —— 可能是計畫後才啟動，"
+                                "或名稱未對上別名（見附註）。以下列出實際投入的部門與人力，"
+                                "供判斷該補計畫、或該收斂。",
+        "u_depts": "個部門",
+        "roles_line": "BU RD {rd} · BU PM {pm} · FU RD {fu}　FTE",
         "total": "合計 {v} FTE",
         "total_pending": "合計 {v} FTE　·　含 {n} 條名稱待確認（見附註）",
 
@@ -50,6 +58,36 @@ STRINGS = {
         "totals_h": "每月超出合計",
         "totals_src": "長條下方數字為當月超配專案數",
         "mover_up": "增加最多", "mover_down": "減少最多",
+
+        # 部門碎片化頁（--dept；逐人、含個資）
+        "d_kicker": "BU10 · 部門碎片化",
+        "d_title": "人力碎片化檢視",
+        "d_doc_title": "BU10 部門碎片化 {ym}",
+        "d_src": "focus = Σ(每案佔比²)：1.00 ＝ 全心單一案，越低越分散。"
+                 "當某人 focus 低於其職能門檻（深度職能 0.70／廣度職能 0.30）"
+                 "且非微量專案數 ≥ 3，標為偏碎片。僅 D 組（人力明細）逐人資料、僅 BU10。",
+        "d_k_depts": "部門", "d_k_people": "人數", "d_k_flagged": "偏碎片", "d_k_fte": "總 FTE",
+        "d_flagged_badge": "偏碎片",
+        "d_focus": "專注度",
+        "d_breadth": "廣度職能",
+        "d_none": "此部門無偏碎片人員",
+        "d_more": "其餘 {n} 人（專責，未標記）",
+        "d_pick": "選擇部門",
+        "d_all": "── 顯示全部部門 ──",
+        "d_opt": "{name}　·　{f} 偏碎片 / {p} 人",
+
+        # 單一專案專頁（--project）
+        "pj_kicker": "BU10 · 逐專案檢視",
+        "pj_title": "逐專案 · plan vs 實際",
+        "pj_doc_title": "BU10 逐專案檢視 {ym}",
+        "pj_src": "選一個專案，看它 {n} 個月的 plan（計畫編列）與 actual（實際投入）逐月對照。"
+                  "各月資料皆取自該月自己的檔案。",
+        "pj_pick": "選擇專案",
+        "pj_opt": "{name}　·　最新 {a} FTE",
+        "pj_lg_plan": "plan 計畫", "pj_lg_act": "actual 實際",
+        "pj_k_latest": "最新 actual · {ym}", "pj_k_latplan": "最新 plan",
+        "pj_k_gap": "差距 · {ym}", "pj_k_peak": "actual 高峰", "pj_k_avg": "actual 月均",
+        "pj_none": "此專案無資料",
 
         "method_h": "計算方式",
         "notes_h": "附註",
@@ -92,6 +130,8 @@ STRINGS = {
         "k_count": "Projects", "k_plan_tot": "Plan total", "k_act_tot": "Actual total", "k_ex_tot": "Total excess",
         "by_project": "Project detail",
         "depts": "Contributing departments",
+        "with_names_hint": "with members (BU RD/PM)",
+        "pii_warn": "⚠ Contains personal data (names / employee IDs) · Internal use only · Do not forward or publish",
         "dept_rest": "{n} other departments",
         "skipped": "Excess below {t} FTE, not charted: {items}",
 
@@ -100,6 +140,13 @@ STRINGS = {
                     "plan and actual are matched by project name",
         "zeroed_h": "In plan, allocated 0",
         "unplanned_h": "Not in plan",
+        "unplanned_detail_h": "Not in Plan — Project Detail",
+        "unplanned_detail_src": "\"Not in plan\" = the project is absent from the plan sheet — it may have "
+                                "started after planning, or a name did not match an alias (see notes). "
+                                "The departments and people actually staffed are listed below, to judge "
+                                "whether to add it to the plan or wind it down.",
+        "u_depts": "depts",
+        "roles_line": "BU RD {rd} · BU PM {pm} · FU RD {fu}　FTE",
         "total": "Total {v} FTE",
         "total_pending": "Total {v} FTE　·　includes {n} names pending confirmation (see notes)",
 
@@ -112,6 +159,37 @@ STRINGS = {
         "totals_h": "Total excess by month",
         "totals_src": "The figure under each bar is that month's over-plan project count",
         "mover_up": "Largest increase", "mover_down": "Largest decrease",
+
+        # Department fragmentation page (--dept; per-person, contains personal data)
+        "d_kicker": "BU10 · Fragmentation",
+        "d_title": "Manpower Fragmentation",
+        "d_doc_title": "BU10 Fragmentation — {ym}",
+        "d_src": "Focus = Σ(share²): 1.00 means fully on a single project, lower means more scattered. "
+                 "A person is flagged when focus falls below the threshold for their function "
+                 "(deep roles 0.70, breadth roles 0.30) across at least 3 non-trivial projects. "
+                 "Per-person data comes from the D group (人力明細) only, BU10 only.",
+        "d_k_depts": "Departments", "d_k_people": "People", "d_k_flagged": "Spread thin", "d_k_fte": "Total FTE",
+        "d_flagged_badge": "spread thin",
+        "d_focus": "focus",
+        "d_breadth": "breadth role",
+        "d_none": "No one flagged in this department",
+        "d_more": "{n} more (focused, not flagged)",
+        "d_pick": "Department",
+        "d_all": "── Show all departments ──",
+        "d_opt": "{name}　·　{f} spread thin / {p} people",
+
+        # Single-project view (--project)
+        "pj_kicker": "BU10 · By Project",
+        "pj_title": "By Project · Plan vs. Actual",
+        "pj_doc_title": "BU10 By Project — {ym}",
+        "pj_src": "Pick a project to see its planned allocation vs. actual staffing across {n} months. "
+                  "Each month is read from its own file.",
+        "pj_pick": "Project",
+        "pj_opt": "{name}　·　latest {a} FTE",
+        "pj_lg_plan": "plan", "pj_lg_act": "actual",
+        "pj_k_latest": "Actual · {ym}", "pj_k_latplan": "Plan (latest)",
+        "pj_k_gap": "Gap · {ym}", "pj_k_peak": "Actual peak", "pj_k_avg": "Actual avg/mo",
+        "pj_none": "No data for this project",
 
         "method_h": "Method",
         "notes_h": "Notes",
