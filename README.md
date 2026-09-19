@@ -148,13 +148,17 @@ Resources：`eis://months`、`eis://<YYYYMM>/report.html`（月報 HTML）。
 
 所有回傳都帶 `meta.report_month`；每個 tool 回傳出口都再過一次 PII 檢查。
 
-### 7.5 測試
+### 7.5 給同事的 client 設定文件
+
+`docs/eis-mcp-client-setup.md`：只需填 `<HOST>` 與 `<TOKEN>`，寫成可以直接丟給 OpenCode / Claude 照著執行的步驟（連線前 curl 檢查、存 token、設定檔、驗證、可以問什麼、疑難排解）。
+
+### 7.6 測試
 
 ```bash
 python -m pytest tests -q
 ```
 
-### 7.6 內網主機部署（systemd）
+### 7.7 內網主機部署（systemd）
 
 `deploy/` 有一組可直接用的部署檔：
 
