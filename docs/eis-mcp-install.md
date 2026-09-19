@@ -128,6 +128,21 @@ tokens:
 
 server 啟動時會拒絕：空 token、`REPLACE_ME`、含 `<` `>` 的 token、重複 token、`input/` 非 0700、`tokens.yaml` 非 0600（會印出該下的 chmod 指令）。
 
+### 3.2a 設定 client 會用的位址（`--allowed-host`；OA 電腦 curl 回 421 就是這裡）
+
+`--allowed-host` 檢查的是 **server 自己的位址**（client 在 URL 裡打的 host:port），跟 client 有幾台無關。100 台電腦都用同一個位址連，只需要一個值。同事有人打 IP、有人打主機名，就每種各加一個。
+
+一行寫入（`/etc/eis-mcp/env` 不存在就建、存在就覆蓋），IP 換成 VM 自己的內網 IP，然後重啟：
+
+```bash
+printf 'EIS_BIND_HOST=0.0.0.0\nEIS_PORT=8765\nEIS_ALLOWED_HOST_ARG=--allowed-host 172.18.220.125:8765 --allowed-host localhost:8765 --allowed-host 127.0.0.1:8765\n' | sudo tee /etc/eis-mcp/env >/dev/null && sudo chown root:eis /etc/eis-mcp/env && sudo chmod 640 /etc/eis-mcp/env && sudo systemctl restart eis-mcp && sleep 4 && systemctl is-active eis-mcp && sudo cat /etc/eis-mcp/env
+```
+
+- 看到 `active` 與三行內容即完成；client 的 `<HOST>` 填同一個 `IP:8765`。
+- 有內網 DNS 名稱時（例如 `eis-mcp.pega.local`）改填名稱，之後換 IP 不用改設定。
+- 過渡期不想管：把最後一行改成 `EIS_ALLOWED_HOST_ARG=`（空值）就關掉這道檢查，仍有 Bearer token 防護。
+- `/etc/eis-mcp` 目錄是 `750 root:eis`，一般帳號會 Permission denied，看或改都要 `sudo`；`sudo vim` 開到空白代表檔案不存在，用上面那行建。
+
 ### 3.3 發 token 給同仁（一人一把）
 
 ```bash
@@ -249,7 +264,8 @@ resources：`eis://months`、`eis://YYYYMM/report.html`（該月的單頁月報 
 | `install.sh` 最後印 `WARN: /mcp returned '000'` 但 `systemctl is-active` 是 active | 主機啟動較慢；等 5 秒再 `curl` 一次。腳本已改為最多等 15 秒 |
 | log 有 `tokens.yaml entry N: ...` | token 格式錯：空字串、placeholder、含 `<>`、role 不是 uploader/viewer、重複 |
 | client 回 401 | token 錯或沒帶 header；用 5.4 的 curl 分辨 |
-| client 連不上 | 防火牆沒開 port、`EIS_BIND_HOST` 是 127.0.0.1、或 `--allowed-host` 與 client 打的 Host 不一致（log 會有 rebinding 相關拒絕） |
+| client 連不上（curl `000`） | 防火牆沒開 port、`EIS_BIND_HOST` 是 127.0.0.1、不同網段 |
+| 帶 token 的 curl 回 `421` | `--allowed-host` 沒包含 client 打的 host:port；照 §3.2a 一行改 |
 | `ingest_month` 回 `forbidden` | 用的是 viewer token |
 | `missing_input` | 四類檔案沒齊或檔名不合樣式（回應會列出允許的樣式） |
 | `rejected_pii` | 原檔（通常是 Control List 的任務描述）含工號或「Name(中文)」形狀；修好重傳 |
