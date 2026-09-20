@@ -74,7 +74,10 @@ def build_app(store: Store, tokens: dict[str, Principal], *, cfg: Config | None 
         ts = TransportSecuritySettings(enable_dns_rebinding_protection=True, allowed_hosts=list(allowed_hosts), allowed_origins=[])
     else:
         ts = TransportSecuritySettings(enable_dns_rebinding_protection=False)
-    app = mcp.streamable_http_app(host=host, transport_security=ts)
+    # stateless：每個請求獨立、不發 Mcp-Session-Id。stateful 模式預設閒置 30 分鐘就回收 session，
+    # client（OpenCode）拿舊 id 再呼叫會被拒且不會自動重新 initialize；本服務的 tools 每次都從 header
+    # 重新判身分、不依賴 session，因此不需要 session。json_response：一般 JSON 回應而非 SSE，對反向代理更友善。
+    app = mcp.streamable_http_app(host=host, transport_security=ts, stateless_http=True, json_response=True)
     app.add_middleware(BearerAuthMiddleware, tokens=tokens)
     app.state.eis = state
     return app
