@@ -127,6 +127,7 @@ claude mcp list
 | `opencode mcp list` 顯示 eis 連不上 | 回第 1 步兩個 curl；`000` 是網路、`401` 是 token、`421` 是 allowed-host |
 | tool 回 `unknown_month` | 回應裡有可用月份清單，換一個 |
 | tool 回 `forbidden` | 這個 token 是 viewer，該操作需要 uploader |
+| 閒置一陣子後出現 `Session not found` | server 版本太舊（stateful session 30 分鐘過期）；請管理者 `git pull && sudo deploy/install.sh` 更新，之後不會再發生 |
 | tool 回 `snapshot_broken` | 請管理者重跑該月 `ingest_month` |
 
 完整安裝與營運手冊：`docs/eis-mcp-install.md`；設計：`docs/superpowers/specs/2026-09-18-eis-mcp-server-design.md`。
