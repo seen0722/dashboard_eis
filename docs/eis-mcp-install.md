@@ -296,7 +296,7 @@ resources：`eis://months`、`eis://YYYYMM/report.html`（該月的單頁月報 
 | `install.sh` 最後印 `WARN: /mcp returned '000'` 但 `systemctl is-active` 是 active | 主機啟動較慢；等 5 秒再 `curl` 一次。腳本已改為最多等 15 秒 |
 | log 有 `tokens.yaml entry N: ...` | token 格式錯：空字串、placeholder、含 `<>`、role 不是 uploader/viewer、重複 |
 | client 回 401 | token 錯或沒帶 header；用 5.4 的 curl 分辨 |
-| client 連不上（curl `000`） | 防火牆沒開 port、`EIS_BIND_HOST` 是 127.0.0.1、不同網段 |
+| client 連不上（curl `000`/`403`/`502`） | 公司 proxy 把內網 IP 送出去了：client 設 `NO_PROXY=<server IP>`（見 `docs/eis-mcp-client-setup.md` §0）；或防火牆沒開 port、`EIS_BIND_HOST` 是 127.0.0.1、不同網段 |
 | 帶 token 的 curl 回 `421` | `--allowed-host` 沒包含 client 打的 host:port；照 §3.2a 一行改 |
 | `ingest_month` 回 `forbidden` | 用的是 viewer token |
 | `missing_input` | 四類檔案沒齊或檔名不合樣式（回應會列出允許的樣式） |

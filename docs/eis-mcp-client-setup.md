@@ -10,6 +10,21 @@ EIS MCP server 是公司內網的 HTTP 服務，提供 BU10 專案的 EIS 狀態
 協定：MCP Streamable HTTP，端點 `http://<HOST>/mcp`，認證 `Authorization: Bearer <TOKEN>`。
 server 端不含任何 LLM；模型在 client 端。
 
+## 0. 公司電腦有 proxy 時：內網 IP 要加進不走 proxy 的例外（必做）
+
+OpenCode 走環境變數 `NO_PROXY`，不看 Windows 系統 proxy 設定。已有 `NO_PROXY` 就用逗號把 `<HOST>` 的 IP 接在後面，不要蓋掉。
+
+Windows（PowerShell，設一次永久生效）：
+
+```powershell
+[Environment]::SetEnvironmentVariable("NO_PROXY", "<HOST的IP>,localhost,127.0.0.1", "User")
+[Environment]::SetEnvironmentVariable("no_proxy", "<HOST的IP>,localhost,127.0.0.1", "User")
+```
+
+macOS / Linux：在 `~/.zshrc`（或 `~/.bashrc`）加 `export NO_PROXY=<HOST的IP>,localhost,127.0.0.1` 與 `export no_proxy=$NO_PROXY`。
+
+設完**關閉並重開終端機與 OpenCode**。第 1 步回 `000`、`403` 或 `502` 多半是這步沒生效。長期做法是請 IT 給 server 一個公司網域的 DNS 名稱（proxy 的 PAC 通常已對公司網域直連）。
+
 ## 1. 連線前檢查（一定要做）
 
 ```bash
