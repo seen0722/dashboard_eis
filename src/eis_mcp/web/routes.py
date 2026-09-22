@@ -128,6 +128,8 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
                     raise WebError(404, "Nothing ingested yet", "<p>An uploader must upload a month and call ingest_month first.</p>", "no_snapshot")
                 return RedirectResponse(f"/ui/{latest}/", status_code=307)
             snap = load_snap(state, month)
-            return render_shell(title="Overview", body="<section><p class=\"empty\">Overview arrives in the next task.</p></section>",
-                                months=ok, month=month, suffix="", meta=snap["meta"], active="overview")
+            weeks = int_param(request, "weeks", int(state.cfg.thresholds.get("upcoming_weeks", 8)), 1, 52)
+            today = date_param(request)
+            body = pages_overview.overview_body(snap, state.cfg.thresholds, today, weeks)
+            return render_shell(title="Overview", body=body, months=ok, month=month, suffix="", meta=snap["meta"], active="overview")
         return await respond(state, request, build)

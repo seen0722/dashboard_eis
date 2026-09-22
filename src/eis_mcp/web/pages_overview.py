@@ -1,6 +1,8 @@
 """月份清單與總覽頁的 body。所有數字來自 snapshot / store.months()。"""
 from __future__ import annotations
 from html import escape as e
+from ...portfolio.render.page import exceptions_html, health_html, stage_strip_html
+from .. import queries
 from .shell import fmt_month
 
 
@@ -20,3 +22,23 @@ def months_body(months: list[dict]) -> str:
     return (f'<section><h2>Months</h2><p class="lead">Every month the server knows. Only months with status ok can be browsed.</p>'
             f'<div class="wide"><table><thead><tr><th>Month</th><th>Status</th><th>Last ingest</th><th>By</th><th>Ingest status</th>'
             f'<th class="num">Files</th><th>Categories</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>')
+
+
+def _milestones(month: str, res: dict) -> str:
+    rows = "".join(f'<tr><td>{e(r["date"])}</td><td class="num {"sig" if r["days_left"] < 0 else ""}">{r["days_left"]}</td>'
+                   f'<td><a href="/ui/{month}/projects/{e(r["code"])}">{e(r["name"])}</a></td><td>{e(r["stage_cat"])}</td><td>{r["milestone"].upper()}</td></tr>'
+                   for r in res["milestones"])
+    if not rows:
+        return f'<p class="empty">No EVT/DVT/PVT/MP within ±{res["weeks"]} weeks of {e(res["today"])}.</p>'
+    return (f'<table><thead><tr><th>Date</th><th class="num">Days left</th><th>Project</th><th>Stage</th><th>Milestone</th></tr></thead>'
+            f'<tbody>{rows}</tbody></table><p class="dim">Negative days left = already passed. Active projects only (in briefing, not suspended).</p>')
+
+
+def overview_body(snap: dict, th: dict, today: str, weeks: int) -> str:
+    month = snap["meta"]["report_month"]; lm = snap["meta"]["latest_month"]
+    up = queries.upcoming(snap, today, weeks)
+    form = (f'<form method="get" class="filters"><label>Weeks <input type="number" name="weeks" value="{weeks}" min="1" max="52"></label>'
+            f'<label>Today <input type="text" name="today" value="{e(today)}" size="10"></label><button>Apply</button></form>')
+    return (f'<section><h2>Decisions this month</h2><p class="lead">Exceptions the rules found, ranked; each names the decision asked for.</p>{exceptions_html(snap, "en", th)}</section>'
+            f'<section>{stage_strip_html(snap, "en", lm)}<h2>Milestones within {weeks} weeks</h2>{form}{_milestones(month, up)}</section>'
+            f'<section><h2>Data health</h2><p class="lead">What the source files could not answer.</p>{health_html(snap, "en")}</section>')

@@ -101,3 +101,14 @@ def test_every_ok_page_writes_audit_row(ingested):
 def test_nav_month_is_not_over_escaped():
     t = render_shell(title="x", body="", months=["202609"], month="202609")
     assert 'href="/ui/202609/projects"' in t
+
+
+# ---- 總覽 ----
+def test_overview_shows_decisions_health_and_milestones(ingested):
+    t = html(ingested, f"/ui/202609/?today={TODAY}")
+    assert "Decisions this month" in t and "Data health" in t and '<ol class="ex">' in t and "report_month 202609" in t
+    assert "Milestones within 8 weeks" in t and "THORPE" in t and "-43" in t          # MP 2026-07-31 距 2026-09-12 已過 43 天
+    t2 = html(ingested, f"/ui/202609/?today={TODAY}&weeks=2")
+    assert "Milestones within 2 weeks" in t2 and "-43" not in t2
+    assert get(ingested, "/ui/202609/?weeks=0").status_code == 400
+    assert get(ingested, "/ui/202609/?today=13/09/2026").status_code == 400

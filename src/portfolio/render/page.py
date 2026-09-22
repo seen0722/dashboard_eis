@@ -156,3 +156,7 @@ def render_page(snap: dict, lang: str, today: str, th: dict) -> str:
 <footer><p>{e(t(lang, "foot_1"))}</p><p>{e(t(lang, "foot_2"))}</p><p>{e(t(lang, "foot_3"))}</p></footer>
 <script>(function(){{var s=document.getElementById('pick'),ps=document.querySelectorAll('#projects .proj');function show(i){{ps.forEach(function(p){{p.style.display=p.dataset.idx===String(i)?'':'none';}});}}s.addEventListener('change',function(){{show(s.value);}});show(s.value);}})();</script>
 </body></html>"""
+
+
+# 給 src/eis_mcp/web 重用的片段（底線版本仍是本模組內部的名字）。
+exceptions_html, stage_strip_html, health_html, project_card_html = _exceptions, _stage_strip, _health, _appendix_one
