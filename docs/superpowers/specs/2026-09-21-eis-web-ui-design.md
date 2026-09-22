@@ -86,9 +86,9 @@ route handler
 | 路徑 | 內容 | 對應 tool |
 |---|---|---|
 | `/ui/` | 月份清單（status、ingest 時間、上傳檔 category/size，不含原始檔名），最新 ok 月份放最上面並標示 latest；沒有任何月份時顯示「nothing ingested yet」 | `list_months` |
-| `/ui/latest/` | 302 到最新 ok 月份的總覽（nav 與書籤用）；沒有月份時 404 | — |
+| `/ui/latest/` | 307 到最新 ok 月份的總覽（nav 與書籤用）；沒有月份時 404 | — |
 | `/ui/{month}/` | 總覽：Decisions this month、stage 統計條、里程碑視窗（±N 週，與 `get_upcoming_milestones` 同義，不是月報的「-1 週到 +N 週」）、Data health。N 取 `cfg.thresholds["upcoming_weeks"]`，可用 `?weeks=`、`?today=` 覆蓋 | `get_exceptions` / `get_health` / `get_upcoming_milestones` |
-| `/ui/{month}/projects?stage_cat=&group=&customer=&q=` | 專案表：code、name、stage、stage_cat、customer、group、latest FTE。四個篩選欄位為 GET 表單，狀態在 URL；`stage_cat` 用下拉（七個固定值），`group`/`customer` 用下拉（從快照 distinct 值填）；`q` 對應 tool 的 `text`。nav 搜尋框也送到這裡；結果剛好一筆時 302 到該單案頁 | `search_projects` |
+| `/ui/{month}/projects?stage_cat=&group=&customer=&q=` | 專案表：code、name、stage、stage_cat、customer、group、latest FTE。四個篩選欄位為 GET 表單，狀態在 URL；`stage_cat` 用下拉（七個固定值），`group`/`customer` 用下拉（從快照 distinct 值填）；`q` 對應 tool 的 `text`。nav 搜尋框也送到這裡；結果剛好一筆時 307 到該單案頁 | `search_projects` |
 | `/ui/{month}/projects/{code}` | 單案：基本資料、dates、`in_briefing`/`in_control_list`/`has_plan`、FTE 與 NTD 12 個月表、PVA 圖（重用 `charts.pva_svg`）、tasks、history；頂端「compare with previous month」連到 diff（前一個 ok 月份存在時才顯示） | `get_project` |
 | `/ui/{month}/projects/{code}/diff?to={YYYYMM}` | 跨月差異表：欄位、a、b；巢狀欄位攤平成 `dates.evt`、`pva.SW.plan` 這種鍵；`changed` 為空顯示 identical | `diff_project` |
 | `/ui/{month}/loads?min_util=` | 部門負載表（dept、function、util 12 個月、latest_util，`min_util` 篩選）+ 產能圖（重用 `charts.capacity_svg`）。橘色標「latest_util 低於 `spare_capacity_pct`」的閒置產能，與月報第 5 條例外同義；不標 100%（mock 實測 54 個部門有 47 個是 100%，標了等於沒標） | `get_dept_loads` / `get_capacity` |
@@ -135,9 +135,9 @@ route handler
 - `tests/eis_mcp/test_queries.py`：每個 `queries.*` 函式的單元測試，用 `tests/portfolio/test_cli.build_input` 產的快照。
 - `tests/eis_mcp/test_web.py`：`starlette.testclient.TestClient(build_app(...))`，不需要 MCP client helper。
   - 認證邊界（§2.2 三條）。
-  - `/ui/` 200 列出月份且 latest 標示正確；`/ui/latest/` 302 到最新月；無月份時 `/ui/` 200 顯示提示、`/ui/latest/` 404。
+  - `/ui/` 200 列出月份且 latest 標示正確；`/ui/latest/` 307 到最新月；無月份時 `/ui/` 200 顯示提示、`/ui/latest/` 404。
   - 總覽含 exceptions 標題與 health 列；`?weeks=2` 改變里程碑數量。
-  - projects 篩選：`stage_cat`、`group`、`q` 各一；`q` 命中一筆時 302 到單案頁。
+  - projects 篩選：`stage_cat`、`group`、`q` 各一；`q` 命中一筆時 307 到單案頁。
   - 單案頁含 code、name、PVA `<svg>`；多筆候選頁；查無 404。
   - diff：有差異、identical、`to` 無 snapshot 404。
   - loads：`min_util` 篩選；corrections 頁。
