@@ -9,6 +9,7 @@
 EIS MCP server 是公司內網的 HTTP 服務，提供 BU10 專案的 EIS 狀態（stage、里程碑、人力、例外事項）。
 協定：MCP Streamable HTTP，端點 `http://<HOST>/mcp`，認證 `Authorization: Bearer <TOKEN>`。
 server 端不含任何 LLM；模型在 client 端。
+不想裝任何 client 的話，直接用瀏覽器開 `http://<HOST>:<PORT>/ui/`（唯讀、免 token；內容與下面的 tools 一樣）。
 
 ## 0. 公司電腦有 proxy 時：內網 IP 要加進不走 proxy 的例外（必做）
 

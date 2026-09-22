@@ -180,6 +180,30 @@ journalctl -u eis-mcp -f
 
 更新程式：`git pull && sudo deploy/install.sh`（資料、tokens、env 都保留）。加人或改 token：編輯 `/var/lib/eis-mcp/tokens.yaml` 後 `sudo systemctl restart eis-mcp`。
 
+### 7.8 網頁查詢（免登入、唯讀）
+
+同一支服務也提供瀏覽器介面：`http://<HOST>:<PORT>/ui/`。**沒有存取管制**（內網同仁全部視為 viewer），所以只該開在內網；VPS 那台的 nginx 只代理 `/mcp` 與 `/upload/`，不要把 `/ui/` 開到公網。
+
+| 路徑 | 內容 | 對應 tool |
+|---|---|---|
+| `/ui/` | 月份清單；`/ui/latest/` 轉到最新月份 | `list_months` |
+| `/ui/<YYYYMM>/` | Decisions、stage 統計、里程碑視窗（`?weeks=`、`?today=`）、Data health | `get_exceptions` / `get_health` / `get_upcoming_milestones` |
+| `/ui/<YYYYMM>/projects?stage_cat=&group=&customer=&q=` | 專案表；`q` 剛好一筆時直接進單案 | `search_projects` |
+| `/ui/<YYYYMM>/projects/<code or name>` | 單案全紀錄、PVA 圖、tasks、history | `get_project` |
+| `/ui/<YYYYMM>/projects/<code>/diff?to=<YYYYMM>` | 跨月差異 | `diff_project` |
+| `/ui/<YYYYMM>/loads?min_util=` | 部門負載與產能圖 | `get_dept_loads` / `get_capacity` |
+| `/ui/<YYYYMM>/corrections` | 歷史數字被改 | `get_corrections` |
+| `/ui/<YYYYMM>/report.html` | 完整月報 | resource |
+
+每頁出口都過一次 PII 檢查（命中則整頁不出、回 503），並在 `audit.sqlite` 記一列 `kind=web`（無 name/role）。
+
+前置 nginx 只需多開一個 location（範例在 `deploy/nginx.conf.sample`）：
+
+```nginx
+location /ui/ { proxy_pass http://127.0.0.1:8765; proxy_set_header Host $host; }
+location = /ui { return 301 /ui/; }
+```
+
 ## 8. 已知限制
 
 - 每人每月填報上限 1.0 FTE，超載不會出現在數字裡；報告頁尾有註明。
