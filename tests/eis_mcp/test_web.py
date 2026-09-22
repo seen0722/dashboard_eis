@@ -176,3 +176,5 @@ def test_diff_flatten():
     ch = {"stage": {"a": "PVT", "b": "MP"}, "dates": {"mp": {"a": None, "b": "2026-01-01"}}, "tasks": {"a_count": 1, "b_count": 2},
           "pva": {"BU RD": {"plan": {"a": [1.0], "b": [2.0]}}}}
     assert flatten_changes(ch) == [("dates.mp", "–", "2026-01-01"), ("pva.BU RD.plan", "[1.0]", "[2.0]"), ("stage", "PVT", "MP"), ("tasks (count)", "1", "2")]
+    added = {"pva": {"FU RD": {"a": None, "b": {"role": "FU RD", "plan": [1.0], "actual": [0.0]}}}}
+    assert flatten_changes(added) == [("pva.FU RD", "–", "{role: FU RD, plan: [1.0], actual: [0.0]}")]

@@ -63,6 +63,8 @@ def _fmt(v) -> str:
         return "–"
     if isinstance(v, list):
         return "[" + ", ".join(_fmt(x) for x in v) + "]"
+    if isinstance(v, dict):
+        return "{" + ", ".join(f"{k}: {_fmt(x)}" for k, x in v.items()) + "}"
     return str(v)
 
 
