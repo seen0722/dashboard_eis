@@ -29,11 +29,11 @@ def fmt_month(month: str) -> str:
 def _nav(months: list[str], month: str | None, suffix: str, active: str) -> str:
     links = [f'<a href="/ui/"{" class=\"on\"" if active == "months" else ""}>Months</a>']
     if month:
-        links += [f'<a href="/ui/{month}/{path}"{" class=\"on\"" if active == key else ""}>{label}</a>' for key, label, path in NAV]
-        opts = "".join(f'<option value="/ui/{m}/{e(suffix)}"{" selected" if m == month else ""}>{fmt_month(m)}</option>' for m in months)
+        links += [f'<a href="/ui/{e(month)}/{path}"{" class=\"on\"" if active == key else ""}>{label}</a>' for key, label, path in NAV]
+        opts = "".join(f'<option value="/ui/{e(m)}/{e(suffix)}"{" selected" if m == month else ""}>{fmt_month(m)}</option>' for m in months)
         picker = (f'<label>Month <select onchange="location.href=this.value">{opts}</select></label>'
                   f'<input type="search" name="q" placeholder="code or name" form="navsearch"><button form="navsearch">Find</button>'
-                  f'<form id="navsearch" method="get" action="/ui/{month}/projects"></form>')
+                  f'<form id="navsearch" method="get" action="/ui/{e(month)}/projects"></form>')
     else:
         picker = ""
     return f'<nav class="top" aria-label="EIS">{"".join(links)}<form>{picker}</form></nav>' if month else f'<nav class="top" aria-label="EIS">{"".join(links)}</nav>'

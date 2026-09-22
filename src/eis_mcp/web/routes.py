@@ -100,7 +100,7 @@ async def respond(state: ServerState, request: Request, build: Callable[[list[st
 def register_routes(mcp: MCPServer, state: ServerState) -> None:
     @mcp.custom_route("/ui", methods=["GET"])
     async def ui_root(request: Request) -> Response:
-        return RedirectResponse("/ui/", status_code=307)
+        return await respond(state, request, lambda ok: RedirectResponse("/ui/", status_code=307))
 
     @mcp.custom_route("/ui/", methods=["GET"])
     async def months(request: Request) -> Response:

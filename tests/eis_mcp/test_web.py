@@ -1,6 +1,7 @@
 """/ui/* 網頁：免 token、唯讀、每頁出口過 PII 檢查並寫 audit。用 ASGI transport 直接打，不啟 MCP lifespan。"""
 import json
 import httpx
+from src.eis_mcp.web.shell import render_shell
 from src.portfolio.model.snapshot import write_snapshot
 from tests.eis_mcp.conftest import TODAY, _run, post_raw
 
@@ -41,6 +42,8 @@ def test_ui_is_public_but_mcp_and_upload_still_need_token(app):
     assert post_raw(app, None, "/mcp", json={}).status_code == 401
     assert post_raw(app, None, "/upload/202609").status_code == 401
     assert get(app, "/uiX/").status_code == 401
+    row = last_audit(app)
+    assert row["kind"] == "web" and row["action"] == "/ui" and row["status"] == "ok"
 
 
 # ---- 月份清單與 latest ----
@@ -93,3 +96,8 @@ def test_every_ok_page_writes_audit_row(ingested):
     html(ingested, "/ui/")
     row = last_audit(ingested)
     assert row["kind"] == "web" and row["action"] == "/ui/" and row["status"] == "ok" and row["role"] is None
+
+
+def test_nav_month_is_not_over_escaped():
+    t = render_shell(title="x", body="", months=["202609"], month="202609")
+    assert 'href="/ui/202609/projects"' in t
