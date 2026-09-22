@@ -1,4 +1,4 @@
-"""組裝 Starlette app：/mcp（Streamable HTTP）+ POST /upload/{month}，共用 Bearer middleware。"""
+"""組裝 Starlette app：/mcp（Streamable HTTP）+ POST /upload/{month} + GET /ui/*（免 token），共用 Bearer middleware。"""
 from __future__ import annotations
 import time
 from mcp.server.mcpserver import MCPServer
@@ -12,6 +12,7 @@ from .auth import Audit, BearerAuthMiddleware, Principal
 from .state import ServerState
 from .store import ALLOWED_DESCRIPTIONS, MONTH_RE, Store, classify_filename
 from .tools import register_all
+from .web import register_routes
 
 INSTRUCTIONS = (
     "EIS project status for BU10, built from the monthly EIS Excel export. Every tool response carries "
@@ -70,6 +71,7 @@ def build_app(store: Store, tokens: dict[str, Principal], *, cfg: Config | None 
     mcp = MCPServer("eis", instructions=INSTRUCTIONS)
     register_upload_route(mcp, state)
     register_all(mcp, state)
+    register_routes(mcp, state)
     if allowed_hosts:
         ts = TransportSecuritySettings(enable_dns_rebinding_protection=True, allowed_hosts=list(allowed_hosts), allowed_origins=[])
     else:
