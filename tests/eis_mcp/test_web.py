@@ -159,6 +159,29 @@ def test_project_page_links_previous_month_when_present(ingested):
     assert f'href="/ui/202610/projects/{CODE}/diff?to=202609"' in t
 
 
+# ---- loads / corrections ----
+def test_loads_page_filters_and_capacity_chart(ingested):
+    t = html(ingested, "/ui/202609/loads")
+    assert "<svg" in t and "Capacity" in t and "latest util" in t.lower() and "BA80700R01" in t
+    assert 'class="num sig">100<' not in t                                     # 100% 不標橘；橘色只給低於 spare_capacity_pct 的
+    n_rows = t.count("<tr><td>")
+    t2 = html(ingested, "/ui/202609/loads?min_util=1000")
+    assert "No department" in t2 and t2.count("<tr><td>") < n_rows
+    assert get(ingested, "/ui/202609/loads?min_util=abc").status_code == 400
+
+
+def test_corrections_page(ingested):
+    t = html(ingested, "/ui/202609/corrections")
+    assert "No corrections" in t
+    store = ingested.state.eis.store
+    f = store.snapshot_dir("202609") / "portfolio.json"
+    snap = json.loads(f.read_text(encoding="utf-8"))
+    snap["issues"].append({"level": "track", "check": "cross_month_correction", "detail": "THORPE Jul FTE 17.0 -> 12.0", "source": "snapshot", "code": CODE})
+    f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
+    t = html(ingested, "/ui/202609/corrections")
+    assert "17.0 -&gt; 12.0" in t and f'href="/ui/202609/projects/{CODE}"' in t
+
+
 # ---- diff ----
 def test_diff_page_changed_identical_and_errors(ingested):
     clone_month(ingested, "202610", stage="MP", fte=[12.0] * 8 + [5.0] + [0.0] * 3)

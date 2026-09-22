@@ -11,7 +11,7 @@ from ...portfolio.render.pii import find_pii
 from ..state import ServerState
 from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
 from .. import queries
-from . import pages_overview, pages_project
+from . import pages_load, pages_overview, pages_project
 from .shell import render_error, render_shell
 
 
@@ -187,4 +187,27 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             today = date_param(request)
             body = pages_overview.overview_body(snap, state.cfg.thresholds, today, weeks)
             return render_shell(title="Overview", body=body, months=ok, month=month, suffix="", meta=snap["meta"], active="overview")
+        return await respond(state, request, build)
+
+    @mcp.custom_route("/ui/{month}/loads", methods=["GET"])
+    async def loads(request: Request) -> Response:
+        month = request.path_params["month"]
+
+        def build(ok):
+            snap = load_snap(state, month)
+            min_util = float_param(request, "min_util", 0, 1000)
+            res = queries.dept_loads(snap, min_util)
+            suffix = "loads" + (f"?min_util={min_util:g}" if min_util is not None else "")
+            return render_shell(title="Department loads", body=pages_load.loads_body(month, snap, res, min_util, float(state.cfg.thresholds.get("spare_capacity_pct", 85))), months=ok, month=month,
+                                suffix=suffix, meta=snap["meta"], active="loads")
+        return await respond(state, request, build)
+
+    @mcp.custom_route("/ui/{month}/corrections", methods=["GET"])
+    async def corrections(request: Request) -> Response:
+        month = request.path_params["month"]
+
+        def build(ok):
+            snap = load_snap(state, month)
+            return render_shell(title="Corrections", body=pages_load.corrections_body(month, queries.corrections(snap)), months=ok, month=month,
+                                suffix="corrections", meta=snap["meta"], active="corrections")
         return await respond(state, request, build)
