@@ -16,7 +16,7 @@ SNAP = {"meta": {"report_month": "202609", "latest_month": 8, "snap_date": "2026
         "capacity": [5] * 8 + [0] * 4, "exceptions": [{"rank": 1, "title": "milestones_passed", "count": 1}], "health": [{"level": "ok", "check": "x", "count": 0}],
         "issues": [{"level": "track", "check": "cross_month_correction", "detail": "THORPE Jul FTE 17.0 -> 12.0", "source": "snapshot", "code": "BR0000015346"},
                    {"level": "track", "check": "name_unresolved", "detail": "x", "source": "Briefing", "code": None}]}
-CFG = Config(aliases={"thor": "thorpe"})
+CFG = Config(aliases={"THOR": "THORPE"})
 
 
 def test_project_exact_alias_and_candidates():

@@ -24,7 +24,7 @@ def resolve_project(snap: dict, query: str, cfg: Config) -> dict | list[dict]:
     exact = [p for p in projects if p["code"].upper() == q.upper()]
     if exact:
         return exact[0]
-    nq = normalize_name(q); nq = normalize_name(cfg.aliases.get(nq.lower(), nq))
+    nq = normalize_name(q); nq = cfg.aliases.get(nq, nq)
     same = [p for p in projects if normalize_name(p["name"]) == nq]
     if len(same) == 1:
         return same[0]
