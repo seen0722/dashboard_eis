@@ -112,3 +112,48 @@ def test_overview_shows_decisions_health_and_milestones(ingested):
     assert "Milestones within 2 weeks" in t2 and "-43" not in t2
     assert get(ingested, "/ui/202609/?weeks=0").status_code == 400
     assert get(ingested, "/ui/202609/?today=13/09/2026").status_code == 400
+
+
+# ---- 專案 ----
+def add_twin(app):
+    """快照裡多放一個 THORPE2，讓「多筆候選」有東西可測。"""
+    store = app.state.eis.store
+    f = store.snapshot_dir("202609") / "portfolio.json"
+    snap = json.loads(f.read_text(encoding="utf-8"))
+    twin = dict(snap["projects"][0]); twin["code"] = "BR0000099999"; twin["name"] = "THORPE2"; twin["stage_cat"] = "POC"; twin["customer"] = "Beta"
+    snap["projects"].append(twin)
+    f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
+
+
+def test_projects_table_filters_and_single_hit_redirect(ingested):
+    add_twin(ingested)
+    t = html(ingested, "/ui/202609/projects")
+    assert t.count(f'href="/ui/202609/projects/BR0000') == 2 and "THORPE2" in t and "2 projects" in t
+    assert 'value="POC" selected' not in t and 'value="POC"' in t and 'value="Beta"' in t     # 下拉有 distinct 值
+    t = html(ingested, "/ui/202609/projects?stage_cat=POC")
+    assert "THORPE2" in t and 'projects/BR0000015346"' not in t and 'value="POC" selected' in t
+    t = html(ingested, "/ui/202609/projects?customer=Beta&stage_cat=")
+    assert "1 project" in t and "THORPE2" in t
+    r = get(ingested, "/ui/202609/projects?q=THORPE2")
+    assert r.status_code == 307 and r.headers["location"] == "/ui/202609/projects/BR0000099999"
+    t = html(ingested, "/ui/202609/projects?q=zzz")
+    assert "0 projects" in t
+
+
+def test_project_page_candidates_and_not_found(ingested):
+    t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
+    assert "THORPE" in t and CODE in t and "<svg" in t and "PVT" in t and "Aug" in t and "12.0" in t
+    assert "compare with previous month" not in t.lower()                     # 只有一個月份
+    t = html(ingested, f"/ui/202609/projects/thorpe?today={TODAY}")           # 名稱也可以當 path 參數
+    assert CODE in t
+    add_twin(ingested)
+    t = html(ingested, "/ui/202609/projects/THORP")
+    assert "Several projects match" in t and 'href="/ui/202609/projects/BR0000099999"' in t
+    t = html(ingested, "/ui/202609/projects/nope", 404)
+    assert "no project in 202609 matches 'nope'" in t and 'href="/ui/202609/projects"' in t
+
+
+def test_project_page_links_previous_month_when_present(ingested):
+    clone_month(ingested, "202610", stage="MP")
+    t = html(ingested, f"/ui/202610/projects/{CODE}")
+    assert f'href="/ui/202610/projects/{CODE}/diff?to=202609"' in t

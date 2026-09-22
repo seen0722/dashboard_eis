@@ -10,7 +10,8 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 from ...portfolio.render.pii import find_pii
 from ..state import ServerState
 from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
-from . import pages_overview
+from .. import queries
+from . import pages_overview, pages_project
 from .shell import render_error, render_shell
 
 
@@ -115,6 +116,42 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
         def build(ok):
             load_snap(state, month)          # 404/503 規則與其他頁一致
             return state.store.report_html(month)
+        return await respond(state, request, build)
+
+    @mcp.custom_route("/ui/{month}/projects", methods=["GET"])
+    async def projects(request: Request) -> Response:
+        month = request.path_params["month"]
+        qp = request.query_params
+        filters = {k: (qp.get(k) or "").strip() for k in ("stage_cat", "group", "customer", "q")}
+
+        def build(ok):
+            snap = load_snap(state, month)
+            res = queries.search(snap, filters["stage_cat"] or None, filters["group"] or None, filters["customer"] or None, filters["q"] or None)
+            if filters["q"] and res["count"] == 1 and not any(filters[k] for k in ("stage_cat", "group", "customer")):
+                return RedirectResponse(f"/ui/{month}/projects/{res['projects'][0]['code']}", status_code=307)
+            body = pages_project.projects_body(month, res, filters, queries.distinct(snap, "group"), queries.distinct(snap, "customer"))
+            suffix = "projects" + (("?" + str(qp)) if str(qp) else "")
+            return render_shell(title="Projects", body=body, months=ok, month=month, suffix=suffix, meta=snap["meta"], active="projects")
+        return await respond(state, request, build)
+
+    @mcp.custom_route("/ui/{month}/projects/{code}", methods=["GET"])
+    async def project(request: Request) -> Response:
+        month, code = request.path_params["month"], request.path_params["code"]
+
+        def build(ok):
+            snap = load_snap(state, month)
+            try:
+                res = queries.project(snap, code, state.cfg)
+            except queries.NotFound as ex:
+                raise WebError(404, "Project not found", f'<p>{e(str(ex), quote=False)}.</p><p><a href="/ui/{month}/projects">Back to the project list</a></p>', "not_found") from None
+            if "candidates" in res:
+                return render_shell(title="Projects", body=pages_project.candidates_body(month, res["candidates"], code), months=ok, month=month,
+                                    suffix="projects", meta=snap["meta"], active="projects")
+            p = res["project"]; today = date_param(request)
+            later = [m for m in ok if m < month]           # ok 是 newest first；前一個 ok 月份 = 小於本月的第一個
+            prev = later[0] if later else None
+            body = pages_project.project_body(month, p, today, snap["meta"]["latest_month"], prev)
+            return render_shell(title=p["name"], body=body, months=ok, month=month, suffix=f"projects/{p['code']}", meta=snap["meta"], active="projects")
         return await respond(state, request, build)
 
     @mcp.custom_route("/ui/{month}/", methods=["GET"])
