@@ -106,3 +106,24 @@ def test_audit_records_rows(tmp_path):
     assert rows[0]["name"] == "Alice" and rows[0]["role"] == "uploader" and rows[0]["kind"] == "tool" and rows[0]["status"] == "ok"
     assert rows[0]["args_json"] == '{"report_month": "202609"}' and rows[0]["duration_ms"] == 1234 and rows[0]["at"]
     assert rows[1]["name"] is None and rows[1]["detail"] == "bad month"
+
+
+def test_is_public_only_matches_ui_prefix():
+    from src.eis_mcp.auth import is_public
+    assert is_public("/ui") and is_public("/ui/") and is_public("/ui/202609/projects?x=1".split("?")[0])
+    assert not is_public("/uiX") and not is_public("/ui-anything") and not is_public("/mcp") and not is_public("/upload/202609") and not is_public("/")
+
+
+def test_middleware_lets_public_paths_through_without_token():
+    async def echo(request):
+        return JSONResponse({"has_principal": hasattr(request.state, "principal")})
+    app = Starlette(routes=[Route("/ui/", echo), Route("/mcp", echo, methods=["POST"]), Route("/uiX", echo)])
+    app.add_middleware(BearerAuthMiddleware, tokens=TOKENS)
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            return await c.get("/ui/"), await c.post("/mcp"), await c.get("/uiX"), await c.post("/mcp", headers={"Authorization": "Bearer tok-view"})
+    ui, mcp, uix, mcp_ok = asyncio.run(go())
+    assert ui.status_code == 200 and ui.json() == {"has_principal": False}
+    assert mcp.status_code == 401 and uix.status_code == 401
+    assert mcp_ok.status_code == 200 and mcp_ok.json() == {"has_principal": True}

@@ -1,4 +1,4 @@
-"""靜態 Bearer token 認證、角色、稽核。tokens.yaml 由管理者手動維護，改了要重啟。"""
+"""靜態 Bearer token 認證、角色、稽核。tokens.yaml 由管理者手動維護，改了要重啟。/ui 與 /ui/* 免 token（見 is_public）。"""
 from __future__ import annotations
 import json
 import sqlite3
@@ -13,6 +13,14 @@ from starlette.responses import JSONResponse
 from .store import now_iso
 
 ROLES = ("uploader", "viewer")
+
+# 免 token 的路徑：網頁查詢介面（唯讀、內網）。只放行 "/ui" 本身與 "/ui/" 開頭，"/uiX" 之類不算。
+PUBLIC_PATHS = ("/ui",)
+PUBLIC_PREFIXES = ("/ui/",)
+
+
+def is_public(path: str) -> bool:
+    return path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES)
 
 
 @dataclass(frozen=True)
@@ -56,6 +64,8 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
         self.tokens = tokens
 
     async def dispatch(self, request: Request, call_next):
+        if is_public(request.url.path):
+            return await call_next(request)
         p = principal_from_headers(request.headers, self.tokens)
         if p is None:
             return JSONResponse({"error": "unauthorized", "detail": "send 'Authorization: Bearer <token>'; ask the server owner for a token"}, status_code=401)
