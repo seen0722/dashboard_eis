@@ -164,6 +164,7 @@ def test_loads_page_filters_and_capacity_chart(ingested):
     t = html(ingested, "/ui/202609/loads")
     assert "<svg" in t and "Capacity" in t and "latest util" in t.lower() and "BA80700R01" in t
     assert 'class="num sig">100<' not in t                                     # 100% 不標橘；橘色只給低於 spare_capacity_pct 的
+    assert 'class="num sig">62<' in t                                        # 低於 spare_capacity_pct(85) 的部門標橘
     n_rows = t.count("<tr><td>")
     t2 = html(ingested, "/ui/202609/loads?min_util=1000")
     assert "No department" in t2 and t2.count("<tr><td>") < n_rows
