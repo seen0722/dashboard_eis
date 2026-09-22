@@ -157,3 +157,22 @@ def test_project_page_links_previous_month_when_present(ingested):
     clone_month(ingested, "202610", stage="MP")
     t = html(ingested, f"/ui/202610/projects/{CODE}")
     assert f'href="/ui/202610/projects/{CODE}/diff?to=202609"' in t
+
+
+# ---- diff ----
+def test_diff_page_changed_identical_and_errors(ingested):
+    clone_month(ingested, "202610", stage="MP", fte=[12.0] * 8 + [5.0] + [0.0] * 3)
+    t = html(ingested, f"/ui/202610/projects/{CODE}/diff?to=202609")
+    assert "stage" in t and "MP" in t and "PVT" in t and "fte" in t and "5.0" in t and "202610" in t and "202609" in t
+    t = html(ingested, f"/ui/202609/projects/{CODE}/diff?to=202609")
+    assert "identical" in t.lower()
+    assert get(ingested, f"/ui/202609/projects/{CODE}/diff").status_code == 400
+    assert get(ingested, f"/ui/202609/projects/{CODE}/diff?to=202501").status_code == 404
+    assert get(ingested, "/ui/202609/projects/BR0000000000/diff?to=202610").status_code == 404
+
+
+def test_diff_flatten():
+    from src.eis_mcp.web.pages_project import flatten_changes
+    ch = {"stage": {"a": "PVT", "b": "MP"}, "dates": {"mp": {"a": None, "b": "2026-01-01"}}, "tasks": {"a_count": 1, "b_count": 2},
+          "pva": {"BU RD": {"plan": {"a": [1.0], "b": [2.0]}}}}
+    assert flatten_changes(ch) == [("dates.mp", "–", "2026-01-01"), ("pva.BU RD.plan", "[1.0]", "[2.0]"), ("stage", "PVT", "MP"), ("tasks (count)", "1", "2")]

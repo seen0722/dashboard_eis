@@ -56,3 +56,37 @@ def project_body(month: str, p: dict, today: str, lm: int, prev: str | None) -> 
             f'<section><h2>Milestones, plan vs actual, tasks</h2>{project_card_html(p, "en", today, lm, 0)}</section>'
             f'<section><h2>FTE and NTD by month</h2>{months_tbl}</section>'
             f'<section><h2>Briefing history</h2>{hist_tbl}</section>')
+
+
+def _fmt(v) -> str:
+    if v is None:
+        return "–"
+    if isinstance(v, list):
+        return "[" + ", ".join(_fmt(x) for x in v) + "]"
+    return str(v)
+
+
+def flatten_changes(changed: dict, prefix: str = "") -> list[tuple[str, str, str]]:
+    """queries.diff 的 changed 樹攤成 (欄位路徑, a, b)。葉節點是 {"a","b"} 或 {"a_count","b_count"}；其餘往下走。依路徑排序。"""
+    out = []
+    for k, v in changed.items():
+        path = f"{prefix}{k}"
+        if set(v) == {"a", "b"}:
+            out.append((path, _fmt(v["a"]), _fmt(v["b"])))
+        elif set(v) == {"a_count", "b_count"}:
+            out.append((f"{path} (count)", str(v["a_count"]), str(v["b_count"])))
+        else:
+            out.extend(flatten_changes(v, path + "."))
+    return sorted(out)
+
+
+def diff_body(month: str, res: dict) -> str:
+    a, b = res["month_a"], res["month_b"]
+    rows = flatten_changes(res["changed"])
+    if not rows:
+        return f'<section><h2>{e(res["code"])}: identical in {a[:4]}-{a[4:]} and {b[:4]}-{b[4:]}</h2><p class="empty">No field differs (numeric lists compared with 0.05 tolerance).</p></section>'
+    trs = "".join(f'<tr><td>{e(f)}</td><td>{e(x)}</td><td class="sig">{e(y)}</td></tr>' for f, x, y in rows)
+    return (f'<section><h2>{e(res["code"])}: {len(rows)} change{"" if len(rows) == 1 else "s"}</h2>'
+            f'<p class="lead"><a href="/ui/{month}/projects/{e(res["code"])}">Back to the project</a></p>'
+            f'<div class="wide"><table><thead><tr><th>Field</th><th>{a[:4]}-{a[4:]} (a)</th><th>{b[:4]}-{b[4:]} (b)</th></tr></thead><tbody>{trs}</tbody></table></div>'
+            f'<p class="dim">Only fields that differ are listed; task/history lists report a count change only.</p></section>')

@@ -134,6 +134,24 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             return render_shell(title="Projects", body=body, months=ok, month=month, suffix=suffix, meta=snap["meta"], active="projects")
         return await respond(state, request, build)
 
+    @mcp.custom_route("/ui/{month}/projects/{code}/diff", methods=["GET"])
+    async def diff(request: Request) -> Response:
+        month, code = request.path_params["month"], request.path_params["code"]
+        to = (request.query_params.get("to") or "").strip()
+
+        def build(ok):
+            snap = load_snap(state, month)
+            if not to:
+                raise WebError(400, "Missing 'to'", f'<p>Add <code>?to=YYYYMM</code> to pick the month to compare with.</p>', "missing_to")
+            other = load_snap(state, to)
+            try:
+                res = queries.diff(snap, other, code)
+            except queries.NotFound as ex:
+                raise WebError(404, "Project not found", f'<p>{e(str(ex), quote=False)}.</p><p><a href="/ui/{month}/projects">Back to the project list</a></p>', "not_found") from None
+            return render_shell(title=f"Diff {res['code']}", body=pages_project.diff_body(month, res), months=ok, month=month,
+                                suffix=f"projects/{res['code']}/diff?to={to}", meta=snap["meta"], active="projects")
+        return await respond(state, request, build)
+
     @mcp.custom_route("/ui/{month}/projects/{code}", methods=["GET"])
     async def project(request: Request) -> Response:
         month, code = request.path_params["month"], request.path_params["code"]
