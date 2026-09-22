@@ -188,7 +188,7 @@ journalctl -u eis-mcp -f
 |---|---|---|
 | `/ui/` | 月份清單；`/ui/latest/` 轉到最新月份 | `list_months` |
 | `/ui/<YYYYMM>/` | Decisions、stage 統計、里程碑視窗（`?weeks=`、`?today=`）、Data health | `get_exceptions` / `get_health` / `get_upcoming_milestones` |
-| `/ui/<YYYYMM>/projects?stage_cat=&group=&customer=&q=` | 專案表；`q` 剛好一筆時直接進單案 | `search_projects` |
+| `/ui/<YYYYMM>/projects?stage_cat=&group=&customer=&q=` | 專案表；`q` 剛好一筆且沒設其他篩選時直接進單案 | `search_projects` |
 | `/ui/<YYYYMM>/projects/<code or name>` | 單案全紀錄、PVA 圖、tasks、history | `get_project` |
 | `/ui/<YYYYMM>/projects/<code>/diff?to=<YYYYMM>` | 跨月差異 | `diff_project` |
 | `/ui/<YYYYMM>/loads?min_util=` | 部門負載與產能圖 | `get_dept_loads` / `get_capacity` |

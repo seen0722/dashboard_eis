@@ -1,6 +1,7 @@
 """/ui/* 的 route handler。每個 handler：解析參數 → 讀快照 → queries → pages → respond()（PII 出口檢查 + audit）。"""
 from __future__ import annotations
 import datetime as dt
+import logging
 import time
 from collections.abc import Callable
 from html import escape as e
@@ -13,6 +14,8 @@ from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
 from .. import queries
 from . import pages_load, pages_overview, pages_project
 from .shell import render_error, render_shell
+
+log = logging.getLogger("eis_mcp.web")
 
 
 class WebError(Exception):
@@ -86,6 +89,10 @@ async def respond(state: ServerState, request: Request, build: Callable[[list[st
     except WebError as ex:
         state.audit.record(None, "web", path, args, "error", ms(), ex.detail)
         return HTMLResponse(render_error(ex.status, ex.title, ex.body, months), status_code=ex.status)
+    except Exception as ex:  # noqa: BLE001 — 任何未預期錯誤都要有 audit 列與乾淨的 500 頁，不漏 traceback
+        log.exception("web handler failed: %s", path)
+        state.audit.record(None, "web", path, args, "error", ms(), repr(ex)[:200])
+        return HTMLResponse(render_error(500, "Server error", "<p>Something went wrong while building this page. The server log has the details.</p>", months), status_code=500)
     if isinstance(out, Response):
         state.audit.record(None, "web", path, args, "ok", ms())
         return out
@@ -115,7 +122,11 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
 
         def build(ok):
             load_snap(state, month)          # 404/503 規則與其他頁一致
-            return state.store.report_html(month)
+            try:
+                return state.store.report_html(month)
+            except UnknownMonth:
+                raise WebError(404, f"No report for {month}",
+                               "<p>The snapshot exists but its report_en.html is missing; ask an uploader to run ingest_month again.</p>", "no_report") from None
         return await respond(state, request, build)
 
     @mcp.custom_route("/ui/{month}/projects", methods=["GET"])
@@ -166,8 +177,8 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
                 return render_shell(title="Projects", body=pages_project.candidates_body(month, res["candidates"], code), months=ok, month=month,
                                     suffix="projects", meta=snap["meta"], active="projects")
             p = res["project"]; today = date_param(request)
-            later = [m for m in ok if m < month]           # ok 是 newest first；前一個 ok 月份 = 小於本月的第一個
-            prev = later[0] if later else None
+            earlier = [m for m in ok if m < month]           # ok 是 newest first；前一個 ok 月份 = 小於本月的第一個
+            prev = earlier[0] if earlier else None
             body = pages_project.project_body(month, p, today, snap["meta"]["latest_month"], prev)
             return render_shell(title=p["name"], body=body, months=ok, month=month, suffix=f"projects/{p['code']}", meta=snap["meta"], active="projects")
         return await respond(state, request, build)

@@ -55,8 +55,9 @@ def test_months_page_empty(app):
 
 def test_months_page_listed(ingested):
     t = html(ingested, "/ui/")
-    assert "202609" in t and "latest" in t and 'href="/ui/202609/"' in t and "Alice" in t
+    assert "202609" in t and "latest" in t and 'href="/ui/202609/"' in t and "Alice" not in t
     assert "Some One" not in t                                   # 上傳檔名（含 PM 姓名）不出現
+    assert " KB" in t
     r = get(ingested, "/ui/latest/")
     assert r.status_code == 307 and r.headers["location"] == "/ui/202609/"
 
@@ -98,9 +99,28 @@ def test_every_ok_page_writes_audit_row(ingested):
     assert row["kind"] == "web" and row["action"] == "/ui/" and row["status"] == "ok" and row["role"] is None
 
 
+def test_unexpected_exception_is_500_and_audited(ingested, monkeypatch):
+    monkeypatch.setattr("src.eis_mcp.web.routes.pages_overview.overview_body", lambda *a, **k: 1 / 0)
+    t = html(ingested, "/ui/202609/", 500)
+    assert "Server error" in t
+    assert "Traceback" not in t
+    assert "ZeroDivisionError" not in t
+    row = last_audit(ingested)
+    assert row["status"] == "error" and "ZeroDivisionError" in row["detail"]
+
+
 def test_nav_month_is_not_over_escaped():
     t = render_shell(title="x", body="", months=["202609"], month="202609")
     assert 'href="/ui/202609/projects"' in t
+
+
+def test_nav_has_exactly_one_form():
+    t = render_shell(title="x", body="", months=["202609"], month="202609")
+    nav = t[t.index("<nav"):t.index("</nav>")]
+    assert nav.count("<form") == 1
+    assert 'action="/ui/202609/projects"' in nav
+    assert 'name="q"' in nav
+    assert "form=\"" not in nav
 
 
 # ---- 總覽 ----
@@ -123,6 +143,28 @@ def add_twin(app):
     twin = dict(snap["projects"][0]); twin["code"] = "BR0000099999"; twin["name"] = "THORPE2"; twin["stage_cat"] = "POC"; twin["customer"] = "Beta"
     snap["projects"].append(twin)
     f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
+
+
+def add_hostile(app):
+    """快照裡多放一個帶 HTML/引號的敵意專案，用來驗證輸出全程轉義。"""
+    store = app.state.eis.store
+    f = store.snapshot_dir("202609") / "portfolio.json"
+    snap = json.loads(f.read_text(encoding="utf-8"))
+    hostile = dict(snap["projects"][0])
+    hostile["code"] = "BR0000088888"; hostile["name"] = "A<b>&C"; hostile["customer"] = 'X"Y'
+    snap["projects"].append(hostile)
+    f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
+
+
+def test_project_text_is_escaped(ingested):
+    add_hostile(ingested)
+    t = html(ingested, "/ui/202609/projects")
+    assert "A&lt;b&gt;&amp;C" in t
+    assert "<b>&C" not in t
+    assert 'X&quot;Y' in t
+    t = html(ingested, "/ui/202609/projects/BR0000088888")
+    assert "A&lt;b&gt;&amp;C" in t
+    assert "<b>&C" not in t
 
 
 def test_projects_table_filters_and_single_hit_redirect(ingested):

@@ -14,14 +14,15 @@ def months_body(months: list[dict]) -> str:
     rows = []
     for m in months:
         mo = m["month"]; ing = m.get("last_ingest") or {}
-        name = f'<a href="/ui/{mo}/">{fmt_month(mo)}</a>' if m["status"] == "ok" else fmt_month(mo)
+        name = f'<a href="/ui/{e(mo)}/">{fmt_month(mo)}</a>' if m["status"] == "ok" else fmt_month(mo)
         tag = '<span class="tag">latest</span>' if mo == latest else ""
         cats = ", ".join(sorted({u["category"] or "?" for u in m["uploads"]})) or "–"
+        size_kb = f'{sum(u["size"] for u in m["uploads"]) / 1024:,.0f} KB'
         rows.append(f'<tr><td><b>{name}</b>{tag}</td><td>{e(m["status"])}</td><td>{e(str(ing.get("at", "–")))}</td>'
-                    f'<td>{e(str(ing.get("by", "–")))}</td><td>{e(str(ing.get("status", "–")))}</td><td class="num">{len(m["uploads"])}</td><td class="dim">{e(cats)}</td></tr>')
+                    f'<td>{e(str(ing.get("status", "–")))}</td><td class="num">{len(m["uploads"])}</td><td class="num">{size_kb}</td><td class="dim">{e(cats)}</td></tr>')
     return (f'<section><h2>Months</h2><p class="lead">Every month the server knows. Only months with status ok can be browsed.</p>'
-            f'<div class="wide"><table><thead><tr><th>Month</th><th>Status</th><th>Last ingest</th><th>By</th><th>Ingest status</th>'
-            f'<th class="num">Files</th><th>Categories</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>')
+            f'<div class="wide"><table><thead><tr><th>Month</th><th>Status</th><th>Last ingest</th><th>Ingest status</th>'
+            f'<th class="num">Files</th><th class="num">Size</th><th>Categories</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>')
 
 
 def _milestones(month: str, res: dict) -> str:

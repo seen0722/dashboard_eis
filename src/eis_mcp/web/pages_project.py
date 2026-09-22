@@ -45,7 +45,7 @@ def project_body(month: str, p: dict, today: str, lm: int, prev: str | None) -> 
           f'<span>Family</span><span>{e(p["family"]) or "–"}</span><span>Stage</span><span>{e(p["stage"]) or "–"} ({e(p["stage_cat"])})</span>'
           f'<span>In briefing</span><span>{yn(p["in_briefing"])}</span><span>In control list</span><span>{yn(p["in_control_list"])}</span>'
           f'<span>Has plan</span><span>{yn(p["has_plan"])}</span><span>Original MP</span><span>{e(p["dates"].get("mp_orig") or "–")}</span></div>')
-    cmp_ = f'<p><a href="/ui/{month}/projects/{e(p["code"])}/diff?to={prev}">Compare with previous month ({prev[:4]}-{prev[4:]})</a></p>' if prev else ""
+    cmp_ = f'<p><a href="/ui/{e(month)}/projects/{e(p["code"])}/diff?to={e(prev)}">Compare with previous month ({prev[:4]}-{prev[4:]})</a></p>' if prev else ""
     head = "".join(f'<th class="num">{m}</th>' for m in MONTHS)
     months_tbl = (f'<div class="wide"><table><thead><tr><th></th>{head}</tr></thead><tbody>{_twelve("FTE", p["fte"], ".1f")}{_twelve("NTD", p["ntd"], ",.0f")}</tbody></table></div>'
                   f'<p class="dim">latest_month = {MONTHS[lm - 1]}; later months are plan or zero.</p>')

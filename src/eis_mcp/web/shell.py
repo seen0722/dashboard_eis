@@ -6,7 +6,7 @@ from ...portfolio.render.css import CSS
 WEB_CSS = """
 nav.top{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--ink);font-size:13px}
 nav.top a{color:var(--slate);text-decoration:none;padding:2px 0}nav.top a.on{font-weight:600;color:var(--ink);border-bottom:2px solid var(--signal)}
-nav.top form{display:inline-flex;gap:8px;align-items:center;margin-left:auto}
+nav.top .tools{display:inline-flex;gap:8px;align-items:center;margin-left:auto}nav.top .tools form{display:inline-flex;gap:8px}
 input[type=text],input[type=search],input[type=number]{font:inherit;padding:6px 10px;border:1px solid var(--ink);background:#fff;border-radius:0;min-width:0}
 button{font:inherit;padding:6px 14px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
 .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:0 0 18px}.filters label{display:flex;flex-direction:column;font-size:12px;color:var(--ink-2);gap:4px}
@@ -32,11 +32,10 @@ def _nav(months: list[str], month: str | None, suffix: str, active: str) -> str:
         links += [f'<a href="/ui/{e(month)}/{path}"{" class=\"on\"" if active == key else ""}>{label}</a>' for key, label, path in NAV]
         opts = "".join(f'<option value="/ui/{e(m)}/{e(suffix)}"{" selected" if m == month else ""}>{fmt_month(m)}</option>' for m in months)
         picker = (f'<label>Month <select onchange="location.href=this.value">{opts}</select></label>'
-                  f'<input type="search" name="q" placeholder="code or name" form="navsearch"><button form="navsearch">Find</button>'
-                  f'<form id="navsearch" method="get" action="/ui/{e(month)}/projects"></form>')
+                  f'<form method="get" action="/ui/{e(month)}/projects"><input type="search" name="q" placeholder="code or name"><button>Find</button></form>')
     else:
         picker = ""
-    return f'<nav class="top" aria-label="EIS">{"".join(links)}<form>{picker}</form></nav>' if month else f'<nav class="top" aria-label="EIS">{"".join(links)}</nav>'
+    return f'<nav class="top" aria-label="EIS">{"".join(links)}<div class="tools">{picker}</div></nav>' if month else f'<nav class="top" aria-label="EIS">{"".join(links)}</nav>'
 
 
 def _meta_line(meta: dict | None) -> str:
@@ -59,6 +58,6 @@ def render_shell(*, title: str, body: str, months: list[str], month: str | None 
 
 
 def render_error(status: int, title: str, body: str, months: list[str]) -> str:
-    links = "".join(f'<li><a href="/ui/{m}/">{fmt_month(m)}</a></li>' for m in months)
+    links = "".join(f'<li><a href="/ui/{e(m)}/">{fmt_month(m)}</a></li>' for m in months)
     avail = f'<p>Available months:</p><ul>{links}</ul>' if links else '<p>Nothing has been ingested yet.</p>'
     return render_shell(title=f"{status} · {title}", body=f'<section class="err">{body}{avail}</section>', months=months, active="")
