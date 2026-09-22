@@ -112,18 +112,21 @@ def test_is_public_only_matches_ui_prefix():
     from src.eis_mcp.auth import is_public
     assert is_public("/ui") and is_public("/ui/") and is_public("/ui/202609/projects?x=1".split("?")[0])
     assert not is_public("/uiX") and not is_public("/ui-anything") and not is_public("/mcp") and not is_public("/upload/202609") and not is_public("/")
+    assert not is_public("/ui/../mcp") and not is_public("/ui/./x") and not is_public("/ui/%2e%2e/mcp".replace("%2e", "."))
 
 
 def test_middleware_lets_public_paths_through_without_token():
     async def echo(request):
         return JSONResponse({"has_principal": hasattr(request.state, "principal")})
-    app = Starlette(routes=[Route("/ui/", echo), Route("/mcp", echo, methods=["POST"]), Route("/uiX", echo)])
+    app = Starlette(routes=[Route("/ui/", echo), Route("/ui/x", echo), Route("/mcp", echo, methods=["POST"]), Route("/uiX", echo)])
     app.add_middleware(BearerAuthMiddleware, tokens=TOKENS)
 
     async def go():
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
-            return await c.get("/ui/"), await c.post("/mcp"), await c.get("/uiX"), await c.post("/mcp", headers={"Authorization": "Bearer tok-view"})
-    ui, mcp, uix, mcp_ok = asyncio.run(go())
+            return await c.get("/ui/"), await c.post("/mcp"), await c.get("/uiX"), await c.post("/mcp", headers={"Authorization": "Bearer tok-view"}), await c.get("/ui/x?mcp=1"), await c.get("/ui/%2e%2e/mcp")
+    ui, mcp, uix, mcp_ok, ui_query, ui_dotdot = asyncio.run(go())
     assert ui.status_code == 200 and ui.json() == {"has_principal": False}
     assert mcp.status_code == 401 and uix.status_code == 401
     assert mcp_ok.status_code == 200 and mcp_ok.json() == {"has_principal": True}
+    assert ui_query.status_code == 200 and ui_query.json() == {"has_principal": False}
+    assert ui_dotdot.status_code == 401

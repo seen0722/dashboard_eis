@@ -20,6 +20,9 @@ PUBLIC_PREFIXES = ("/ui/",)
 
 
 def is_public(path: str) -> bool:
+    """只放行 "/ui" 與 "/ui/" 開頭；含 "." / ".." 路徑段的一律不算（避免 /ui/%2e%2e/x 之類解碼後繞過）。"""
+    if any(seg in (".", "..") for seg in path.split("/")):
+        return False
     return path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES)
 
 
