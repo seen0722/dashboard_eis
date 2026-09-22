@@ -1,29 +1,11 @@
-"""組合總覽：報告第一屏的 exceptions、health 表、以及里程碑視窗。"""
+"""組合總覽：報告第一屏的 exceptions、health 表、以及里程碑視窗。查詢邏輯在 queries.py。"""
 from __future__ import annotations
 import datetime as dt
 from mcp.server.mcpserver import Context, MCPServer
-from ...portfolio.model.rules import days_between
+from .. import queries
+from ..queries import MILESTONES, upcoming_milestones  # noqa: F401  舊 import 路徑保留（tests 用）
 from ..state import ServerState
 from ._common import check_date, guarded, resolve_month, with_meta
-
-MILESTONES = ("evt", "dvt", "pvt", "mp")
-
-
-def upcoming_milestones(snap: dict, today: str, weeks: int) -> list[dict]:
-    """與 rules._active() 同條件：只看 in_briefing 且非 Suspended 的專案；視窗前後各 weeks 週；已過期者 days_left 為負。"""
-    span = weeks * 7
-    out = []
-    for p in snap["projects"]:
-        if not p.get("in_briefing") or p.get("stage_cat") == "Suspended":
-            continue
-        for ms in MILESTONES:
-            d = p["dates"].get(ms)
-            if not d:
-                continue
-            left = days_between(d, today)
-            if -span <= left <= span:
-                out.append({"code": p["code"], "name": p["name"], "stage_cat": p["stage_cat"], "milestone": ms, "date": d, "days_left": left})
-    return sorted(out, key=lambda r: (r["days_left"], r["code"]))
 
 
 def register(mcp: MCPServer, state: ServerState) -> None:
@@ -34,7 +16,7 @@ def register(mcp: MCPServer, state: ServerState) -> None:
         month "YYYYMM" defaults to the latest ingested month."""
         def go(p):
             _, snap = resolve_month(state, month)
-            return with_meta(snap, count=len(snap["exceptions"]), exceptions=snap["exceptions"])
+            return with_meta(snap, **queries.exceptions(snap))
         return guarded(state, ctx, "get_exceptions", {"month": month}, go)
 
     @mcp.tool()
@@ -43,7 +25,7 @@ def register(mcp: MCPServer, state: ServerState) -> None:
         the source file. Returns {"meta", "health"} as stored in the snapshot. month "YYYYMM" defaults to the latest month."""
         def go(p):
             _, snap = resolve_month(state, month)
-            return with_meta(snap, health=snap["health"])
+            return with_meta(snap, **queries.health(snap))
         return guarded(state, ctx, "get_health", {"month": month}, go)
 
     @mcp.tool()
@@ -54,5 +36,5 @@ def register(mcp: MCPServer, state: ServerState) -> None:
         def go(p):
             _, snap = resolve_month(state, month)
             t = check_date(today) if today else dt.date.today().isoformat()
-            return with_meta(snap, today=t, weeks=weeks, milestones=upcoming_milestones(snap, t, weeks))
+            return with_meta(snap, **queries.upcoming(snap, t, weeks))
         return guarded(state, ctx, "get_upcoming_milestones", {"weeks": weeks, "month": month, "today": today}, go)
