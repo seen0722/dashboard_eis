@@ -210,6 +210,33 @@ EIS_URL=http://eis-host:8765 EIS_TOKEN=<uploader token> scripts/eis-upload.sh 20
    - `missing_input` / `input_unreadable` / `no_manpower_month` / `busy`：訊息裡會說下一步。
 4. 同月份可重跑，會覆蓋快照並在 `ingest.json` 留紀錄。
 
+### 4.1 PM 修正了 Briefing（或任何一個檔）之後：重新 ingest 同一個月
+
+快照是 `ingest_month` 當下產生的，原檔改了不會自動更新。三步，都在有 EIS 檔的那台電腦做；前提是 server 已更新到能讀新版面的程式（`git pull && sudo deploy/install.sh`）。
+
+1. 把新檔放進該月的輸入資料夾，**舊的同類檔案刪掉**（一個資料夾只留一份 Briefing；兩份並存時會取檔名排序最後的那個，不要靠這個）：
+
+   ```bash
+   cd input-08
+   rm "BU10_Project_Briefing_20260907.xlsx"                       # Windows 用 del
+   cp "../input-08-2/BU10_Project_Briefing_2026_v2.xlsx" .
+   ```
+
+2. 整包重新上傳（同名覆蓋，不用清 server 上的舊檔）：
+
+   ```bash
+   EIS_URL=http://<host>:8765 EIS_TOKEN=<uploader token> scripts/eis-upload.sh 202608 ./input-08
+   ```
+
+   只傳單一檔也可以（`curl -sS -H "Authorization: Bearer <token>" -F "file=@input-08/<檔名>" http://<host>:8765/upload/202608`），但舊檔會留在 server 端，建議整包重傳一次乾淨。
+
+3. 在 AI client 用 uploader token 重跑：「用 eis 呼叫 ingest_month，report_month 202608」。回傳 `status: ok`，且 `summary.snap_date` 變成新 Briefing 的最新分頁日期（例如 `20260929`），就是用到新檔了。同月份重跑直接覆蓋快照，`ingest.json` 留歷次紀錄。
+
+驗證：問「search_projects，biz_type JDM」，回傳應有 `category`、`panel_size` 欄位（2026-09 起 Briefing 新增的 Type / Category / Panel Size）。
+
+注意：舊月份的人力包配新月份的 Briefing 時，`briefing_stale` 會偏高，是兩者時間差造成，不是資料錯；等該月人力包到手再正式跑一次即可。
+
+
 ## 5. Client 設定
 
 三種 client 都只需要 URL 與 token。以下 `<host>` 換成主機名或 IP，`<token>` 由管理者從 `tokens.yaml` 發給你。建議把 token 存成檔案而不是寫死在設定裡。
