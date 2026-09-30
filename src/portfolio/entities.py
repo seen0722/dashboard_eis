@@ -42,6 +42,9 @@ class BriefingRow:
     product: str = ""
     dates: dict[str, str | None] = field(default_factory=empty_dates)
     updated: str | None = None      # 資料更新日
+    biz_type: str = ""              # JDM / ODM / EMS（2026-09 Briefing 新增的 Type 欄；舊版面留空）
+    category: str = ""              # Tablet / NB / AI PC …（Category 欄）
+    panel_size: str = ""            # 10" / 14" / NA（Panel Size 欄，原樣保留）
     status_text: str = ""
 
 
@@ -102,6 +105,9 @@ class Project:
     product: str = ""
     stage: str = ""
     stage_cat: str = ""
+    biz_type: str = ""              # JDM / ODM / EMS；來自 Briefing 最新快照，舊版面為空字串
+    category: str = ""
+    panel_size: str = ""
     dates: dict[str, str | None] = field(default_factory=empty_dates)
     in_briefing: bool = False
     in_control_list: bool = False

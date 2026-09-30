@@ -1,7 +1,8 @@
 # Briefing Stage 文字 → stage_cat。由上而下第一個符合的生效，regex 不分大小寫。
 order:
   - cat: Suspended
-    pattern: "suspend|discontinu|cancel|hold"
+    # 2026-09 起 Briefing 改版：結案一律寫 Terminate、暫停寫 Suspend
+    pattern: "suspend|discontinu|cancel|hold|terminat"
   - cat: RFQ / RFI
     pattern: "RFQ|RFI"
   - cat: POC

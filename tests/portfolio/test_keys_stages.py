@@ -40,6 +40,8 @@ def test_ambiguous_or_non_boundary_suffix_stays_unresolved():
 @pytest.mark.parametrize("stage,cat", [
     ("RFQ", "RFQ / RFI"), ("RFI", "RFQ / RFI"), ("POC-DVT-1", "POC"), ("DVT2", "Execution"), ("Pre-EIV", "Execution"),
     ("PVT2 --> DVT (for v.D01)", "Execution"), ("MP", "MP"), ("Sustain", "Sustain / EOP"), ("EOP", "Sustain / EOP"),
-    ("suspended", "Suspended"), ("Suspending", "Suspended"), ("discontinued", "Suspended"), ("", ""), ("banana", "Other")])
+    ("suspended", "Suspended"), ("Suspending", "Suspended"), ("discontinued", "Suspended"),
+    ("Terminate", "Suspended"), ("Suspend", "Suspended"),   # 2026-09 Briefing 改版後 PM 統一用的詞
+    ("", ""), ("banana", "Other")])
 def test_stage_cat(stage, cat):
     assert stage_cat(stage, load_config()) == cat

@@ -55,7 +55,7 @@ def test_search_projects_filters(ingested):
     err, out = call_tool(ingested, "tok-view", "search_projects", {})
     assert not err and out["count"] >= 1
     row = next(r for r in out["projects"] if r["code"] == CODE)
-    assert set(row) == {"code", "name", "stage", "stage_cat", "customer", "group", "latest_fte"} and row["latest_fte"] == 12.0
+    assert set(row) == {"code", "name", "stage", "stage_cat", "customer", "group", "biz_type", "category", "panel_size", "latest_fte"} and row["latest_fte"] == 12.0
     err, out = call_tool(ingested, "tok-view", "search_projects", {"stage_cat": "execution"})
     assert not err and any(r["code"] == CODE for r in out["projects"])
     err, out = call_tool(ingested, "tok-view", "search_projects", {"stage_cat": "Suspended"})
@@ -64,6 +64,23 @@ def test_search_projects_filters(ingested):
     assert not err and out["count"] == 1
     err, out = call_tool(ingested, "tok-view", "search_projects", {"group": "trenton"})
     assert not err and out["count"] == 1
+
+
+def test_search_projects_by_biz_type_and_category(ingested):
+    """合成 fixture 用舊版 Briefing（無 Type/Category），先把快照裡 THORPE 的三欄補上再測篩選。"""
+    store = ingested.state.eis.store
+    f = store.snapshot_dir("202609") / "portfolio.json"
+    snap = json.loads(f.read_text(encoding="utf-8"))
+    snap["projects"][0].update({"biz_type": "ODM", "category": "Tablet", "panel_size": '10"'})
+    f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
+    err, out = call_tool(ingested, "tok-view", "search_projects", {"biz_type": "odm"})
+    assert not err and [r["code"] for r in out["projects"]] == [CODE]
+    err, out = call_tool(ingested, "tok-view", "search_projects", {"category": "tablet"})
+    assert not err and out["count"] == 1 and out["projects"][0]["panel_size"] == '10"'
+    err, out = call_tool(ingested, "tok-view", "search_projects", {"biz_type": "JDM"})
+    assert not err and out["count"] == 0
+    err, out = call_tool(ingested, "tok-view", "search_projects", {"category": "NB"})
+    assert not err and out["count"] == 0
 
 
 def test_get_project_resolves_alias(ingested, monkeypatch):

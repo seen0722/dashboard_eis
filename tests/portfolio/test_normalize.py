@@ -8,7 +8,8 @@ def make_inputs():
     briefing = [
         BriefingRow("20260831", "AERIS", None, "POC-DVT-1", "AMD", "NB (14\")", {"kickoff": None, "evt": None, "dvt": "2026-07-24", "pvt": "2026-10-29", "mp": None, "mp_orig": None}),
         BriefingRow("20260907", "AERIS", "BR0000016203", "POC-DVT-1", "AMD", "NB (14\")", {"kickoff": None, "evt": None, "dvt": "2026-07-24", "pvt": "2026-10-29", "mp": None, "mp_orig": None}),
-        BriefingRow("20260907", "THORPE", "BR0000015346", "PVT", "Trimble", "Tablet", {"kickoff": "2024-04-02", "evt": "2024-04-02", "dvt": "2025-03-06", "pvt": "2026-03-21", "mp": "2026-07-31", "mp_orig": "2025-10-13"}),
+        BriefingRow("20260907", "THORPE", "BR0000015346", "PVT", "Trimble", "Tablet", {"kickoff": "2024-04-02", "evt": "2024-04-02", "dvt": "2025-03-06", "pvt": "2026-03-21", "mp": "2026-07-31", "mp_orig": "2025-10-13"},
+                    biz_type="ODM", category="Tablet", panel_size='10"'),
         BriefingRow("20260907", "GHOST", None, "RFQ", "X", "Y"),
     ]
     summary = [MonthlyFTE("THORPE", "Trenton", [12.0] * 8 + [0] * 4, [1e6] * 8 + [0] * 4), MonthlyFTE("Aeris", "Othes", [7.8] * 8 + [0] * 4)]
@@ -27,6 +28,8 @@ def test_merge_by_code_with_alias_and_history():
     assert t.name == "THORPE" and t.group == "Trenton" and t.stage == "PVT" and t.stage_cat == "Execution"
     assert t.dates["mp"] == "2026-07-31" and t.fte[0] == 12.0 and t.ntd[0] == 1e6
     assert t.in_briefing and t.in_control_list and t.has_plan
+    assert (t.biz_type, t.category, t.panel_size) == ("ODM", "Tablet", '10"')
+    assert (by["BR0000016203"].biz_type, by["BR0000016203"].category, by["BR0000016203"].panel_size) == ("", "", "")
     assert t.pva["BU RD"].plan[0] == 14.5
     assert t.tasks[0].description == "Thorpe SW release by [name]"
     a = by["BR0000016203"]
