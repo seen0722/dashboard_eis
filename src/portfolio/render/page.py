@@ -126,7 +126,8 @@ def _appendix_one(p: dict, lang: str, today: str, latest_month: int, i: int) -> 
             dets.append(f'<details><summary data-expand="{e(t(lang, "expand"))}" data-collapse="{e(t(lang, "collapse"))}"><span>{e(t(lang, "task_summary", mon=MONTHS[m - 1], bu=bu, fu=fu, fte=f"{sum(x["fte"] for x in ts):.1f}"))}</span></summary>'
                         f'<table><thead><tr><th>{e(t(lang, "col_side"))}</th><th>{e(t(lang, "col_function"))}</th><th>{e(t(lang, "col_dept"))}</th><th class="num">{e(t(lang, "col_fte"))}</th><th>{e(t(lang, "col_task"))}</th></tr></thead><tbody>{trs}</tbody></table></details>')
         body = f'<div class="pva">{"".join(cards)}</div><h3 style="font-size:15px;margin:26px 0 6px">{e(t(lang, "s_tasks"))}</h3>{"".join(dets)}'
-    meta = "  ".join(x for x in (p["code"] if not p["code"].startswith("NAME:") else "", p["customer"], p["product"], p["group"]) if x)
+    # biz_type（JDM/ODM/EMS）來自 2026-09 起的 Briefing Type 欄；product 在新版已是 Category + Panel Size，不再重複列。舊版面為空就略過。
+    meta = "  ".join(x for x in (p["code"] if not p["code"].startswith("NAME:") else "", p["customer"], p.get("biz_type", ""), p["product"], p["group"]) if x)
     return f'<div class="proj" data-idx="{i}"><div class="dim">{e(meta)}</div><div class="ms">{"".join(ms)}</div>{body}</div>'
 
 
@@ -138,7 +139,7 @@ def render_page(snap: dict, lang: str, today: str, th: dict) -> str:
     late = {c for x in snap["exceptions"] if x["title"] == "milestones_passed" for c in x["codes"]}
     start = f"{today[:7]}-01"
     head_svg, rows = timeline_svg(ps, today, start, th["timeline_months"], late, lang)
-    order = sorted(range(len(ps)), key=lambda i: (0 if ps[i]["in_briefing"] and ps[i]["stage_cat"] not in ("Suspended", "Sustain / EOP") else 1, -ps[i]["fte"][lm - 1]))
+    order = sorted(range(len(ps)), key=lambda i: ps[i]["name"].casefold())   # 附錄依專案名稱字母排序（需求方 2026-09-30）
     options = "".join(f'<option value="{i}">{e(ps[i]["name"])}{", " + e(ps[i]["stage"]) if ps[i]["stage"] else ""}</option>' for i in order)
     appendix = "".join(_appendix_one(ps[i], lang, today, lm, i) for i in order)
     ym = f"{m['report_month'][:4]}-{m['report_month'][4:]}"

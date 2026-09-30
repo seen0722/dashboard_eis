@@ -11,7 +11,8 @@ TH = {"mp_slip_days": 60, "mp_typo_days": 300, "spare_capacity_pct": 85, "suspen
 
 
 def snap():
-    a = Project(code="BR1", name="THORPE", stage="PVT", stage_cat="Execution", customer="Trimble", in_briefing=True, in_control_list=True, has_plan=True)
+    a = Project(code="BR1", name="THORPE", stage="PVT", stage_cat="Execution", customer="Trimble", product='Tablet 10"', biz_type="ODM",
+                category="Tablet", panel_size='10"', in_briefing=True, in_control_list=True, has_plan=True)
     a.dates.update({"kickoff": "2024-04-02", "dvt": "2026-09-08", "pvt": "2026-03-21", "mp": "2026-07-31", "mp_orig": "2025-10-13"}); a.fte[7] = 12.4
     a.pva = {"BU RD": PlanVsActual("BU RD", plan=[14.5] * 12, actual=[18] * 8 + [0] * 4)}
     a.tasks = [Task(8, "BU", "BSP", "研發三部", 3.1, "SW release"), Task(8, "FU", "SQA", "軟體三處", 0.6, "SQA")]
@@ -72,3 +73,19 @@ def test_find_pii():
     assert find_pii("CRICKET(維護單價) and THORPE(維護)") == []
     assert find_pii("nothing here", {"SECRET"}) == []
     assert find_pii("by SECRET person", {"SECRET"}) == ["SECRET"]
+
+
+def test_appendix_meta_shows_biz_type_only_when_present():
+    """新版 Briefing 的 Type（JDM/ODM/EMS）顯示在附錄卡片的 meta 列；舊版面沒有時不留空隙。product 已含 Category+Panel，不重複列。"""
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    assert "BR1  Trimble  ODM  Tablet 10&quot;" in html or 'BR1  Trimble  ODM  Tablet 10"' in html
+    assert "BR2  Trimble" in html and "BR2  Trimble  " not in html.split("BR2  Trimble")[1][:2]
+
+
+def test_appendix_is_sorted_by_project_name_case_insensitively():
+    """附錄的下拉選單與卡片都依專案名稱字母排序（不分大小寫），不再依 FTE 或 stage 分群。"""
+    import re
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    names = re.findall(r'<option value="\d+">([^<,]+)', html.split('id="pick"')[1].split("</select>")[0])
+    assert names == sorted(names, key=str.casefold)
+    assert names[:3] == ["AX200", "KOS", "Q11"]
