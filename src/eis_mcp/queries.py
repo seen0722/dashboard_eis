@@ -67,6 +67,20 @@ def search(snap: dict, stage_cat: str | None = None, group: str | None = None, c
     return {"count": len(rows), "projects": [_summary(q, lm) for q in rows]}
 
 
+def exact_code(snap: dict, text: str) -> str | None:
+    """網頁搜尋框用：text 與某專案 code 相同（不分大小寫），或與恰好一個專案的正規化名稱相同，就回該 code；否則 None。
+    search() 的 text 只做 name/customer/product 子字串比對（MCP tool 的語意，不改），所以 code 或完整名稱要先在這裡攔。"""
+    t = text.strip()
+    if not t:
+        return None
+    for q in snap["projects"]:
+        if q["code"].casefold() == t.casefold():
+            return q["code"]
+    nt = normalize_name(t)
+    hits = [q["code"] for q in snap["projects"] if normalize_name(q["name"]) == nt]
+    return hits[0] if len(hits) == 1 else None
+
+
 def distinct(snap: dict, field: str) -> list[str]:
     return sorted({p[field] for p in snap["projects"] if p.get(field)})
 

@@ -35,11 +35,16 @@ def projects_body(month: str, res: dict, filters: dict, groups: list[str], custo
 def candidates_body(month: str, cands: list[dict], query: str) -> str:
     rows = "".join(f'<tr><td><a href="/ui/{month}/projects/{e(c["code"])}">{e(c["code"])}</a></td><td><b>{e(c["name"])}</b></td><td>{e(c["stage"])}</td></tr>' for c in cands)
     return (f'<section><h2>Several projects match "{e(query)}"</h2><p class="lead">Pick one.</p>'
-            f'<table><thead><tr><th>Code</th><th>Project</th><th>Stage</th></tr></thead><tbody>{rows}</tbody></table></section>')
+            f'<div class="wide"><table><thead><tr><th>Code</th><th>Project</th><th>Stage</th></tr></thead><tbody>{rows}</tbody></table></div></section>')
 
 
 def _twelve(label: str, values: list, fmt: str) -> str:
     return f'<tr><th>{e(label)}</th>' + "".join(f'<td class="num">{format(v, fmt) if v is not None else "–"}</td>' for v in values) + "</tr>"
+
+
+def _ymd(s: str) -> str:
+    """Briefing 快照日 20260629 → 2026-06-29；不是 8 位數字就原樣。"""
+    return f"{s[:4]}-{s[4:6]}-{s[6:]}" if len(s) == 8 and s.isdigit() else s
 
 
 def project_body(month: str, p: dict, today: str, lm: int, prev: str | None) -> str:
@@ -52,12 +57,14 @@ def project_body(month: str, p: dict, today: str, lm: int, prev: str | None) -> 
     cmp_ = f'<p><a href="/ui/{e(month)}/projects/{e(p["code"])}/diff?to={e(prev)}">Compare with previous month ({prev[:4]}-{prev[4:]})</a></p>' if prev else ""
     head = "".join(f'<th class="num">{m}</th>' for m in MONTHS)
     months_tbl = (f'<div class="wide"><table><thead><tr><th></th>{head}</tr></thead><tbody>{_twelve("FTE", p["fte"], ".1f")}{_twelve("NTD", p["ntd"], ",.0f")}</tbody></table></div>'
-                  f'<p class="dim">latest_month = {MONTHS[lm - 1]}; later months are plan or zero.</p>')
-    hist = "".join(f'<tr><td>{e(str(h.get("snap", "")))}</td><td>{e(str(h.get("stage") or "–"))}</td><td>{e(str(h.get("dvt") or "–"))}</td><td>{e(str(h.get("mp") or "–"))}</td></tr>' for h in p["history"])
+                  f'<p class="dim">Manpower keyed in through {MONTHS[lm - 1]}; later months are plan or zero.</p>')
+    hist = "".join(f'<tr><td>{e(_ymd(str(h.get("snap", ""))))}</td><td>{e(str(h.get("stage") or "–"))}</td><td>{e(str(h.get("dvt") or "–"))}</td><td>{e(str(h.get("mp") or "–"))}</td></tr>' for h in p["history"])
     hist_tbl = (f'<table><thead><tr><th>Snapshot</th><th>Stage</th><th>DVT</th><th>MP</th></tr></thead><tbody>{hist}</tbody></table>'
                 if hist else '<p class="empty">No earlier briefing snapshots.</p>')
+    # 月報的卡片把每月 task 表都收在 <details>（新到舊）；網頁只有這一案，最新月預設展開，其餘仍收合。
+    card = project_card_html(p, "en", today, lm, 0).replace("<details>", "<details open>", 1)
     return (f'<section>{kv}{cmp_}</section>'
-            f'<section><h2>Milestones, plan vs actual, tasks</h2>{project_card_html(p, "en", today, lm, 0)}</section>'
+            f'<section><h2>Milestones, plan vs actual, tasks</h2>{card}</section>'
             f'<section><h2>FTE and NTD by month</h2>{months_tbl}</section>'
             f'<section><h2>Briefing history</h2>{hist_tbl}</section>')
 

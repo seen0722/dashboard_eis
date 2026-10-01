@@ -88,7 +88,7 @@ route handler
 | `/ui/` | 月份清單（status、ingest 時間、上傳檔 category/size，不含原始檔名），最新 ok 月份放最上面並標示 latest；沒有任何月份時顯示「nothing ingested yet」 | `list_months` |
 | `/ui/latest/` | 307 到最新 ok 月份的總覽（nav 與書籤用）；沒有月份時 404 | — |
 | `/ui/{month}/` | 總覽：Decisions this month、stage 統計條、里程碑視窗（±N 週，與 `get_upcoming_milestones` 同義，不是月報的「-1 週到 +N 週」）、Data health。N 取 `cfg.thresholds["upcoming_weeks"]`，可用 `?weeks=`、`?today=` 覆蓋 | `get_exceptions` / `get_health` / `get_upcoming_milestones` |
-| `/ui/{month}/projects?stage_cat=&group=&customer=&q=` | 專案表：code、name、stage、stage_cat、customer、group、latest FTE。四個篩選欄位為 GET 表單，狀態在 URL；`stage_cat` 用下拉（七個固定值），`group`/`customer` 用下拉（從快照 distinct 值填）；`q` 對應 tool 的 `text`。nav 搜尋框也送到這裡；結果剛好一筆時 307 到該單案頁 | `search_projects` |
+| `/ui/{month}/projects?stage_cat=&group=&customer=&q=` | 專案表：code、name、stage、stage_cat、customer、group、latest FTE。四個篩選欄位為 GET 表單，狀態在 URL；`stage_cat` 用下拉（七個固定值），`group`/`customer` 用下拉（從快照 distinct 值填）；`q` 對應 tool 的 `text`。nav 搜尋框也送到這裡；`q` 與某個 code 相同（不分大小寫）或與恰好一個專案名稱完全相同時，先 307 到該單案頁（`queries.exact_code`，2026-10-01），否則走子字串比對，結果剛好一筆時同樣 307 | `search_projects` |
 | `/ui/{month}/projects/{code}` | 單案：基本資料、dates、`in_briefing`/`in_control_list`/`has_plan`、FTE 與 NTD 12 個月表、PVA 圖（重用 `charts.pva_svg`）、tasks、history；頂端「compare with previous month」連到 diff（前一個 ok 月份存在時才顯示） | `get_project` |
 | `/ui/{month}/projects/{code}/diff?to={YYYYMM}` | 跨月差異表：欄位、a、b；巢狀欄位攤平成 `dates.evt`、`pva.SW.plan` 這種鍵；`changed` 為空顯示 identical | `diff_project` |
 | `/ui/{month}/loads?min_util=` | 部門負載表（dept、function、util 12 個月、latest_util，`min_util` 篩選）+ 產能圖（重用 `charts.capacity_svg`）。橘色標「latest_util 低於 `spare_capacity_pct`」的閒置產能，與月報第 5 條例外同義；不標 100%（mock 實測 54 個部門有 47 個是 100%，標了等於沒標） | `get_dept_loads` / `get_capacity` |
@@ -100,8 +100,10 @@ route handler
 - `<head>`：`<meta charset="utf-8">`、viewport、`<title>EIS · {page} · {YYYY-MM}</title>`、`<style>` 內嵌 `render/css.py` 的 `CSS` + `WEB_CSS`（nav、表單、錯誤頁、diff 表的少量樣式）。
 - nav：月份下拉（列出所有 ok 月份，選了就跳同一頁的該月份）、Overview / Projects / Loads / Corrections / Report 連結、搜尋框（送到 projects 頁 `q=`）。
 - footer：與月報相同的三行說明（資料來源、`report_month`、`latest_month`）。
-- 每頁 `<h1>` 下方印 `meta.report_month` 與 `meta.latest_month`（與 tools 的「回答時一律引用 meta」同一原則）。
-- 表單一律 GET，無 JavaScript。月份下拉的 `onchange` 跳頁是唯一例外；無 JS 時走 nav 的 Months 連結（`/ui/`）選月份。
+- 每頁 `<h1>` 下方印資料時點：「Report month 2026-09 · manpower keyed in through Aug · Briefing 2026-09-07」，分別來自 `meta.report_month`、`meta.latest_month`、`meta.snap_date`（與 tools 的「回答時一律引用 meta」同一原則；2026-10-01 起不再直接印欄位名）。
+- 表單一律 GET，無 JavaScript（2026-10-01 起）。月份切換是 GET 表單送到 `/ui/go?month=&page=`，server 驗證月份與 `page`（只接受 `/ui/{month}/` 之下的相對路徑，擋 scheme、host、開頭斜線、`..`、反斜線）後 307；鍵盤選月份不會每按一次就跳頁。diff 頁換月份時回到該案的單案頁。
+- 頁面上的「幾天前／後」與里程碑視窗，`today` 預設為快照的 Briefing 日期（`meta.snap_date`），與例外文字的天數同一基準；`?today=` 可覆蓋。
+- 總覽的例外每條附「Open:」連結到相關專案（來源是例外自帶的 `codes`）；Data health 名稱欄裡完全等於某專案名稱的項目為連結；decide 級三項與 Decisions 重複，收進 `<details>`。單案頁最新月份的 task 表預設展開。
 
 ### 3.2 視覺
 

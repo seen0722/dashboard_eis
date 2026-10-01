@@ -1,6 +1,8 @@
-"""頁面外殼：<head>、nav、footer、錯誤頁。CSS = 月報的 CSS + 這裡的 WEB_CSS，全部 inline，無 JS 依賴（月份下拉的 onchange 是唯一例外）。"""
+"""頁面外殼：<head>、nav、footer、錯誤頁。CSS = 月報的 CSS + 這裡的 WEB_CSS，全部 inline，無 JavaScript。
+月份切換是 GET 表單送到 /ui/go（routes.go 驗證後 redirect），鍵盤選月份不會每按一次方向鍵就跳頁。"""
 from __future__ import annotations
 from html import escape as e
+from ...portfolio.entities import MONTHS
 from ...portfolio.render.css import CSS
 
 WEB_CSS = """
@@ -11,11 +13,16 @@ input[type=text],input[type=search],input[type=number]{font:inherit;padding:6px 
 button{font:inherit;padding:6px 14px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
 .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:0 0 18px}.filters label{display:flex;flex-direction:column;font-size:12px;color:var(--ink-2);gap:4px}
 .kv{display:grid;grid-template-columns:160px 1fr;gap:4px 16px;max-width:80ch;margin:0 0 18px}.kv span:first-child{color:var(--ink-2)}
-.metaline{color:var(--ink-2);font-size:12px;margin:6px 0 0}
+.metaline{color:var(--ink-2);font-size:12px;margin:6px 0 0;max-width:none}nav.top+header{margin-top:20px}
 .err{max-width:70ch}.err h1{color:var(--signal)}
-.wide{overflow-x:auto}table a{color:var(--slate)}
+.wide{overflow-x:auto}table a,section a{color:var(--slate)}
+td.num+td,th.num+th{padding-left:16px}tbody th{border-bottom:1px solid var(--rule);color:var(--ink);text-align:left}
+ol.ex li{grid-template-columns:44px minmax(0,1fr)}
 .tag{display:inline-block;font-size:11px;padding:1px 6px;border:1px solid var(--rule);color:var(--ink-2);margin-left:6px;vertical-align:1px}
 .empty{color:var(--ink-3);padding:18px 0}
+ol.ex .open{font-size:12px;margin-top:4px}ol.ex .open a{color:var(--slate);margin-right:10px}
+details.dup summary{cursor:pointer;color:var(--ink-2);font-size:13px;margin:12px 0 6px}
+@media(max-width:640px){body{padding:20px 16px 60px}nav.top .tools{margin-left:0;flex-wrap:wrap}nav.top .tools form{flex-wrap:wrap}nav.top input[type=search]{width:150px}ol.ex li{grid-template-columns:32px minmax(0,1fr)}}
 """
 
 NAV = (("overview", "Overview", ""), ("projects", "Projects", "projects"), ("loads", "Loads", "loads"),
@@ -30,18 +37,26 @@ def _nav(months: list[str], month: str | None, suffix: str, active: str) -> str:
     links = [f'<a href="/ui/"{" class=\"on\"" if active == "months" else ""}>Months</a>']
     if month:
         links += [f'<a href="/ui/{e(month)}/{path}"{" class=\"on\"" if active == key else ""}>{label}</a>' for key, label, path in NAV]
-        opts = "".join(f'<option value="/ui/{e(m)}/{e(suffix)}"{" selected" if m == month else ""}>{fmt_month(m)}</option>' for m in months)
-        picker = (f'<label>Month <select onchange="location.href=this.value">{opts}</select></label>'
-                  f'<form method="get" action="/ui/{e(month)}/projects"><input type="search" name="q" placeholder="code or name"><button>Find</button></form>')
+        opts = "".join(f'<option value="{e(m)}"{" selected" if m == month else ""}>{fmt_month(m)}</option>' for m in months)
+        picker = (f'<form method="get" action="/ui/go"><label>Month <select name="month">{opts}</select></label>'
+                  f'<input type="hidden" name="page" value="{e(suffix)}"><button>Go</button></form>'
+                  f'<form method="get" action="/ui/{e(month)}/projects"><input type="search" name="q" placeholder="code or name" aria-label="Search projects"><button>Find</button></form>')
     else:
         picker = ""
     return f'<nav class="top" aria-label="EIS">{"".join(links)}<div class="tools">{picker}</div></nav>' if month else f'<nav class="top" aria-label="EIS">{"".join(links)}</nav>'
 
 
 def _meta_line(meta: dict | None) -> str:
+    """給人看的資料時點：報告月、人力填報到哪個月、Briefing 快照日。欄位名（report_month 等）留給 MCP，不放頁面。"""
     if not meta:
         return ""
-    return f'<p class="metaline">report_month {e(str(meta.get("report_month", "")))} · latest_month {e(str(meta.get("latest_month", "")))} · snapshot {e(str(meta.get("snap_date", "")))}</p>'
+    rm, lm, sd = str(meta.get("report_month", "")), meta.get("latest_month"), str(meta.get("snap_date", ""))
+    parts = [f"Report month {fmt_month(rm)}"]
+    if isinstance(lm, int) and 1 <= lm <= 12:
+        parts.append(f"manpower keyed in through {MONTHS[lm - 1]}")
+    if len(sd) == 8:
+        parts.append(f"Briefing {sd[:4]}-{sd[4:6]}-{sd[6:]}")
+    return f'<p class="metaline">{e(" · ".join(parts))}</p>'
 
 
 def render_shell(*, title: str, body: str, months: list[str], month: str | None = None, suffix: str = "",
@@ -53,7 +68,7 @@ def render_shell(*, title: str, body: str, months: list[str], month: str | None 
             f'<header><div><h1>{e(title)}</h1>{_meta_line(meta)}</div></header>'
             f'{body}'
             f'<footer><p>Values come straight from the monthly EIS snapshot; nothing is inferred or filled in.</p>'
-            f'<p>Same data as the MCP tools; report_month is the YYYYMM the snapshot was built for, latest_month the last calendar month with reported manpower.</p></footer>'
+            f'<p>Same data as the MCP tools. Report month is the month the snapshot was built for (report_month in the tools); keyed in through is the last month with reported manpower (latest_month).</p></footer>'
             f'</body></html>')
 
 

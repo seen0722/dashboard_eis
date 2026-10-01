@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import time
+from urllib.parse import urlsplit
 from collections.abc import Callable
 from html import escape as e
 from mcp.server.mcpserver import MCPServer
@@ -66,10 +67,20 @@ def float_param(request: Request, name: str, lo: float, hi: float) -> float | No
     return v
 
 
-def date_param(request: Request, name: str = "today") -> str:
+def snap_day(snap: dict) -> str:
+    """快照的 Briefing 日期（YYYY-MM-DD）。頁面上的「幾天前/後」預設以它為準，與例外文字的天數同一基準；
+    用 server 當天會讓舊月份越看越偏，且同一頁出現兩個基準。缺值才退回當天。"""
+    sd = str(snap.get("meta", {}).get("snap_date", ""))
+    try:
+        return dt.date(int(sd[:4]), int(sd[4:6]), int(sd[6:8])).isoformat()
+    except ValueError:
+        return dt.date.today().isoformat()
+
+
+def date_param(request: Request, default: str, name: str = "today") -> str:
     raw = request.query_params.get(name)
     if not raw:
-        return dt.date.today().isoformat()
+        return default
     try:
         return dt.date.fromisoformat(raw).isoformat()
     except ValueError:
@@ -105,7 +116,27 @@ async def respond(state: ServerState, request: Request, build: Callable[[list[st
     return HTMLResponse(out)
 
 
+def safe_page(page: str) -> str:
+    """/ui/go 的 page 參數只能是 /ui/{month}/ 之下的相對路徑（可帶 query）：擋 scheme、host、開頭斜線、..、反斜線、控制字元，
+    避免變成 open redirect 或跳出 /ui/。"""
+    parts = urlsplit(page)
+    if (parts.scheme or parts.netloc or page.startswith("/") or "\\" in page or any(ord(c) < 32 for c in page)
+            or ".." in parts.path.split("/")):
+        raise WebError(400, "Bad page", "<p>That page is not under this site.</p>", "bad_page")
+    return page
+
+
 def register_routes(mcp: MCPServer, state: ServerState) -> None:
+    @mcp.custom_route("/ui/go", methods=["GET"])
+    async def go(request: Request) -> Response:
+        month = (request.query_params.get("month") or "").strip()
+        page = request.query_params.get("page") or ""
+
+        def build(ok):
+            load_snap(state, month)                       # 月份格式錯或沒有快照 → 404，與其他頁一致
+            return RedirectResponse(f"/ui/{month}/{safe_page(page)}", status_code=307)
+        return await respond(state, request, build)
+
     @mcp.custom_route("/ui", methods=["GET"])
     async def ui_root(request: Request) -> Response:
         return await respond(state, request, lambda ok: RedirectResponse("/ui/", status_code=307))
@@ -137,6 +168,9 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
 
         def build(ok):
             snap = load_snap(state, month)
+            hit = queries.exact_code(snap, filters["q"]) if filters["q"] and not any(filters[k] for k in ("stage_cat", "group", "customer", "biz_type", "category")) else None
+            if hit:                                          # 完全相同的 code 或名稱直接進單案頁，不被子字串比對拖成列表
+                return RedirectResponse(f"/ui/{month}/projects/{hit}", status_code=307)
             res = queries.search(snap, filters["stage_cat"] or None, filters["group"] or None, filters["customer"] or None, filters["q"] or None,
                                  filters["biz_type"] or None, filters["category"] or None)
             if filters["q"] and res["count"] == 1 and not any(filters[k] for k in ("stage_cat", "group", "customer", "biz_type", "category")):
@@ -156,13 +190,15 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             snap = load_snap(state, month)
             if not to:
                 raise WebError(400, "Missing 'to'", f'<p>Add <code>?to=YYYYMM</code> to pick the month to compare with.</p>', "missing_to")
+            if to == month:
+                raise WebError(400, "Same month on both sides", f'<p>Pick a month other than {e(month)} for <code>to</code>.</p>', "same_month")
             other = load_snap(state, to)
             try:
                 res = queries.diff(snap, other, code)
             except queries.NotFound as ex:
                 raise WebError(404, "Project not found", f'<p>{e(str(ex), quote=False)}.</p><p><a href="/ui/{month}/projects">Back to the project list</a></p>', "not_found") from None
             return render_shell(title=f"Diff {res['code']}", body=pages_project.diff_body(month, res), months=ok, month=month,
-                                suffix=f"projects/{res['code']}/diff?to={to}", meta=snap["meta"], active="projects")
+                                suffix=f"projects/{res['code']}", meta=snap["meta"], active="projects")   # 換月份回單案頁，避免同月互比
         return await respond(state, request, build)
 
     @mcp.custom_route("/ui/{month}/projects/{code}", methods=["GET"])
@@ -178,7 +214,7 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             if "candidates" in res:
                 return render_shell(title="Projects", body=pages_project.candidates_body(month, res["candidates"], code), months=ok, month=month,
                                     suffix="projects", meta=snap["meta"], active="projects")
-            p = res["project"]; today = date_param(request)
+            p = res["project"]; today = date_param(request, snap_day(snap))
             earlier = [m for m in ok if m < month]           # ok 是 newest first；前一個 ok 月份 = 小於本月的第一個
             prev = earlier[0] if earlier else None
             body = pages_project.project_body(month, p, today, snap["meta"]["latest_month"], prev)
@@ -197,7 +233,7 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
                 return RedirectResponse(f"/ui/{latest}/", status_code=307)
             snap = load_snap(state, month)
             weeks = int_param(request, "weeks", int(state.cfg.thresholds.get("upcoming_weeks", 8)), 1, 52)
-            today = date_param(request)
+            today = date_param(request, snap_day(snap))
             body = pages_overview.overview_body(snap, state.cfg.thresholds, today, weeks)
             return render_shell(title="Overview", body=body, months=ok, month=month, suffix="", meta=snap["meta"], active="overview")
         return await respond(state, request, build)

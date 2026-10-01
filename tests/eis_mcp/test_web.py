@@ -114,10 +114,13 @@ def test_nav_month_is_not_over_escaped():
     assert 'href="/ui/202609/projects"' in t
 
 
-def test_nav_has_exactly_one_form():
+def test_nav_forms_are_not_nested():
+    """曾因巢狀 <form> 讓搜尋框在瀏覽器裡失效；現在 nav 有月份與搜尋兩個表單，必須並排、不可巢狀。"""
     t = render_shell(title="x", body="", months=["202609"], month="202609")
     nav = t[t.index("<nav"):t.index("</nav>")]
-    assert nav.count("<form") == 1
+    assert nav.count("<form") == 2 and nav.count("</form>") == 2
+    first_close = nav.index("</form>")
+    assert nav.index("<form", nav.index("<form") + 1) > first_close
     assert 'action="/ui/202609/projects"' in nav
     assert 'name="q"' in nav
     assert "form=\"" not in nav
@@ -126,7 +129,7 @@ def test_nav_has_exactly_one_form():
 # ---- 總覽 ----
 def test_overview_shows_decisions_health_and_milestones(ingested):
     t = html(ingested, f"/ui/202609/?today={TODAY}")
-    assert "Decisions this month" in t and "Data health" in t and '<ol class="ex">' in t and "report_month 202609" in t
+    assert "Decisions this month" in t and "Data health" in t and '<ol class="ex">' in t and "Report month 2026-09" in t
     assert "Milestones within 8 weeks" in t and "THORPE" in t and "-43" in t          # MP 2026-07-31 距 2026-09-12 已過 43 天
     t2 = html(ingested, f"/ui/202609/?today={TODAY}&weeks=2")
     assert "Milestones within 2 weeks" in t2 and "-43" not in t2
@@ -230,7 +233,8 @@ def test_diff_page_changed_identical_and_errors(ingested):
     clone_month(ingested, "202610", stage="MP", fte=[12.0] * 8 + [5.0] + [0.0] * 3)
     t = html(ingested, f"/ui/202610/projects/{CODE}/diff?to=202609")
     assert "stage" in t and "MP" in t and "PVT" in t and "fte" in t and "5.0" in t and "202610" in t and "202609" in t
-    t = html(ingested, f"/ui/202609/projects/{CODE}/diff?to=202609")
+    clone_month(ingested, "202611")                                          # 內容與 202609 相同 → identical
+    t = html(ingested, f"/ui/202611/projects/{CODE}/diff?to=202609")
     assert "identical" in t.lower()
     assert get(ingested, f"/ui/202609/projects/{CODE}/diff").status_code == 400
     assert get(ingested, f"/ui/202609/projects/{CODE}/diff?to=202501").status_code == 404
@@ -244,3 +248,96 @@ def test_diff_flatten():
     assert flatten_changes(ch) == [("dates.mp", "–", "2026-01-01"), ("pva.BU RD.plan", "[1.0]", "[2.0]"), ("stage", "PVT", "MP"), ("tasks (count)", "1", "2")]
     added = {"pva": {"FU RD": {"a": None, "b": {"role": "FU RD", "plan": [1.0], "actual": [0.0]}}}}
     assert flatten_changes(added) == [("pva.FU RD", "–", "{role: FU RD, plan: [1.0], actual: [0.0]}")]
+
+
+# ---- 2026-10-01 review 修正 ----
+def snap_date_iso(app, month="202609"):
+    sd = app.state.eis.store.load_snapshot(month)["meta"]["snap_date"]
+    return f"{sd[:4]}-{sd[4:6]}-{sd[6:]}"
+
+
+def test_search_by_code_or_exact_name_goes_to_project(ingested):
+    add_twin(ingested)                                                        # THORPE 與 THORPE2：子字串比對會命中兩筆
+    for q in (CODE, CODE.lower(), "THORPE", "thorpe"):
+        r = get(ingested, f"/ui/202609/projects?q={q}")
+        assert r.status_code == 307 and r.headers["location"] == f"/ui/202609/projects/{CODE}", q
+    t = html(ingested, "/ui/202609/projects?q=THORP")                         # 不是完全相同 → 仍是列表
+    assert "2 projects" in t
+
+
+def test_exceptions_and_health_link_to_projects(ingested):
+    t = html(ingested, f"/ui/202609/?today={TODAY}")
+    ex = t[t.index('<ol class="ex">'):t.index("</ol>")]
+    assert f'href="/ui/202609/projects/{CODE}"' in ex
+    health = t[t.index("<h2>Data health"):]
+    assert "<details" in health and "repeat the Decisions above" in health  # decide 級三項與 Decisions 重複，收合
+
+
+def test_today_defaults_to_snapshot_date(ingested):
+    iso = snap_date_iso(ingested)
+    t = html(ingested, "/ui/202609/")
+    assert f'name="today" value="{iso}"' in t
+    t = html(ingested, f"/ui/202609/projects/{CODE}")
+    assert "THORPE" in t                                                      # 單案頁也以快照日期為準（不再用 server 當天）
+
+
+def test_milestone_footnote_matches_inactive_rule(ingested):
+    t = html(ingested, f"/ui/202609/?today={TODAY}")
+    assert "Active projects only (in briefing, not terminated or suspended)." in t
+
+
+def test_meta_line_is_readable(ingested):
+    t = html(ingested, "/ui/202609/")
+    assert "Report month 2026-09" in t and "manpower keyed in through" in t and f"Briefing {snap_date_iso(ingested)}" in t
+    assert "latest_month" not in t[t.index("<header>"):t.index("</header>")]
+
+
+def test_diff_against_same_month_is_400_and_picker_leaves_diff(ingested):
+    assert get(ingested, f"/ui/202609/projects/{CODE}/diff?to=202609").status_code == 400
+    clone_month(ingested, "202610", stage="MP")
+    t = html(ingested, f"/ui/202610/projects/{CODE}/diff?to=202609")
+    nav = t[t.index("<nav"):t.index("</nav>")]
+    assert "diff" not in nav and f'value="projects/{CODE}"' in nav
+
+
+def test_month_picker_works_without_js(ingested):
+    t = html(ingested, "/ui/202609/projects")
+    nav = t[t.index("<nav"):t.index("</nav>")]
+    assert "onchange" not in t and 'action="/ui/go"' in nav and 'aria-label="Search projects"' in nav
+    r = get(ingested, "/ui/go?month=202609&page=projects%3Fstage_cat%3DPOC")
+    assert r.status_code == 307 and r.headers["location"] == "/ui/202609/projects?stage_cat=POC"
+    r = get(ingested, "/ui/go?month=202609&page=")
+    assert r.status_code == 307 and r.headers["location"] == "/ui/202609/"
+    for bad in ("//evil.example", "/x", "..%2Fmcp", "http:x", "a%5Cb"):
+        assert get(ingested, f"/ui/go?month=202609&page={bad}").status_code == 400, bad
+    assert get(ingested, "/ui/go?month=2026-09&page=").status_code == 404
+
+
+def test_latest_task_month_is_open(ingested):
+    t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
+    assert t.count("<details open>") == 1
+    assert "<details>" not in t or t.index("<details open>") < t.index("<details>")      # 打開的是最上面（最新月）那一個
+
+
+def test_tables_scroll_on_narrow_screens(ingested):
+    t = html(ingested, f"/ui/202609/?today={TODAY}")
+    ms = t[t.index("<h2>Milestones"):t.index("<h2>Data health")]
+    assert '<div class="wide"><table>' in ms
+    assert "@media(max-width:640px)" in t
+    add_twin(ingested)
+    t = html(ingested, "/ui/202609/projects/THORP")
+    assert '<div class="wide"><table>' in t
+
+
+def test_open_links_can_wrap(ingested):
+    """連結之間要有空白：沒有斷行點時整串變成一個長字，手機寬度下把例外清單撐到 1000px 以上（2026-10-01 實機看到）。"""
+    t = html(ingested, f"/ui/202609/?today={TODAY}")
+    opens = [seg[:seg.index("</div>")] for seg in t.split('<div class="open">')[1:]]
+    assert opens and all("</a><a" not in o for o in opens)
+
+
+def test_project_page_dates_and_footnote_are_readable(ingested):
+    t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
+    assert "latest_month =" not in t and "Manpower keyed in through" in t
+    hist = t[t.index("<h2>Briefing history"):]
+    assert "<td>2026-" in hist and "<td>2026090" not in hist
