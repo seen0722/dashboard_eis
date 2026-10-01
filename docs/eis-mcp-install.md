@@ -237,6 +237,54 @@ EIS_URL=http://eis-host:8765 EIS_TOKEN=<uploader token> scripts/eis-upload.sh 20
 注意：舊月份的人力包配新月份的 Briefing 時，`briefing_stale` 會偏高，是兩者時間差造成，不是資料錯；等該月人力包到手再正式跑一次即可。
 
 
+## 4a. 網頁查詢介面 `/ui/`（免登入、唯讀）
+
+同一支服務、同一個 port 也提供瀏覽器介面：`http://<HOST>:8765/ui/`。不需要 OpenCode、不需要 token，同事用公司瀏覽器直接開。資料與 MCP tools 完全相同（同一份 `queries.py`），差別只在不需要 LLM 就能看。
+
+### 4a.1 部署（已裝過 MCP server 的主機）
+
+網頁包在 2026-10-01 之後的程式裡，更新即有，不需額外服務或 port：
+
+```bash
+cd dashboard_eis && git pull
+PYTHON=/opt/python3.12/bin/python3.12 sudo -E deploy/install.sh     # 離線主機照 §3.0 用 deploy/offline/
+systemctl is-active eis-mcp
+curl -s -o /dev/null -w '%{http_code}\n' -L http://127.0.0.1:8765/ui/    # 期待 200（/mcp 仍是 401）
+```
+
+已 ingest 的月份馬上能看。要有 Type / Category 欄位與 Terminated 分類，該月要用 2026-09 版面的 Briefing 重新 `ingest_month`（§4.1）。
+
+### 4a.2 部署前要決定：誰看得到
+
+`/ui/` **沒有任何存取管制**，等於把 BU10 所有專案的 stage、客戶、人力分佈開放給能連到 VM 8765 的每個人。目前的決定（2026-10-01）：**內網全員可看**。若之後要限縮：
+- 最簡單：請 IT 在防火牆只放行 BU10 的網段到 8765。
+- 或在 nginx 前面對 `/ui/` 加 basic auth，server 本身不用改。
+- **公網主機絕不開 `/ui/`**：反向代理只代理 `/mcp` 與 `/upload/`（VPS 那台就是這樣）。
+
+### 4a.3 瀏覽器會打的位址要在 `--allowed-host` 裡
+
+同事在瀏覽器打 `http://172.18.220.125:8765/ui/`，`/etc/eis-mcp/env` 的 `EIS_ALLOWED_HOST_ARG` 就要含 `--allowed-host 172.18.220.125:8765`（§3.2a）。用主機名或 DNS 名稱連的也要各加一個，否則瀏覽器看到 421。
+
+### 4a.4 上線後請一位同事用 OA 電腦實際點三個互動
+
+字串測試看不出瀏覽器才會發生的問題（nav 搜尋框曾因巢狀 `<form>` 失效過），所以每次改網頁後都要真的點：
+1. 右上角搜尋框輸入 `THORPE` 按 Enter → 應跳到單案頁。
+2. Projects 頁用 Stage / Type / Category 篩選後按 Filter → 列數變化。
+3. Diff 頁選兩個月份 → 顯示差異表。
+
+### 4a.5 與 MCP 的差異（營運要知道）
+
+| 項目 | MCP（OpenCode） | `/ui/` |
+|---|---|---|
+| 認證 | Bearer token，一人一把 | 無 |
+| 稽核 `audit.sqlite` 的 `name` | token 持有人 | 空，只有來源 IP（經 nginx 要傳 `X-Forwarded-For`） |
+| PII 出口掃描 | 每個 tool 回傳 | 每頁回傳前，同一個 `find_pii` |
+| 月份頁的上傳者姓名、上傳檔名 | `list_months` 不回傳檔名 | 兩者都不顯示 |
+| 原檔 `input/` | 碰不到 | 碰不到 |
+| 資源競爭 | 同一個 process，ingest 當下（數十秒）網頁可能短暫拿到上一個月或 `snapshot_broken` | 同左；ingest 挑非上班時段 |
+
+頁面清單與 URL 參數見 README §7.8。
+
 ## 5. Client 設定
 
 三種 client 都只需要 URL 與 token。以下 `<host>` 換成主機名或 IP，`<token>` 由管理者從 `tokens.yaml` 發給你。建議把 token 存成檔案而不是寫死在設定裡。
@@ -329,6 +377,8 @@ resources：`eis://months`、`eis://YYYYMM/report.html`（該月的單頁月報 
 | `missing_input` | 四類檔案沒齊或檔名不合樣式（回應會列出允許的樣式） |
 | `rejected_pii` | 原檔（通常是 Control List 的任務描述）含工號或「Name(中文)」形狀；修好重傳 |
 | `snapshot_broken` | 快照檔損毀；重跑 `ingest_month` 該月 |
+| 瀏覽器開 `/ui/` 回 421 | `--allowed-host` 沒含瀏覽器打的 host:port；照 §3.2a 加 |
+| `/ui/` 搜尋框按 Enter 沒反應 | 用真瀏覽器重測（§4a.4）；若仍失效回報，附瀏覽器版本 |
 | `unknown_month` | 該月沒 ingest 過；回應會列可用月份 |
 
 ## 9. 開發機快速試跑（不裝 systemd）

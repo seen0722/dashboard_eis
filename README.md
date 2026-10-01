@@ -182,13 +182,15 @@ journalctl -u eis-mcp -f
 
 ### 7.8 網頁查詢（免登入、唯讀）
 
+部署與上線檢查見 `docs/eis-mcp-install.md` §4a。
+
 同一支服務也提供瀏覽器介面：`http://<HOST>:<PORT>/ui/`。**沒有存取管制**（內網同仁全部視為 viewer），所以只該開在內網。若前面有對外的反向代理（例如公網測試主機），只代理 `/mcp` 與 `/upload/`，絕不要把 `/ui/` 加進去。
 
 | 路徑 | 內容 | 對應 tool |
 |---|---|---|
 | `/ui/` | 月份清單；`/ui/latest/` 轉到最新月份 | `list_months` |
 | `/ui/<YYYYMM>/` | Decisions、stage 統計、里程碑視窗（`?weeks=`、`?today=`）、Data health | `get_exceptions` / `get_health` / `get_upcoming_milestones` |
-| `/ui/<YYYYMM>/projects?stage_cat=&group=&customer=&q=` | 專案表；`q` 剛好一筆且沒設其他篩選時直接進單案 | `search_projects` |
+| `/ui/<YYYYMM>/projects?stage_cat=&biz_type=&category=&group=&customer=&q=` | 專案表（含 Type / Category 欄）；`q` 剛好一筆且沒設其他篩選時直接進單案 | `search_projects` |
 | `/ui/<YYYYMM>/projects/<code or name>` | 單案全紀錄、PVA 圖、tasks、history | `get_project` |
 | `/ui/<YYYYMM>/projects/<code>/diff?to=<YYYYMM>` | 跨月差異 | `diff_project` |
 | `/ui/<YYYYMM>/loads?min_util=` | 部門負載與產能圖 | `get_dept_loads` / `get_capacity` |
