@@ -24,7 +24,8 @@ def test_milestones_passed_rules():
     assert got == [("THORPE", "mp", 43), ("N1X", "pvt", 10)]
 
 
-def test_exceptions_five_fixed_entries():
+def test_exceptions_skip_mp_slip_and_empty_entries():
+    """2026-10-01 需求方裁定：MP 延後不需要主管決策，整條移出 Decisions（改在健康度 track 級）；0 筆的例外不顯示，排名重編。"""
     cfg = load_config()
     kos = proj("KOS", "suspended", "Suspended", in_cl=False)
     kos.fte[3] = 0.4; kos.fte[4] = 0.4   # charged Apr-May, zero since Jun -> "wound", not "still charging"
@@ -34,7 +35,8 @@ def test_exceptions_five_fixed_entries():
           proj("KILO12", "RFQ", "RFQ / RFI", mp="2028-08-12", mp_orig="2027-08-26", plan=1)]
     loads = [DeptLoad("D1", "研發三部", "BSP", keyed_in=[5] * 12, util=[100] * 12), DeptLoad("D2", "研發二課", "SW", keyed_in=[8] * 12, util=[68] * 12)]
     ex = build_exceptions(ps, loads, 8, cfg, TODAY)
-    assert [e.title for e in ex] == ["milestones_passed", "suspended_charging", "budget_missing", "mp_slipped", "spare_capacity"]
+    assert [e.title for e in ex] == ["milestones_passed", "suspended_charging", "budget_missing", "spare_capacity"]
+    assert [e.rank for e in ex] == [1, 2, 3, 4]
     assert ex[0].codes == ["BRTHORPE"] and "43" in ex[0].evidence
     assert ex[1].count == 1 and ex[1].evidence == ""   # KOS is the only suspended project, and it isn't charging this month
     assert ex[1].extra["twins"] == 1 and ex[1].extra["twin_list"][0]["twin_code"] == "TR_KOS"
@@ -42,8 +44,8 @@ def test_exceptions_five_fixed_entries():
     assert "TR_KOS" in ex[1].codes
     # THORPE、TR_KOS、KILO12 有 plan，共 4 份 Control List（THORPE, TR_KOS, NOPLAN, KILO12）。涵蓋率走 extra，不混進 evidence。
     assert ex[2].codes == ["BRNOPLAN"] and ex[2].evidence == "NOPLAN" and ex[2].extra == {"covered": 3, "total": 4}
-    assert ex[3].codes == ["BRKILO12"] and "352" in ex[3].evidence
-    assert ex[4].codes == [] and "SW 研發二課" in ex[4].evidence and "1" in ex[4].ask_data
+    assert ex[3].codes == [] and "SW 研發二課" in ex[3].evidence and "1" in ex[3].ask_data
+    assert all(e.count > 0 for e in ex)
 
 
 def test_second_identity_issues_and_health_row():
@@ -68,8 +70,16 @@ def test_exceptions_when_no_latest_month():
     ex = build_exceptions(ps, loads, 0, cfg, TODAY)
     assert ex[0].codes == ["BRTHORPE"]
     assert ex[1].codes == []
-    assert ex[4].evidence == ""
-    assert ex[4].ask_data == "0"
+    assert "spare_capacity" not in [e.title for e in ex]          # 沒有最新月 → 0 個閒置部門 → 不列
+    assert [e.rank for e in ex] == list(range(1, len(ex) + 1))
+
+
+def test_empty_exceptions_are_dropped_and_ranks_renumbered():
+    cfg = load_config()
+    ps = [proj("NOPLAN")]                                        # 只有缺預算這一條有東西
+    loads = [DeptLoad("D1", "研發三部", "BSP", keyed_in=[5] * 12, util=[100] * 12)]
+    ex = build_exceptions(ps, loads, 8, cfg, TODAY)
+    assert [(e.rank, e.title) for e in ex] == [(1, "budget_missing")]
 
 
 def test_health_rows_and_task_gaps():
@@ -88,6 +98,7 @@ def test_health_rows_and_task_gaps():
     assert rows["milestones_passed"].names == ["THORPE"]
     assert rows["in_briefing_no_cl"].names == ["NOCL"] and rows["in_cl_no_briefing"].names == ["NOBRIEF"]
     assert rows["mp_typo"].names == ["KILO12"] and rows["customer_blank"].count == 1
+    assert rows["mp_slipped"].level == "track" and rows["mp_slipped"].names == ["KILO12 2027-08-26 -> 2028-08-12 (352d)"]
     assert rows["name_unresolved"].count == 1 and rows["cl_unreadable"].count == 1 and rows["cross_month_correction"].count == 1
     assert rows["task_description_blank"].names == ["THORPE (8)"]
     assert rows["names_masked"].level == "ok" and rows["names_masked"].count == 3
@@ -136,5 +147,6 @@ def test_second_identity_carries_stage_cat():
     kos = proj("KOS", "Terminate", "Terminated", in_cl=False)
     tr = Project(code="TR_KOS", name="TR_BU10_IPC_KOS", in_control_list=True); tr.fte[7] = 0.49
     ex = build_exceptions([kos, tr], [], 8, cfg, TODAY)
-    tw = ex[1].extra["twin_list"][0]
+    susp = next(e for e in ex if e.title == "suspended_charging")    # 0 筆的例外會被拿掉，不能用位置取
+    tw = susp.extra["twin_list"][0]
     assert tw["cat"] == "Terminated" and tw["twin"] == "TR_BU10_IPC_KOS"

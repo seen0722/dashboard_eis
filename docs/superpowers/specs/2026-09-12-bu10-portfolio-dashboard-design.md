@@ -63,13 +63,14 @@ Resource Summary 中最後一個 Total EIS 人力非零的月份（input-08 為 
 
 ### 4.1 例外（Decisions this month）
 
-由規則產生、依急迫排序、每條輸出 title / evidence / decision ask / source。第一版規則：
+由規則產生、依急迫排序、每條輸出 title / evidence / decision ask / source。**0 筆的例外不列**，排名依下列順序重編（2026-10-01）。規則：
 
 1. **Milestone passed, stage not advanced**：MP 已過且 stage_cat ∉ {MP, Sustain/EOP}；或 PVT 已過且 stage 含 EVT/DVT/POC。依過期天數排序。
 2. **Suspended projects still charging**：stage_cat ∈ INACTIVE（Terminated 或 Suspended）且最新月 total_fte > 0.05；標題分別列出 terminated / suspended 數。
 3. **Budget missing**：Control List 三組 plan 全為 0。附預測涵蓋率。
-4. **MP slipped > 60 days vs Original MP**；相差 > 300 天另標「疑為輸入錯誤」。
-5. **Departments with spare capacity**：最新月 load% < 85%。附「其餘 N 個部門已達上限」。
+4. **Departments with spare capacity**：最新月 load% < 85%。附「其餘 N 個部門已達上限」。
+
+原第 4 條「MP slipped > 60 days vs Original MP」2026-10-01 移出例外，改為健康度 track 級（見 §4.2）：PM 已確認的延後不需要主管決策。舊快照仍存有這條，月報字串保留以顯示舊月份。
 
 規則的門檻（60 天、300 天、85%、0.05）放 `config/thresholds.yaml`。每條例外的 codes[] 用來在時程表與附錄標橘色。
 
@@ -81,6 +82,7 @@ Resource Summary 中最後一個 Total EIS 人力非零的月份（input-08 為 
 | decide | 里程碑已過但 Stage 未推進 | Briefing |
 | track | 在 Briefing（非停案）但沒有 Control List | 對照 |
 | track | 有 Control List 但不在 Briefing | 對照 |
+| track | MP 較 Original 延後 > 60 天（附原訂 → 目前與天數；2026-10-01 由例外移來） | Briefing |
 | track | MP 與 Original 相差 > 300 天 | Briefing |
 | track | Customer 為 NA / TBD / 空白 | Briefing |
 | track | 名稱需 alias 才對得上 | 三來源 |
@@ -174,5 +176,6 @@ config/
 ## 11. 已確認的決定（2026-09-12）
 
 - 「Suspended 仍掛人力」門檻採 0.05 FTE。
-- 例外第五條（可調度部門）保留在給主管的版本。
+- 例外「可調度部門」（原第五條，2026-10-01 起為第四條）保留在給主管的版本。
+- 2026-10-01：MP 延後移出例外改列健康度；0 筆的例外不顯示、排名重編。
 - NTD 成本允許出現在主管報告；第一版不做，第二版加成本視圖。

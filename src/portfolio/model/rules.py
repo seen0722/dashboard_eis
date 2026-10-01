@@ -124,7 +124,6 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
             susp_codes.append(tw["twin_code"])
     cls = [p for p in projects if p.in_control_list]
     noplan = [p for p in cls if not p.has_plan]
-    slipped = mp_slipped(projects, th["mp_slip_days"])
     spare = [d for d in loads if d.util[m] is not None and d.util[m] < th["spare_capacity_pct"]] if has_month else []
     full = (len([d for d in loads if d.util[m] is not None]) - len(spare)) if has_month else 0
     ex = [
@@ -134,9 +133,7 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
                    "suspended_charging", "briefing_summary", susp_codes),
         Exception_(3, "budget_missing", ", ".join(sorted(p.name for p in noplan)),
                    "budget_missing", "control_list_pva", [p.code for p in noplan]),
-        Exception_(4, "mp_slipped", "; ".join(f"{p.name} {p.dates['mp_orig']} -> {p.dates['mp']} ({n}d)" for p, n in slipped),
-                   "mp_slipped", "briefing_mp", [p.code for p, _ in slipped]),
-        Exception_(5, "spare_capacity", ", ".join(f"{d.function} {d.dept_name} ({d.keyed_in[m]} people, {d.util[m]}%)" for d in sorted(spare, key=lambda d: d.util[m])),
+        Exception_(4, "spare_capacity", ", ".join(f"{d.function} {d.dept_name} ({d.keyed_in[m]} people, {d.util[m]}%)" for d in sorted(spare, key=lambda d: d.util[m])),
                    "spare_capacity", "control_list_month", []),
     ]
     # By design: ex[1] (suspended_charging).count is the total number of suspended projects (len(susp)),
@@ -144,7 +141,7 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
     # the title template uses both numbers ("{n} projects suspended, {charging} still charging, {twins}
     # booked under a second code" via extra below). Do not "fix" count to len(charging); that would drop
     # the total-suspended figure the template needs.
-    for e, n in zip(ex, (len(passed), len(susp), len(noplan), len(slipped), len(spare))):
+    for e, n in zip(ex, (len(passed), len(susp), len(noplan), len(spare))):
         e.count = n
     briefed = len([p for p in projects if p.in_briefing])
     ex[1].extra = {"pct": round(len(susp) * 100 / max(1, briefed)), "briefed": briefed,
@@ -153,8 +150,15 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
                     "wound_list": wound, "zero_list": zero, "twin_list": twins}
     # 涵蓋率是數字，不是證據：走 extra 讓 render 直接取用，evidence 只留專案名。
     ex[2].extra = {"covered": len(cls) - len(noplan), "total": len(cls)}
-    ex[4].ask_data = str(full)
-    return ex
+    ex[3].ask_data = str(full)
+    # 2026-10-01 需求方裁定：
+    # - MP 延後（mp_slipped）不在這裡：PM 確認過的延後不需要主管決策，改列在健康度 track 級（見 CHECKS）。
+    #   舊快照裡仍存著這條例外，render/strings.py 的 ex_mp_slipped_* 為了顯示舊月份而保留。
+    # - 0 筆的例外不列，排名依原順序重編，第一屏只剩要決定的事。
+    kept = [e for e in ex if e.count]
+    for i, e in enumerate(kept, 1):
+        e.rank = i
+    return kept
 
 
 # (check, level, source_key, from_issues)
@@ -162,7 +166,7 @@ CHECKS = [
     ("budget_missing", "decide", "control_list", False), ("milestones_passed", "decide", "briefing", False),
     ("suspended_second_identity", "decide", "cross", True),
     ("in_briefing_no_cl", "track", "cross", False), ("in_cl_no_briefing", "track", "cross", False),
-    ("mp_typo", "track", "briefing", False), ("customer_blank", "track", "briefing", False),
+    ("mp_slipped", "track", "briefing", False), ("mp_typo", "track", "briefing", False), ("customer_blank", "track", "briefing", False),
     ("name_unresolved", "track", "cross", True), ("task_description_blank", "track", "control_list", False),
     ("briefing_stale", "track", "briefing", True), ("cl_unreadable", "track", "control_list", True),
     ("cl_format_drift", "track", "control_list", True), ("duplicate_source", "track", "cross", True),
@@ -183,6 +187,7 @@ def build_health(projects: list[Project], loads: list[DeptLoad], issues: list[Is
         "milestones_passed": [p.name for p, *_ in milestones_passed(projects, today)],
         "in_briefing_no_cl": sorted(p.name for p in active if not p.in_control_list),
         "in_cl_no_briefing": sorted(p.name for p in projects if p.in_control_list and not p.in_briefing),
+        "mp_slipped": [f"{p.name} {p.dates['mp_orig']} -> {p.dates['mp']} ({n}d)" for p, n in mp_slipped(projects, th["mp_slip_days"])],
         "mp_typo": [p.name for p, n in mp_slipped(projects, th["mp_typo_days"])],
         "customer_blank": sorted(p.name for p in active if p.customer.strip().upper() in blank),
         "task_description_blank": [f"{n} ({','.join(map(str, ms))})" for n, ms in task_description_gaps(projects)],

@@ -91,7 +91,7 @@ route handler
 | `/ui/{month}/projects?stage_cat=&group=&customer=&q=` | 專案表：code、name、stage、stage_cat、customer、group、latest FTE。四個篩選欄位為 GET 表單，狀態在 URL；`stage_cat` 用下拉（七個固定值），`group`/`customer` 用下拉（從快照 distinct 值填）；`q` 對應 tool 的 `text`。nav 搜尋框也送到這裡；`q` 與某個 code 相同（不分大小寫）或與恰好一個專案名稱完全相同時，先 307 到該單案頁（`queries.exact_code`，2026-10-01），否則走子字串比對，結果剛好一筆時同樣 307 | `search_projects` |
 | `/ui/{month}/projects/{code}` | 單案：基本資料、dates、`in_briefing`/`in_control_list`/`has_plan`、FTE 與 NTD 12 個月表、PVA 圖（重用 `charts.pva_svg`）、tasks、history；頂端「compare with previous month」連到 diff（前一個 ok 月份存在時才顯示） | `get_project` |
 | `/ui/{month}/projects/{code}/diff?to={YYYYMM}` | 跨月差異表：欄位、a、b；巢狀欄位攤平成 `dates.evt`、`pva.SW.plan` 這種鍵；`changed` 為空顯示 identical | `diff_project` |
-| `/ui/{month}/loads?min_util=` | 部門負載表（dept、function、util 12 個月、latest_util，`min_util` 篩選）+ 產能圖（重用 `charts.capacity_svg`）。橘色標「latest_util 低於 `spare_capacity_pct`」的閒置產能，與月報第 5 條例外同義；不標 100%（mock 實測 54 個部門有 47 個是 100%，標了等於沒標） | `get_dept_loads` / `get_capacity` |
+| `/ui/{month}/loads?min_util=` | 部門負載表（dept、function、util 12 個月、latest_util，`min_util` 篩選）+ 產能圖（重用 `charts.capacity_svg`）。橘色標「latest_util 低於 `spare_capacity_pct`」的閒置產能，與月報「可調度部門」例外同義；不標 100%（mock 實測 54 個部門有 47 個是 100%，標了等於沒標） | `get_dept_loads` / `get_capacity` |
 | `/ui/{month}/corrections` | 歷史數字被改清單 | `get_corrections` |
 | `/ui/{month}/report.html` | 現成月報 `store.report_html(month)` 原樣送出 | resource `eis://{month}/report.html` |
 

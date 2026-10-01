@@ -10,7 +10,7 @@ def _cells(values: list, fmt: str) -> str:
 
 
 def loads_body(month: str, snap: dict, res: dict, min_util: float | None, spare_pct: float) -> str:
-    """橘色標的是「低於 spare_pct 的閒置產能」，與月報第 5 條例外同一語意；>=100 的部門佔絕大多數，標了等於沒標。"""
+    """橘色標的是「低於 spare_pct 的閒置產能」，與月報「可調度部門」例外同一語意；>=100 的部門佔絕大多數，標了等於沒標。"""
     lm = res["latest_month"]
     form = (f'<form method="get" class="filters"><label>Min latest util (%) <input type="number" name="min_util" value="{"" if min_util is None else f"{min_util:g}"}" min="0" max="1000" step="1"></label>'
             f'<button>Filter</button> <a href="/ui/{month}/loads">clear</a></form>')

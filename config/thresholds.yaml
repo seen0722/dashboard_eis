@@ -40,7 +40,7 @@ fragmentation:
 
 # ---- BU10 Portfolio Review（src/portfolio）----
 portfolio:
-  mp_slip_days: 60            # MP 較 Original MP 延後超過此天數 → 例外
+  mp_slip_days: 60            # MP 較 Original MP 延後超過此天數 → 健康度 track（2026-10-01 起不列為例外）
   mp_typo_days: 300           # 相差超過此天數 → 疑為輸入錯誤
   spare_capacity_pct: 85      # 部門負載低於此 % → 可調度
   suspended_fte_min: 0.05     # 停案仍掛人力的門檻
