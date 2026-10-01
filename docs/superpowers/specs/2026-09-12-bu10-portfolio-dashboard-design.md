@@ -53,7 +53,7 @@ Resource Summary 中最後一個 Total EIS 人力非零的月份（input-08 為 
 
 ### 3.3 Stage 分類（`stage_cat`）
 
-依 Briefing Stage 文字，順序判斷：Suspended（suspend / discontinu / cancel / hold）→ RFQ/RFI → POC → Execution（EVT / DVT / PVT / EIV）→ MP → Sustain/EOP → Other。規則放 `config/stages.yaml`，可調。
+依 Briefing Stage 文字，順序判斷：Terminated（terminat / discontinu / cancel）→ Suspended（suspend / hold）→ RFQ/RFI → POC → Execution（EVT / DVT / PVT / EIV）→ MP → Sustain/EOP → Other。規則放 `config/stages.yaml`，可調。2026-10 起把結案（Terminated，掛帳人力該撤）與暫停（Suspended，掛帳可能刻意保留）分開；程式以 `entities.INACTIVE` 同時涵蓋兩者。
 
 ### 3.4 部門負載
 
@@ -66,7 +66,7 @@ Resource Summary 中最後一個 Total EIS 人力非零的月份（input-08 為 
 由規則產生、依急迫排序、每條輸出 title / evidence / decision ask / source。第一版規則：
 
 1. **Milestone passed, stage not advanced**：MP 已過且 stage_cat ∉ {MP, Sustain/EOP}；或 PVT 已過且 stage 含 EVT/DVT/POC。依過期天數排序。
-2. **Suspended projects still charging**：stage_cat = Suspended 且最新月 total_fte > 0.05。
+2. **Suspended projects still charging**：stage_cat ∈ INACTIVE（Terminated 或 Suspended）且最新月 total_fte > 0.05；標題分別列出 terminated / suspended 數。
 3. **Budget missing**：Control List 三組 plan 全為 0。附預測涵蓋率。
 4. **MP slipped > 60 days vs Original MP**；相差 > 300 天另標「疑為輸入錯誤」。
 5. **Departments with spare capacity**：最新月 load% < 85%。附「其餘 N 個部門已達上限」。
@@ -99,7 +99,7 @@ Resource Summary 中最後一個 Total EIS 人力非零的月份（input-08 為 
 
 1. **Header + title block**：左為 `BU10 Portfolio Review` 與一句用途說明；右上角標題欄四列：Report month / Manpower data (range, N projects) / Briefing snapshot (date, revision) / Generated (date, pipeline version)。
 2. **Decisions this month**：有序清單，橘色序號；每條 title（粗）、evidence、`Decision needed:` 一句、`Source:` 一句。
-3. **Stage strip**：一列數字 RFQ/RFI、POC、Execution、MP、Sustain/EOP、Suspended（橘）、Total FTE latest month（含 FU，來源 Resource Summary，標籤註明 `incl. FU`）。
+3. **Stage strip**：一列數字 RFQ/RFI、POC、Execution、MP、Sustain/EOP、Terminated（橘）、Suspended（橘）、Total FTE latest month（含 FU，來源 Resource Summary，標籤註明 `incl. FU`）。
 4. **Milestones, next 8 weeks**（左，含過去 7 天）與 **Six-month timeline**（右）：週格線，月份標籤 `2026-09`；標記 □ EVT ■ DVT ▲ PVT ● MP；過期未推進為橘；停案不列；RFQ/RFI 無日期者顯示 `RFQ, no dates yet`。
 5. **Manpower and capacity**：一張圖，Jan–Dec：BU keyed-in headcount（天花板，黑虛線）、BU RD + PM actual（板岩實線）、BU RD + PM budget（板岩虛線）、FU RD actual（鋼青）。9–12 月區域灰底並標 `Budget covers N / M projects`。
 6. **Data health**：表格，欄位 Level / Check / Count / Projects / Source；decide 級的數字為橘。

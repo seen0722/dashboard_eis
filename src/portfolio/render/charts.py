@@ -2,7 +2,7 @@
 from __future__ import annotations
 import datetime as dt
 from html import escape
-from ..entities import MONTHS
+from ..entities import INACTIVE, MONTHS
 from .strings import t
 
 SLATE, SLATE2, TEAL, INK, INK2, INK3, SIGNAL, GRID, GRID2 = "#3D5A80", "#A9B8CC", "#5C8D89", "#22262A", "#5B6167", "#9AA3AB", "#E8590C", "#e6e9e6", "#c4c9c5"
@@ -46,7 +46,7 @@ def timeline_svg(projects: list[dict], today: str, start: str, months: int, late
     head, d = [], t0
     while d < t1:
         head.append(f'<text x="{x(d.isoformat())+4:.1f}" y="12" font-size="11" fill="{INK2}">{d.strftime("%Y-%m")}</text>'); d = _add_months(d, 1)
-    rows = [p for p in projects if p["in_briefing"] and p["stage_cat"] != "Suspended"
+    rows = [p for p in projects if p["in_briefing"] and p["stage_cat"] not in INACTIVE
             and (any(in_win(p["dates"][k]) for k in ("evt", "dvt", "pvt", "mp")) or (p["stage_cat"] == "RFQ / RFI" and not p["dates"]["mp"]))]
     rows.sort(key=lambda p: p["dates"]["mp"] or p["dates"]["pvt"] or p["dates"]["dvt"] or p["dates"]["evt"] or "9")
     out = []

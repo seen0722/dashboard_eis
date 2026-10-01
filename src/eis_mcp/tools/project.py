@@ -29,13 +29,17 @@ def register(mcp: MCPServer, state: ServerState) -> None:
 
     @mcp.tool()
     def search_projects(ctx: Context, stage_cat: str | None = None, group: str | None = None, customer: str | None = None,
-                        text: str | None = None, month: str | None = None) -> dict:
-        """List projects, optionally filtered. stage_cat is one of RFQ / RFI, POC, Execution, MP, Sustain / EOP, Suspended, Other
-        (case-insensitive). group and customer match whole values; text matches a substring of name, customer or product.
-        Returns {"meta", "count", "projects": [{code, name, stage, stage_cat, customer, group, latest_fte}]} where latest_fte is
-        the FTE of meta.latest_month. Use get_project for the full record.
+                        biz_type: str | None = None, category: str | None = None, text: str | None = None,
+                        month: str | None = None) -> dict:
+        """List projects, optionally filtered. stage_cat is one of RFQ / RFI, POC, Execution, MP, Sustain / EOP, Terminated, Suspended, Other
+        (case-insensitive). group, customer, biz_type (JDM | ODM | EMS) and category (Tablet, NB, AI PC, Box PC, ...) match whole
+        values case-insensitively; text matches a substring of name, customer or product. biz_type / category / panel_size come
+        from the PM Briefing's Type / Category / Panel Size columns (added 2026-09) and are empty strings for older briefings.
+        Returns {"meta", "count", "projects": [{code, name, stage, stage_cat, customer, group, biz_type, category, panel_size,
+        latest_fte}]} where latest_fte is the FTE of meta.latest_month. Use get_project for the full record.
         """
         def go(p):
             _, snap = resolve_month(state, month)
-            return with_meta(snap, **queries.search(snap, stage_cat, group, customer, text))
-        return guarded(state, ctx, "search_projects", {"stage_cat": stage_cat, "group": group, "customer": customer, "text": text, "month": month}, go)
+            return with_meta(snap, **queries.search(snap, stage_cat, group, customer, text, biz_type, category))
+        return guarded(state, ctx, "search_projects", {"stage_cat": stage_cat, "group": group, "customer": customer, "biz_type": biz_type,
+                                                       "category": category, "text": text, "month": month}, go)

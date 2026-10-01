@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 from ..portfolio.config import Config, normalize_name
-from ..portfolio.entities import MONTHS
+from ..portfolio.entities import INACTIVE, MONTHS
 from ..portfolio.model.rules import days_between
 
 MILESTONES = ("evt", "dvt", "pvt", "mp")
@@ -46,17 +46,23 @@ def project(snap: dict, query: str, cfg: Config) -> dict:
 
 def _summary(p: dict, lm: int) -> dict:
     return {"code": p["code"], "name": p["name"], "stage": p["stage"], "stage_cat": p["stage_cat"], "customer": p["customer"],
-            "group": p["group"], "latest_fte": p["fte"][lm - 1]}
+            "group": p["group"], "biz_type": p.get("biz_type", ""), "category": p.get("category", ""),
+            "panel_size": p.get("panel_size", ""), "latest_fte": p["fte"][lm - 1]}
 
 
-def search(snap: dict, stage_cat: str | None = None, group: str | None = None, customer: str | None = None, text: str | None = None) -> dict:
+def search(snap: dict, stage_cat: str | None = None, group: str | None = None, customer: str | None = None, text: str | None = None,
+           biz_type: str | None = None, category: str | None = None) -> dict:
+    """biz_type（JDM/ODM/EMS）與 category 來自 2026-09 起 Briefing 的 Type/Category 欄；舊快照沒有這兩欄時視為空字串。"""
     lm = snap["meta"]["latest_month"]
     nt = normalize_name(text) if text else ""
     ng, nc = (normalize_name(group) if group else ""), (normalize_name(customer) if customer else "")
+    nb, nk = (normalize_name(biz_type) if biz_type else ""), (normalize_name(category) if category else "")
     rows = [q for q in snap["projects"]
             if (not stage_cat or q["stage_cat"].lower() == stage_cat.lower())
             and (not ng or normalize_name(q["group"]) == ng)
             and (not nc or normalize_name(q["customer"]) == nc)
+            and (not nb or normalize_name(q.get("biz_type", "")) == nb)
+            and (not nk or normalize_name(q.get("category", "")) == nk)
             and (not nt or any(nt in normalize_name(q[k]) for k in ("name", "customer", "product")))]
     return {"count": len(rows), "projects": [_summary(q, lm) for q in rows]}
 
@@ -75,11 +81,11 @@ def health(snap: dict) -> dict:
 
 
 def upcoming_milestones(snap: dict, today: str, weeks: int) -> list[dict]:
-    """與 rules._active() 同條件：只看 in_briefing 且非 Suspended 的專案；視窗前後各 weeks 週；已過期者 days_left 為負。"""
+    """與 rules._active() 同條件：只看 in_briefing 且非 Terminated/Suspended 的專案；視窗前後各 weeks 週；已過期者 days_left 為負。"""
     span = weeks * 7
     out = []
     for p in snap["projects"]:
-        if not p.get("in_briefing") or p.get("stage_cat") == "Suspended":
+        if not p.get("in_briefing") or p.get("stage_cat") in INACTIVE:
             continue
         for ms in MILESTONES:
             d = p["dates"].get(ms)

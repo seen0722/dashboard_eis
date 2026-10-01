@@ -36,7 +36,12 @@ def test_search_filters_and_latest_fte():
     assert out["count"] == 1 and out["projects"][0]["code"] == "BR0000099999" and out["projects"][0]["latest_fte"] == 1.0
     assert q.search(SNAP, customer="acme")["count"] == 2
     assert [p["code"] for p in q.search(SNAP, text="sleep")["projects"]] == ["BR0000077777"]
-    assert set(q.search(SNAP)["projects"][0]) == {"code", "name", "stage", "stage_cat", "customer", "group", "latest_fte"}
+    assert set(q.search(SNAP)["projects"][0]) == {"code", "name", "stage", "stage_cat", "customer", "group", "biz_type", "category", "panel_size", "latest_fte"}
+    # 舊快照沒有 Type/Category/Panel 三欄：回空字串，篩選時視為不符
+    assert q.search(SNAP)["projects"][0]["biz_type"] == "" and q.search(SNAP, biz_type="JDM")["count"] == 0
+    snap2 = {**SNAP, "projects": [{**P1, "biz_type": "JDM", "category": "NB", "panel_size": '14"'}, P2]}
+    assert [p["code"] for p in q.search(snap2, biz_type="jdm")["projects"]] == ["BR0000015346"]
+    assert q.search(snap2, category="nb")["projects"][0]["panel_size"] == '14"' and q.search(snap2, category="Tablet")["count"] == 0
 
 
 def test_exceptions_health_corrections_are_snapshot_rows():

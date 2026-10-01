@@ -4,7 +4,8 @@ from html import escape as e
 from ...portfolio.entities import MONTHS
 from ...portfolio.render.page import project_card_html
 
-STAGE_CATS = ("RFQ / RFI", "POC", "Execution", "MP", "Sustain / EOP", "Suspended", "Other")
+STAGE_CATS = ("RFQ / RFI", "POC", "Execution", "MP", "Sustain / EOP", "Terminated", "Suspended", "Other")
+BIZ_TYPES = ("JDM", "ODM", "EMS")
 
 
 def _select(name: str, options: list[str], current: str) -> str:
@@ -12,18 +13,21 @@ def _select(name: str, options: list[str], current: str) -> str:
     return f'<select name="{name}"><option value="">any</option>{opts}</select>'
 
 
-def projects_body(month: str, res: dict, filters: dict, groups: list[str], customers: list[str]) -> str:
+def projects_body(month: str, res: dict, filters: dict, groups: list[str], customers: list[str], categories: list[str] | None = None) -> str:
     form = (f'<form method="get" class="filters">'
             f'<label>Stage {_select("stage_cat", list(STAGE_CATS), filters.get("stage_cat", ""))}</label>'
+            f'<label>Type {_select("biz_type", list(BIZ_TYPES), filters.get("biz_type", ""))}</label>'
+            f'<label>Category {_select("category", categories or [], filters.get("category", ""))}</label>'
             f'<label>Group {_select("group", groups, filters.get("group", ""))}</label>'
             f'<label>Customer {_select("customer", customers, filters.get("customer", ""))}</label>'
             f'<label>Text <input type="text" name="q" value="{e(filters.get("q", ""))}" placeholder="name, customer or product"></label>'
             f'<button>Filter</button> <a href="/ui/{month}/projects">clear</a></form>')
     rows = "".join(f'<tr><td><a href="/ui/{month}/projects/{e(p["code"])}">{e(p["code"])}</a></td><td><b>{e(p["name"])}</b></td><td>{e(p["stage"])}</td>'
-                   f'<td>{e(p["stage_cat"])}</td><td>{e(p["customer"])}</td><td>{e(p["group"])}</td><td class="num">{p["latest_fte"]:.1f}</td></tr>'
+                   f'<td>{e(p["stage_cat"])}</td><td>{e(p.get("biz_type", ""))}</td><td>{e(p.get("category", ""))}{(" " + e(p["panel_size"])) if p.get("panel_size") and p["panel_size"].upper() != "NA" else ""}</td>'
+                   f'<td>{e(p["customer"])}</td><td>{e(p["group"])}</td><td class="num">{p["latest_fte"]:.1f}</td></tr>'
                    for p in res["projects"])
     n = res["count"]
-    table = (f'<div class="wide"><table><thead><tr><th>Code</th><th>Project</th><th>Stage</th><th>Category</th><th>Customer</th><th>Group</th>'
+    table = (f'<div class="wide"><table><thead><tr><th>Code</th><th>Project</th><th>Stage</th><th>Stage cat.</th><th>Type</th><th>Category</th><th>Customer</th><th>Group</th>'
              f'<th class="num">Latest FTE</th></tr></thead><tbody>{rows}</tbody></table></div>') if rows else '<p class="empty">No project matches.</p>'
     return f'<section><h2>{n} project{"" if n == 1 else "s"}</h2>{form}{table}</section>'
 

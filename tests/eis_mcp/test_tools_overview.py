@@ -17,6 +17,7 @@ def test_upcoming_milestones_pure_function():
     snap = {"projects": [
         {"code": "A", "name": "A", "stage_cat": "Execution", "in_briefing": True, "dates": {"evt": None, "dvt": None, "pvt": "2026-03-21", "mp": "2026-07-31"}},
         {"code": "S", "name": "S", "stage_cat": "Suspended", "in_briefing": True, "dates": {"evt": None, "dvt": None, "pvt": None, "mp": "2026-09-20"}},
+        {"code": "T", "name": "T", "stage_cat": "Terminated", "in_briefing": True, "dates": {"evt": None, "dvt": None, "pvt": None, "mp": "2026-09-20"}},
         {"code": "N", "name": "N", "stage_cat": "Execution", "in_briefing": False, "dates": {"evt": None, "dvt": None, "pvt": None, "mp": "2026-09-20"}},
         {"code": "B", "name": "B", "stage_cat": "POC", "in_briefing": True, "dates": {"evt": "2026-10-01", "dvt": None, "pvt": None, "mp": None}},
     ]}

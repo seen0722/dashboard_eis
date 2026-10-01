@@ -133,14 +133,16 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
     async def projects(request: Request) -> Response:
         month = request.path_params["month"]
         qp = request.query_params
-        filters = {k: (qp.get(k) or "").strip() for k in ("stage_cat", "group", "customer", "q")}
+        filters = {k: (qp.get(k) or "").strip() for k in ("stage_cat", "group", "customer", "biz_type", "category", "q")}
 
         def build(ok):
             snap = load_snap(state, month)
-            res = queries.search(snap, filters["stage_cat"] or None, filters["group"] or None, filters["customer"] or None, filters["q"] or None)
-            if filters["q"] and res["count"] == 1 and not any(filters[k] for k in ("stage_cat", "group", "customer")):
+            res = queries.search(snap, filters["stage_cat"] or None, filters["group"] or None, filters["customer"] or None, filters["q"] or None,
+                                 filters["biz_type"] or None, filters["category"] or None)
+            if filters["q"] and res["count"] == 1 and not any(filters[k] for k in ("stage_cat", "group", "customer", "biz_type", "category")):
                 return RedirectResponse(f"/ui/{month}/projects/{res['projects'][0]['code']}", status_code=307)
-            body = pages_project.projects_body(month, res, filters, queries.distinct(snap, "group"), queries.distinct(snap, "customer"))
+            body = pages_project.projects_body(month, res, filters, queries.distinct(snap, "group"), queries.distinct(snap, "customer"),
+                                               queries.distinct(snap, "category"))
             suffix = "projects" + (("?" + str(qp)) if str(qp) else "")
             return render_shell(title="Projects", body=body, months=ok, month=month, suffix=suffix, meta=snap["meta"], active="projects")
         return await respond(state, request, build)

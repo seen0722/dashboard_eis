@@ -2,12 +2,12 @@
 from __future__ import annotations
 import datetime as dt
 from html import escape as e
-from ..entities import MONTHS
+from ..entities import INACTIVE, MONTHS
 from .css import CSS
 from .charts import timeline_svg, capacity_svg, pva_svg
 from .strings import t
 
-STAGE_KEYS = [("RFQ / RFI", "stage_rfq"), ("POC", "stage_poc"), ("Execution", "stage_exec"), ("MP", "stage_mp"), ("Sustain / EOP", "stage_sustain"), ("Suspended", "stage_suspended")]
+STAGE_KEYS = [("RFQ / RFI", "stage_rfq"), ("POC", "stage_poc"), ("Execution", "stage_exec"), ("MP", "stage_mp"), ("Sustain / EOP", "stage_sustain"), ("Terminated", "stage_terminated"), ("Suspended", "stage_suspended")]
 
 
 def _days(a: str, b: str) -> int:
@@ -24,13 +24,15 @@ def _title_block(m: dict, lang: str, n_cl: int, latest_month: int) -> str:
 
 def _susp_twin_line(tw: dict, lang: str, mon: str) -> str:
     cl = t(lang, "ex_susp_twin_cl") if tw["twin_in_cl"] else ""
-    return t(lang, "ex_susp_twin_line", name=tw["name"], code=tw["code"], twin=tw["twin"], twin_code=tw["twin_code"],
+    cat = t(lang, "cat_terminated" if tw.get("cat") == "Terminated" else "cat_suspended")
+    return t(lang, "ex_susp_twin_line", name=tw["name"], code=tw["code"], cat=cat, twin=tw["twin"], twin_code=tw["twin_code"],
               fte=f"{tw['twin_fte']:.2f}", mon=mon, cl=cl)
 
 
 def _suspended_charging_body(x: dict, lang: str, lm: int) -> str:
-    """例外 2 的細節：先亮橘色的「第二身分」（最需要決定），再列仍掛帳／今年曾掛帳現歸零／全年無人力
-    三段，任何一段沒資料就整段省略。"""
+    """例外 2 的細節，只列需要決定的：先亮橘色的「第二身分」，再列仍掛帳（Terminated 掛帳是異常，標註分類）、
+    暫停但已無人力（會重啟嗎？）、暫停且全年無人力。已結案且人力為零是正常收尾，不列（總數在 stage strip）。
+    任何一段沒資料就整段省略。"""
     extra = x.get("extra", {})
     twins, charging = extra.get("twin_list", []), extra.get("charging_list", [])
     wound, zero = extra.get("wound_list", []), extra.get("zero_list", [])
@@ -40,13 +42,17 @@ def _suspended_charging_body(x: dict, lang: str, lm: int) -> str:
         lines = "".join(f'<div class="sig">{e(_susp_twin_line(tw, lang, mon))}</div>' for tw in twins)
         blocks.append(f'<div class="body"><b class="sig">{e(t(lang, "ex_susp_twin_h"))}</b>{lines}</div>')
     if charging:
-        lines = "".join(f'<div>{e(f"{c["name"]} {c["fte"]:.1f} FTE")}</div>' for c in charging)
+        lines = "".join(f'<div>{e(f"{c["name"]} {c["fte"]:.1f} FTE" + (f" ({t(lang, "cat_terminated")})" if c.get("cat") == "Terminated" else ""))}</div>' for c in charging)
         blocks.append(f'<div class="body"><b>{e(t(lang, "ex_susp_charging_h", mon=mon))}</b>{lines}</div>')
-    if wound:
-        lines = "".join(f'<div>{e(t(lang, "ex_susp_wound_line", name=w["name"], peak=f"{w["peak"]:.1f}", peak_month=w["peak_month"], zero_since=w["zero_since"]))}</div>' for w in wound)
-        blocks.append(f'<div class="body"><b>{e(t(lang, "ex_susp_wound_h"))}</b>{lines}</div>')
-    if zero:
-        blocks.append(f'<div class="body dim"><b>{e(t(lang, "ex_susp_zero_h", n=len(zero)))}</b> {e(", ".join(z["name"] for z in zero))}</div>')
+    def wound_lines(ws):
+        return "".join(f'<div>{e(t(lang, "ex_susp_wound_line", name=w["name"], peak=f"{w["peak"]:.1f}", peak_month=w["peak_month"], zero_since=w["zero_since"]))}</div>' for w in ws)
+    w_susp = [w for w in wound if w.get("cat") != "Terminated"]
+    if w_susp:
+        since = ", ".join(sorted({w["zero_since"] for w in w_susp}))
+        blocks.append(f'<div class="body"><b>{e(t(lang, "ex_susp_wound_susp_h", since=since))}</b>{wound_lines(w_susp)}</div>')
+    z_susp = [z for z in zero if z.get("cat") != "Terminated"]
+    if z_susp:
+        blocks.append(f'<div class="body"><b>{e(t(lang, "ex_susp_zero_h", n=len(z_susp)))}</b> {e(", ".join(z["name"] for z in z_susp))}</div>')
     return "".join(blocks) or f'<div class="body">{e(t(lang, "none"))}</div>'
 
 
@@ -67,7 +73,7 @@ def _exceptions(snap: dict, lang: str, th: dict) -> str:
 
 def _stage_strip(snap: dict, lang: str, latest_month: int) -> str:
     ps = [p for p in snap["projects"] if p["in_briefing"]]
-    cells = [f'<div><b class="{"sig" if cat == "Suspended" else ""}">{sum(1 for p in ps if p["stage_cat"] == cat)}</b><span>{e(t(lang, key))}</span></div>' for cat, key in STAGE_KEYS]
+    cells = [f'<div><b class="{"sig" if cat in INACTIVE else ""}">{sum(1 for p in ps if p["stage_cat"] == cat)}</b><span>{e(t(lang, key))}</span></div>' for cat, key in STAGE_KEYS]
     total = sum(p["fte"][latest_month - 1] for p in snap["projects"])
     cells.append(f'<div><b>{total:.1f}</b><span>{e(t(lang, "stage_fte", mon=MONTHS[latest_month - 1]))}</span></div>')
     return f'<div class="stages">{"".join(cells)}</div>'
@@ -82,7 +88,7 @@ def _passed_mark(lang: str, overdue: bool, sig: bool) -> str:
 def _upcoming(snap: dict, lang: str, today: str, weeks: int, late: set[str]) -> str:
     rows = []
     for p in snap["projects"]:
-        if not p["in_briefing"] or p["stage_cat"] == "Suspended":
+        if not p["in_briefing"] or p["stage_cat"] in INACTIVE:
             continue
         for k in ("evt", "dvt", "pvt", "mp"):
             d = p["dates"][k]
@@ -126,7 +132,8 @@ def _appendix_one(p: dict, lang: str, today: str, latest_month: int, i: int) -> 
             dets.append(f'<details><summary data-expand="{e(t(lang, "expand"))}" data-collapse="{e(t(lang, "collapse"))}"><span>{e(t(lang, "task_summary", mon=MONTHS[m - 1], bu=bu, fu=fu, fte=f"{sum(x["fte"] for x in ts):.1f}"))}</span></summary>'
                         f'<table><thead><tr><th>{e(t(lang, "col_side"))}</th><th>{e(t(lang, "col_function"))}</th><th>{e(t(lang, "col_dept"))}</th><th class="num">{e(t(lang, "col_fte"))}</th><th>{e(t(lang, "col_task"))}</th></tr></thead><tbody>{trs}</tbody></table></details>')
         body = f'<div class="pva">{"".join(cards)}</div><h3 style="font-size:15px;margin:26px 0 6px">{e(t(lang, "s_tasks"))}</h3>{"".join(dets)}'
-    meta = "  ".join(x for x in (p["code"] if not p["code"].startswith("NAME:") else "", p["customer"], p["product"], p["group"]) if x)
+    # biz_type（JDM/ODM/EMS）來自 2026-09 起的 Briefing Type 欄；product 在新版已是 Category + Panel Size，不再重複列。舊版面為空就略過。
+    meta = "  ".join(x for x in (p["code"] if not p["code"].startswith("NAME:") else "", p["customer"], p.get("biz_type", ""), p["product"], p["group"]) if x)
     return f'<div class="proj" data-idx="{i}"><div class="dim">{e(meta)}</div><div class="ms">{"".join(ms)}</div>{body}</div>'
 
 
@@ -138,7 +145,7 @@ def render_page(snap: dict, lang: str, today: str, th: dict) -> str:
     late = {c for x in snap["exceptions"] if x["title"] == "milestones_passed" for c in x["codes"]}
     start = f"{today[:7]}-01"
     head_svg, rows = timeline_svg(ps, today, start, th["timeline_months"], late, lang)
-    order = sorted(range(len(ps)), key=lambda i: (0 if ps[i]["in_briefing"] and ps[i]["stage_cat"] not in ("Suspended", "Sustain / EOP") else 1, -ps[i]["fte"][lm - 1]))
+    order = sorted(range(len(ps)), key=lambda i: ps[i]["name"].casefold())   # 附錄依專案名稱字母排序（需求方 2026-09-30）
     options = "".join(f'<option value="{i}">{e(ps[i]["name"])}{", " + e(ps[i]["stage"]) if ps[i]["stage"] else ""}</option>' for i in order)
     appendix = "".join(_appendix_one(ps[i], lang, today, lm, i) for i in order)
     ym = f"{m['report_month'][:4]}-{m['report_month'][4:]}"

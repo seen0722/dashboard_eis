@@ -127,7 +127,7 @@ claude mcp list
 |---|---|---|
 | 有哪些月份 | 「有哪些月份的資料」 | `list_months` |
 | 單一專案 | 「THORPE 現在什麼 stage、MP 是哪天」 | `get_project` |
-| 篩選清單 | 「列出所有 Execution 階段的案子」「AMD 的案子」 | `search_projects` |
+| 篩選清單 | 「列出所有 Execution 階段的案子」「AMD 的案子」「JDM 的案子」「NB 類有哪些」 | `search_projects`（可用 stage_cat / customer / biz_type / category 篩） |
 | 本月要決定的事 | 「這個月的 exceptions」「資料健康度」 | `get_exceptions`、`get_health` |
 | 里程碑 | 「未來八週有哪些里程碑」「哪些已逾期」 | `get_upcoming_milestones` |
 | 部門負載 | 「哪些部門負載超過 100%」（`min_util` 是百分比） | `get_dept_loads`、`get_capacity` |

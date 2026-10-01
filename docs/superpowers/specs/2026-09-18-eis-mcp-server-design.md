@@ -181,7 +181,7 @@ audit(id, at, name, role, kind, action, args_json, status, duration_ms, detail)
 | tool | 參數 | 回傳 | 實作依據 |
 |---|---|---|---|
 | `get_project(query, month?)` | `query`：code、名稱或別名 | 命中一筆 → 完整 project dict（code、name、group、family、customer、product、stage、stage_cat、dates、in_briefing、in_control_list、has_plan、fte、ntd、pva、tasks、history）；多筆 → `{candidates: [{code, name}]}` 要求指定；零筆 → error `not_found` | 先精確比對 code；再 `config.normalize_name()` 對名稱與 `portfolio_aliases.yaml` |
-| `search_projects(stage_cat?, group?, customer?, text?, month?)` | 全部可選，`text` 對 name/customer/product 做正規化子字串 | `[{code, name, stage, stage_cat, customer, latest_fte}]` | 純過濾 `projects` |
+| `search_projects(stage_cat?, group?, customer?, biz_type?, category?, text?, month?)` | 全部可選；`biz_type`（JDM/ODM/EMS）與 `category`（Tablet/NB/AI PC…）來自 2026-09 起 Briefing 的 Type/Category 欄，舊版面為空字串；`text` 對 name/customer/product 做正規化子字串 | `[{code, name, stage, stage_cat, customer, group, biz_type, category, panel_size, latest_fte}]` | 純過濾 `projects` |
 | `get_exceptions(month?)` | | 快照 `exceptions` 原樣 | |
 | `get_health(month?)` | | 快照 `health` 原樣 | |
 | `get_upcoming_milestones(weeks=8, month?, today?)` | | `[{code, name, stage_cat, milestone, date, days_left}]`，`milestone` ∈ evt/dvt/pvt/mp；範圍為 `today - weeks*7` 到 `today + weeks*7`，已過期者 `days_left` 為負 | 新寫純函式，放 `tools/overview.py`：只看 `in_briefing` 且 `stage_cat != Suspended` 的專案（與 `rules._active()` 同條件），日期差用 `rules.days_between()`；不重用 `milestones_passed()`，它只回逾期的 MP/PVT |

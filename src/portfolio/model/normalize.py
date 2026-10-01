@@ -63,6 +63,7 @@ def build_projects(master: list[MasterProject], briefing: list[BriefingRow], sum
             p.in_briefing = True
             p.stage, p.stage_cat = r.stage, stage_cat(r.stage, cfg)
             p.customer, p.product, p.dates = r.customer, r.product, dict(r.dates)
+            p.biz_type, p.category, p.panel_size = r.biz_type, r.category, r.panel_size
             if p.code.startswith("NAME:"):
                 p.name = r.name
     summary_seen: set[str] = set()

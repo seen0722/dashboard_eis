@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 from ..config import Config, normalize_name
-from ..entities import Project, Issue, Exception_, HealthRow, MONTHS
+from ..entities import INACTIVE, Project, Issue, Exception_, HealthRow, MONTHS
 from .keys import segments
 from .load import DeptLoad
 
@@ -15,7 +15,7 @@ def days_between(a: str, b: str) -> int:
 
 
 def _active(projects: list[Project]) -> list[Project]:
-    return [p for p in projects if p.in_briefing and p.stage_cat != "Suspended"]
+    return [p for p in projects if p.in_briefing and p.stage_cat not in INACTIVE]
 
 
 def milestones_passed(projects: list[Project], today: str) -> list[tuple[Project, str, str, int]]:
@@ -54,16 +54,16 @@ def suspended_lists(susp: list[Project], m: int, min_fte: float) -> tuple[list[d
     charging, wound, zero = [], [], []
     for p in susp:
         if p.fte[m] > min_fte:
-            charging.append({"name": p.name, "code": p.code, "fte": round(p.fte[m], 2)})
+            charging.append({"name": p.name, "code": p.code, "cat": p.stage_cat, "fte": round(p.fte[m], 2)})
             continue
         history = p.fte[:m]
         active = [i for i, v in enumerate(history) if v > min_fte]
         if active:
             peak = max(history)
-            wound.append({"name": p.name, "code": p.code, "peak": round(peak, 2),
+            wound.append({"name": p.name, "code": p.code, "cat": p.stage_cat, "peak": round(peak, 2),
                           "peak_month": MONTHS[history.index(peak)], "zero_since": MONTHS[active[-1] + 1]})
         else:
-            zero.append({"name": p.name, "code": p.code})
+            zero.append({"name": p.name, "code": p.code, "cat": p.stage_cat})
     return charging, wound, zero
 
 
@@ -76,7 +76,7 @@ def find_second_identities(projects: list[Project], latest_month: int, cfg: Conf
         return []
     m = latest_month - 1
     min_fte = cfg.thresholds["suspended_fte_min"]
-    susp = [p for p in projects if p.in_briefing and p.stage_cat == "Suspended"]
+    susp = [p for p in projects if p.in_briefing and p.stage_cat in INACTIVE]
     out = []
     for p in susp:
         p_segs = segments(p.name)
@@ -91,7 +91,7 @@ def find_second_identities(projects: list[Project], latest_month: int, cfg: Conf
                 continue
             if not (q.in_control_list or sum(q.fte) > min_fte):
                 continue
-            out.append({"name": p.name, "code": p.code, "twin": q.name, "twin_code": q.code,
+            out.append({"name": p.name, "code": p.code, "cat": p.stage_cat, "twin": q.name, "twin_code": q.code,
                         "twin_fte": round(q.fte[m], 2), "twin_in_cl": q.in_control_list})
     return out
 
@@ -107,7 +107,7 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
     m = latest_month - 1
     has_month = latest_month >= 1   # no non-zero month in Resource Summary -> treat FTE/util data as absent, never index with m
     passed = milestones_passed(projects, today)
-    susp = [p for p in projects if p.in_briefing and p.stage_cat == "Suspended"]
+    susp = [p for p in projects if p.in_briefing and p.stage_cat in INACTIVE]
     if has_month:
         charging, wound, zero = suspended_lists(susp, m, th["suspended_fte_min"])
         twins = find_second_identities(projects, latest_month, cfg)
@@ -146,8 +146,10 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
     # the total-suspended figure the template needs.
     for e, n in zip(ex, (len(passed), len(susp), len(noplan), len(slipped), len(spare))):
         e.count = n
-    ex[1].extra = {"pct": round(len(susp) * 100 / max(1, len([p for p in projects if p.in_briefing]))),
+    briefed = len([p for p in projects if p.in_briefing])
+    ex[1].extra = {"pct": round(len(susp) * 100 / max(1, briefed)), "briefed": briefed,
                     "charging": len(charging), "twins": len(twins), "charging_list": charging,
+                    "terminated": sum(1 for p in susp if p.stage_cat == "Terminated"), "suspended": sum(1 for p in susp if p.stage_cat == "Suspended"),
                     "wound_list": wound, "zero_list": zero, "twin_list": twins}
     # 涵蓋率是數字，不是證據：走 extra 讓 render 直接取用，evidence 只留專案名。
     ex[2].extra = {"covered": len(cls) - len(noplan), "total": len(cls)}
