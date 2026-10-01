@@ -135,3 +135,10 @@ def test_render_tolerates_snapshot_ingested_before_terminated_split():
     assert "1 inactive (snapshot predates the terminated/suspended split)" in html
     assert "KOS (BR5) is inactive in the briefing" in html
     assert "Q11: peak 12.2 FTE in May" in html          # 無 cat 的 wound/zero 視為「要問的」，不靜默丟掉
+
+
+def test_in_briefing_no_cl_label_matches_inactive_rule():
+    """規則用 _active（排除 Terminated 與 Suspended）；標籤要講同一件事，不能只說 suspended。"""
+    from src.portfolio.render.strings import t
+    assert "not terminated or suspended" in t("en", "hc_in_briefing_no_cl")
+    assert "非結案或暫停" in t("zh", "hc_in_briefing_no_cl") and "停案" not in t("zh", "hc_in_briefing_no_cl")
