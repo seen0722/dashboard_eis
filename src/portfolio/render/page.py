@@ -24,7 +24,7 @@ def _title_block(m: dict, lang: str, n_cl: int, latest_month: int) -> str:
 
 def _susp_twin_line(tw: dict, lang: str, mon: str) -> str:
     cl = t(lang, "ex_susp_twin_cl") if tw["twin_in_cl"] else ""
-    cat = t(lang, "cat_terminated" if tw.get("cat") == "Terminated" else "cat_suspended")
+    cat = t(lang, {"Terminated": "cat_terminated", "Suspended": "cat_suspended"}.get(tw.get("cat"), "cat_inactive"))
     return t(lang, "ex_susp_twin_line", name=tw["name"], code=tw["code"], cat=cat, twin=tw["twin"], twin_code=tw["twin_code"],
               fte=f"{tw['twin_fte']:.2f}", mon=mon, cl=cl)
 
@@ -62,8 +62,11 @@ def _exceptions(snap: dict, lang: str, th: dict) -> str:
     for x in snap["exceptions"]:
         k = x["title"]; kw = {"n": x["count"], "days": th["mp_slip_days"], "pct": th["spare_capacity_pct"], "full": x.get("ask_data", "")}
         kw.update(x.get("extra", {}))
+        # 2026-10-01 之前 ingest 的快照沒有 terminated/suspended/briefed：用不分類的標題，不要 KeyError（曾讓 /ui 總覽 500）
+        if k == "suspended_charging" and "suspended" not in kw:
+            k = "suspended_charging_legacy"
         src_kw = {"date": f"{snap['meta']['snap_date'][4:6]}/{snap['meta']['snap_date'][6:]}"}
-        body = _suspended_charging_body(x, lang, lm) if k == "suspended_charging" else f'<div class="body">{e(x["evidence"]) or e(t(lang, "none"))}</div>'
+        body = _suspended_charging_body(x, lang, lm) if x["title"] == "suspended_charging" else f'<div class="body">{e(x["evidence"]) or e(t(lang, "none"))}</div>'
         out.append(f'<li><div class="n">{x["rank"]}</div><div><b>{e(t(lang, f"ex_{k}_title", **kw))}</b>'
                    f'{body}'
                    f'<div class="ask"><em>{e(t(lang, "decision_needed"))}</em> {e(t(lang, f"ex_{k}_ask", **kw))}</div>'

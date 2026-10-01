@@ -122,3 +122,16 @@ def test_exception_two_shows_terminated_only_when_still_charging_and_suspended_z
     assert "Still charging in Aug" in html and "ZOMBIE 0.8 FTE (terminated)" in html
     assert "Suspended with no manpower all year" in html and "NAP" in html
     assert "KOS, NAP" not in html and "No manpower all year (" not in html
+
+
+def test_render_tolerates_snapshot_ingested_before_terminated_split():
+    """VM 上由舊程式 ingest 的快照：extra 沒有 terminated/suspended/briefed，rows 沒有 cat。render 不得 500，
+    標題退回不分結案/暫停的寫法。（真實事故 2026-10-01：/ui/202608/ 回 500）"""
+    sn = snap()
+    ex2 = sn["exceptions"][1]
+    ex2["extra"] = {"pct": 20, "charging": 0, "twins": 1, "charging_list": [], "wound_list": [{"name": "Q11", "code": "BR3", "peak": 12.2, "peak_month": "May", "zero_since": "Jul"}],
+                    "zero_list": [{"name": "KOS", "code": "BR5"}], "twin_list": [{k: v for k, v in sn["exceptions"][1]["extra"]["twin_list"][0].items() if k != "cat"}]}
+    html = render_page(sn, "en", "2026-09-12", TH)
+    assert "1 inactive (snapshot predates the terminated/suspended split)" in html
+    assert "KOS (BR5) is inactive in the briefing" in html
+    assert "Q11: peak 12.2 FTE in May" in html          # 無 cat 的 wound/zero 視為「要問的」，不靜默丟掉
