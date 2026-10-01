@@ -12,7 +12,7 @@ nav.top .tools{display:inline-flex;gap:8px;align-items:center;margin-left:auto}n
 input[type=text],input[type=search],input[type=number]{font:inherit;padding:6px 10px;border:1px solid var(--ink);background:#fff;border-radius:0;min-width:0}
 button{font:inherit;padding:6px 14px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
 .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:0 0 18px}.filters label{display:flex;flex-direction:column;font-size:12px;color:var(--ink-2);gap:4px}
-.kv{display:grid;grid-template-columns:160px 1fr;gap:4px 16px;max-width:80ch;margin:0 0 18px}.kv span:first-child{color:var(--ink-2)}
+.kv{display:grid;grid-template-columns:160px 1fr;gap:4px 16px;max-width:80ch;margin:0 0 18px}.kv>span:nth-child(odd){color:var(--ink-2)}
 .metaline{color:var(--ink-2);font-size:12px;margin:6px 0 0;max-width:none}nav.top+header{margin-top:20px}
 .err{max-width:70ch}.err h1{color:var(--signal)}
 .wide{overflow-x:auto}table a,section a{color:var(--slate)}
@@ -32,8 +32,9 @@ ol.home-ex a:hover b,ol.home-ex a:focus-visible b{text-decoration:underline}ol.h
 ul.entries{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 28px}
 ul.entries li{padding:10px 0;border-top:1px solid var(--rule)}ul.entries a{font-size:15px;text-decoration:none}ul.entries a:hover b,ul.entries a:focus-visible b{text-decoration:underline}
 ul.entries p{margin:4px 0 0;font-size:13px}details.home-more{margin:6px 0 12px}details.home-more{border-top:1px solid var(--rule)}details.home-more:first-child{border-top:0}details.home-more>summary{font-weight:600}
+pre.prompt{white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid var(--rule);padding:10px 12px;margin:6px 0 10px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100ch}
 dl.terms{margin:8px 0 0;max-width:90ch}dl.terms dt{font-weight:600;margin-top:12px}dl.terms dd{margin:2px 0 0}dl.terms p{margin:0}
-@media(max-width:640px){body{padding:20px 16px 60px}nav.top .tools{margin-left:0;flex-wrap:wrap}nav.top .tools form{flex-wrap:wrap}nav.top input[type=search]{width:150px}ol.ex li{grid-template-columns:32px minmax(0,1fr)}}
+@media(max-width:640px){body{padding:20px 16px 60px}.kv{grid-template-columns:96px minmax(0,1fr)}.kv code{overflow-wrap:anywhere}nav.top .tools{margin-left:0;flex-wrap:wrap}nav.top .tools form{flex-wrap:wrap}nav.top input[type=search]{width:150px}ol.ex li{grid-template-columns:32px minmax(0,1fr)}}
 """
 
 NAV = (("overview", "Overview", ""), ("projects", "Projects", "projects"), ("loads", "Loads", "loads"),

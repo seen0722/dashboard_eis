@@ -382,3 +382,71 @@ def test_nav_brand_links_home_on_every_page(ingested):
         t = html(ingested, path)
         nav = t[t.index("<nav"):t.index("</nav>")]
         assert '<a href="/ui/" class="brand' in nav and "BU10 Portfolio Review" in nav, path
+
+
+# ---- MCP 服務說明（2026-10-01：首頁可連到，agent 讀 /ui/mcp.md 照著安裝）----
+def get_with_host(app, path, host):
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+            return await c.get(path, headers={"host": host})
+    return _run(go())
+
+
+def test_mcp_page_explains_endpoint_and_lists_real_tools(ingested):
+    t = html(ingested, "/ui/mcp")
+    assert "MCP" in t and "Bearer" in t
+    assert "http://test/mcp" in t and 'href="/ui/mcp.md"' in t
+    assert "Read http://test/ui/mcp.md" in t and "閱讀 http://test/ui/mcp.md" in t      # 可直接貼給 agent 的提示（中英）
+    for tool in ("get_project", "search_projects", "get_exceptions", "list_months"):     # 從 server 註冊的 tools 產生
+        assert tool in t, tool
+    assert "tok-up" not in t and "tok-view" not in t and "Alice" not in t and "Bob" not in t
+
+
+def test_mcp_markdown_is_the_setup_guide_with_host_filled_in(ingested):
+    r = get(ingested, "/ui/mcp.md")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/markdown")
+    md = r.text
+    assert "http://test/mcp" in md and "<HOST>" not in md                     # 端點依使用者開網頁的位址填好
+    assert "<TOKEN>" in md and "tok-up" not in md and "tok-view" not in md     # token 永遠由使用者提供
+    assert "## Tools on this server" in md and "`get_project`" in md
+    assert last_audit(ingested)["action"] == "/ui/mcp.md" and last_audit(ingested)["status"] == "ok"
+
+
+def test_mcp_markdown_ignores_a_strange_host_header(ingested):
+    r = get_with_host(ingested, "/ui/mcp.md", "evil.example/x<script>")
+    assert r.status_code == 200 and "<HOST>" in r.text and "evil" not in r.text and "<script>" not in r.text
+
+
+def test_mcp_markdown_is_pii_checked(ingested, monkeypatch):
+    monkeypatch.setattr("src.eis_mcp.web.routes.find_pii", lambda text, *a, **kw: ["LA0000001"])
+    r = get(ingested, "/ui/mcp.md")
+    assert r.status_code == 503 and "LA0000001" not in r.text
+
+
+def test_mcp_guide_missing_is_loud(ingested, monkeypatch):
+    from pathlib import Path
+    monkeypatch.setattr("src.eis_mcp.web.pages_mcp.GUIDE", Path("/nonexistent/eis-mcp-client-setup.md"))
+    assert get(ingested, "/ui/mcp.md").status_code == 503
+    t = html(ingested, "/ui/mcp")                                            # 說明頁仍可用，只是少了完整文件
+    assert "http://test/mcp" in t and "not installed on this server" in t
+
+
+def test_home_links_to_mcp_page(ingested):
+    t = html(ingested, "/ui/")
+    assert 'href="/ui/mcp"' in t and "AI agent" in t
+
+
+def test_install_script_ships_the_setup_guide():
+    from pathlib import Path
+    s = Path("deploy/install.sh").read_text(encoding="utf-8")
+    assert "docs/eis-mcp-client-setup.md" in s
+
+
+def test_mcp_markdown_table_and_host_note_are_agent_friendly(ingested):
+    md = get(ingested, "/ui/mcp.md").text
+    tools = md[md.index("## Tools on this server"):]
+    for line in tools.splitlines():
+        if line.startswith("| `"):
+            assert line.replace("\\|", "").count("|") == 3, line              # 說明裡的 | 要跳脫，表格才不會多出欄位
+    head = md[:md.index("## 0.")]
+    assert "server 位址已填好：`test`" in head and "只需要向使用者要 `<TOKEN>`" in head and "需要使用者提供兩個值" not in head and "這兩個值" not in head

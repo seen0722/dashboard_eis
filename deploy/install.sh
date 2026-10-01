@@ -27,6 +27,7 @@ rsync -a --delete \
   --include='config/' --include='config/**' \
   --include='scripts/' --include='scripts/**' \
   --include='requirements.txt' --include='README.md' \
+  --include='docs/' --include='docs/eis-mcp-client-setup.md' \
   --exclude='*' \
   "$SRC/" "$APP_DIR/"
 find "$APP_DIR" -name '__pycache__' -type d -prune -exec rm -rf {} +

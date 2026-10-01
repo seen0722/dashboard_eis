@@ -78,6 +78,12 @@ def _entries(month: str) -> str:
     return f'<section><h2>Where to start <span class="zh-inline" lang="{ZH}">從哪裡開始</span></h2><ul class="entries">{rows}</ul></section>'
 
 
+def _agent() -> str:
+    return (f'<section><h2>Use it from an AI agent <span class="zh-inline" lang="{ZH}">用 AI agent 查詢</span></h2>'
+            f'{bi("Ask about these projects from Claude or OpenCode through the EIS MCP server. The setup page has a prompt your agent can follow.", "透過 EIS MCP server，在 Claude 或 OpenCode 裡直接問這些專案。設定頁有一段可以直接貼給 agent 照做的提示。", "dim")}'
+            f'<p><a href="/ui/mcp"><b>MCP setup</b> <span class="zh-inline" lang="{ZH}">MCP 設定說明</span></a></p></section>')
+
+
 def _terms() -> str:
     """名詞定義沿用月報字串或網頁既有說明，不另編新說法。"""
     terms = (
@@ -108,5 +114,6 @@ def home_body(months: list[dict], snap: dict | None, th: dict, broken_month: str
         parts += [_latest(snap, th), _entries(snap["meta"]["report_month"])]
     elif not broken_month:
         parts.append(f'<section>{bi("Nothing ingested yet. An uploader must upload a month and call ingest_month first.", "尚未匯入任何月份。請上傳者先上傳資料並執行 ingest_month。", "empty")}</section>')
+    parts.append(_agent())
     parts.append(f'<section class="home-foot">{_terms()}{_history(months) if months else ""}</section>')
     return "".join(parts)

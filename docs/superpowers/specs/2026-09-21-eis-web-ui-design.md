@@ -86,6 +86,8 @@ route handler
 | 路徑 | 內容 | 對應 tool |
 |---|---|---|
 | `/ui/` | **首頁（2026-10-01，中英並列）**：用途說明（沿用月報 `h1`/`intro` 中英字串）＋唯讀聲明；最新 ok 月份的資料時點、本月例外標題（中英，連到總覽）、stage 統計、專案搜尋框；五個入口各附一句中英說明；名詞（Terms）與資料歷程（Data history，即原月份清單：status、ingest 時間、上傳檔 category/size，不含原始檔名）收在 `<details>`。比最新 ok 月份更新卻讀不出來的月份顯示警告；沒有任何月份時顯示「nothing ingested yet」 | `list_months` + 最新快照 |
+| `/ui/mcp` | **MCP 設定說明（2026-10-01，中英並列）**：用途、端點（依使用者開網頁的 Host 填入，只接受主機名/IP 加 port，否則保留 `<HOST>`）、token 說明（永不顯示 token）、可直接貼給 agent 的提示、Claude Code 一行指令、server 實際註冊的 tools（`list_tools()` 產生）。首頁「Use it from an AI agent」連到這裡 | `list_tools` |
+| `/ui/mcp.md` | 給 agent 讀的設定文件：`docs/eis-mcp-client-setup.md` 原文，`<HOST>` 換成實際位址、開頭兩句改成「只需要向使用者要 token」，文末附 tools 表。`text/markdown`，一樣過 PII 出口檢查與 audit。檔案不在 server 上回 503（`deploy/install.sh` 會複製這個檔） | — |
 | `/ui/latest/` | 307 到最新 ok 月份的總覽（nav 與書籤用）；沒有月份時 404 | — |
 | `/ui/{month}/` | 總覽：Decisions this month、stage 統計條、里程碑視窗（±N 週，與 `get_upcoming_milestones` 同義，不是月報的「-1 週到 +N 週」）、Data health。N 取 `cfg.thresholds["upcoming_weeks"]`，可用 `?weeks=`、`?today=` 覆蓋 | `get_exceptions` / `get_health` / `get_upcoming_milestones` |
 | `/ui/{month}/projects?stage_cat=&group=&customer=&q=` | 專案表：code、name、stage、stage_cat、customer、group、latest FTE。四個篩選欄位為 GET 表單，狀態在 URL；`stage_cat` 用下拉（七個固定值），`group`/`customer` 用下拉（從快照 distinct 值填）；`q` 對應 tool 的 `text`。nav 搜尋框也送到這裡；`q` 與某個 code 相同（不分大小寫）或與恰好一個專案名稱完全相同時，先 307 到該單案頁（`queries.exact_code`，2026-10-01），否則走子字串比對，結果剛好一筆時同樣 307 | `search_projects` |

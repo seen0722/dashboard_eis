@@ -13,7 +13,7 @@ from ...portfolio.render.pii import find_pii
 from ..state import ServerState
 from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
 from .. import queries
-from . import pages_home, pages_load, pages_overview, pages_project
+from . import pages_home, pages_load, pages_mcp, pages_overview, pages_project
 from .shell import SITE, SITE_ZH, render_error, render_shell
 
 log = logging.getLogger("eis_mcp.web")
@@ -87,8 +87,14 @@ def date_param(request: Request, default: str, name: str = "today") -> str:
         raise WebError(400, f"Bad {name}", f"<p>{e(name)} must be YYYY-MM-DD.</p>", f"bad_{name}") from None
 
 
-async def respond(state: ServerState, request: Request, build: Callable[[list[str]], str | Response]) -> Response:
-    """build(months) 回 HTML 字串（會過 PII 檢查後以 200 送出）或 Response（redirect 等，原樣送出）。"""
+class Text:
+    """非 HTML 的文字回應（例如給 agent 讀的 markdown）。與 HTML 一樣過 PII 出口檢查，只是 media type 不同。"""
+    def __init__(self, body: str, media_type: str):
+        self.body, self.media_type = body, media_type
+
+
+async def respond(state: ServerState, request: Request, build: Callable[[list[str]], "str | Text | Response"]) -> Response:
+    """build(months) 回 HTML 字串或 Text（都會過 PII 檢查後以 200 送出），或 Response（redirect 等，原樣送出）。"""
     t0 = time.monotonic(); path = request.url.path; args = dict(request.query_params)
 
     def ms() -> int:
@@ -107,12 +113,15 @@ async def respond(state: ServerState, request: Request, build: Callable[[list[st
     if isinstance(out, Response):
         state.audit.record(None, "web", path, args, "ok", ms())
         return out
-    hits = find_pii(out)
+    text = out.body if isinstance(out, Text) else out
+    hits = find_pii(text)
     if hits:
         state.audit.record(None, "web", path, args, "rejected_pii", ms(), "; ".join(hits[:5]))
         body = f"<p>This page was withheld: it contained {len(hits)} PII-shaped fragment(s). Tell the server owner; an uploader should fix the source and re-run ingest_month.</p>"
         return HTMLResponse(render_error(503, "Page withheld", body, months), status_code=503)
     state.audit.record(None, "web", path, args, "ok", ms())
+    if isinstance(out, Text):
+        return Response(out.body, media_type=out.media_type)
     return HTMLResponse(out)
 
 
@@ -151,6 +160,29 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             snap = state.store.load_snapshot(latest) if latest else None
             body = pages_home.home_body(months, snap, state.cfg.thresholds, broken)
             return render_shell(title=SITE, title_zh=SITE_ZH, body=body, months=ok, active="home")
+        return await respond(state, request, build)
+
+    async def tool_list() -> list[tuple[str, str]]:
+        return sorted((t.name, pages_mcp.first_sentence(t.description)) for t in await mcp.list_tools())
+
+    @mcp.custom_route("/ui/mcp", methods=["GET"])
+    async def mcp_page(request: Request) -> Response:
+        tools = await tool_list(); host = pages_mcp.host_of(request.headers.get("host"))
+
+        def build(ok):
+            return render_shell(title="Use it from an AI agent", title_zh="用 AI agent 查詢", body=pages_mcp.mcp_body(host, tools), months=ok, active="mcp")
+        return await respond(state, request, build)
+
+    @mcp.custom_route("/ui/mcp.md", methods=["GET"])
+    async def mcp_markdown(request: Request) -> Response:
+        tools = await tool_list(); host = pages_mcp.host_of(request.headers.get("host"))
+
+        def build(ok):
+            try:
+                return Text(pages_mcp.guide_markdown(host, tools), "text/markdown; charset=utf-8")
+            except pages_mcp.GuideMissing:
+                raise WebError(503, "Setup guide not installed",
+                               "<p>docs/eis-mcp-client-setup.md is missing on this server; ask the server owner to re-run deploy/install.sh.</p>", "guide_missing") from None
         return await respond(state, request, build)
 
     @mcp.custom_route("/ui/{month}/report.html", methods=["GET"])
