@@ -13,8 +13,8 @@ from ...portfolio.render.pii import find_pii
 from ..state import ServerState
 from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
 from .. import queries
-from . import pages_load, pages_overview, pages_project
-from .shell import render_error, render_shell
+from . import pages_home, pages_load, pages_overview, pages_project
+from .shell import SITE, SITE_ZH, render_error, render_shell
 
 log = logging.getLogger("eis_mcp.web")
 
@@ -144,7 +144,13 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
     @mcp.custom_route("/ui/", methods=["GET"])
     async def months(request: Request) -> Response:
         def build(ok):
-            return render_shell(title="EIS project status", body=pages_overview.months_body(state.store.months()), months=ok, active="months")
+            months = state.store.months()                    # newest first
+            latest = next((m["month"] for m in months if m["status"] == "ok"), None)
+            # 比最新可讀月份還新、卻讀不出來的月份要明講；首頁不因它 503，仍說明用途並顯示最新可讀的那個月
+            broken = next((m["month"] for m in months if m["status"] == "broken" and (latest is None or m["month"] > latest)), None)
+            snap = state.store.load_snapshot(latest) if latest else None
+            body = pages_home.home_body(months, snap, state.cfg.thresholds, broken)
+            return render_shell(title=SITE, title_zh=SITE_ZH, body=body, months=ok, active="home")
         return await respond(state, request, build)
 
     @mcp.custom_route("/ui/{month}/report.html", methods=["GET"])

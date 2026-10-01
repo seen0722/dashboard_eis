@@ -16,7 +16,7 @@
 - 從網頁上傳或 ingest（uploader 流程仍走 `scripts/eis-upload.sh` + MCP `ingest_month`）。
 - JSON `/api/*`。程式化取資料走 MCP；`queries.py` 抽出後日後要加很便宜。
 - 前端框架、Node build 鏈、CDN 資源。內網主機離線部署（`deploy/bundle-offline.sh`），一切 server-side render、CSS inline。
-- 中文介面。v1 英文（與月報、tools 一致）；`?lang=zh` 留到 v2，`render/strings.py` 已有雙語字串。
+- 中文介面。v1 英文（與月報、tools 一致）；`?lang=zh` 留到 v2，`render/strings.py` 已有雙語字串。例外：首頁 2026-10-01 起中英並列（需求方決定），讓第一次來的人看懂用途。
 
 ## 2. 架構
 
@@ -85,7 +85,7 @@ route handler
 
 | 路徑 | 內容 | 對應 tool |
 |---|---|---|
-| `/ui/` | 月份清單（status、ingest 時間、上傳檔 category/size，不含原始檔名），最新 ok 月份放最上面並標示 latest；沒有任何月份時顯示「nothing ingested yet」 | `list_months` |
+| `/ui/` | **首頁（2026-10-01，中英並列）**：用途說明（沿用月報 `h1`/`intro` 中英字串）＋唯讀聲明；最新 ok 月份的資料時點、本月例外標題（中英，連到總覽）、stage 統計、專案搜尋框；五個入口各附一句中英說明；名詞（Terms）與資料歷程（Data history，即原月份清單：status、ingest 時間、上傳檔 category/size，不含原始檔名）收在 `<details>`。比最新 ok 月份更新卻讀不出來的月份顯示警告；沒有任何月份時顯示「nothing ingested yet」 | `list_months` + 最新快照 |
 | `/ui/latest/` | 307 到最新 ok 月份的總覽（nav 與書籤用）；沒有月份時 404 | — |
 | `/ui/{month}/` | 總覽：Decisions this month、stage 統計條、里程碑視窗（±N 週，與 `get_upcoming_milestones` 同義，不是月報的「-1 週到 +N 週」）、Data health。N 取 `cfg.thresholds["upcoming_weeks"]`，可用 `?weeks=`、`?today=` 覆蓋 | `get_exceptions` / `get_health` / `get_upcoming_milestones` |
 | `/ui/{month}/projects?stage_cat=&group=&customer=&q=` | 專案表：code、name、stage、stage_cat、customer、group、latest FTE。四個篩選欄位為 GET 表單，狀態在 URL；`stage_cat` 用下拉（七個固定值），`group`/`customer` 用下拉（從快照 distinct 值填）；`q` 對應 tool 的 `text`。nav 搜尋框也送到這裡；`q` 與某個 code 相同（不分大小寫）或與恰好一個專案名稱完全相同時，先 307 到該單案頁（`queries.exact_code`，2026-10-01），否則走子字串比對，結果剛好一筆時同樣 307 | `search_projects` |
@@ -98,7 +98,7 @@ route handler
 ### 3.1 共用外殼（`shell.py`）
 
 - `<head>`：`<meta charset="utf-8">`、viewport、`<title>EIS · {page} · {YYYY-MM}</title>`、`<style>` 內嵌 `render/css.py` 的 `CSS` + `WEB_CSS`（nav、表單、錯誤頁、diff 表的少量樣式）。
-- nav：月份下拉（列出所有 ok 月份，選了就跳同一頁的該月份）、Overview / Projects / Loads / Corrections / Report 連結、搜尋框（送到 projects 頁 `q=`）。
+- nav：最左邊站名「BU10 Portfolio Review」連回首頁（取代原本的 Months 連結）、月份下拉（列出所有 ok 月份，選了就跳同一頁的該月份）、Overview / Projects / Loads / Corrections / Report 連結、搜尋框（送到 projects 頁 `q=`）。
 - footer：與月報相同的三行說明（資料來源、`report_month`、`latest_month`）。
 - 每頁 `<h1>` 下方印資料時點：「Report month 2026-09 · manpower keyed in through Aug · Briefing 2026-09-07」，分別來自 `meta.report_month`、`meta.latest_month`、`meta.snap_date`（與 tools 的「回答時一律引用 meta」同一原則；2026-10-01 起不再直接印欄位名）。
 - 表單一律 GET，無 JavaScript（2026-10-01 起）。月份切換是 GET 表單送到 `/ui/go?month=&page=`，server 驗證月份與 `page`（只接受 `/ui/{month}/` 之下的相對路徑，擋 scheme、host、開頭斜線、`..`、反斜線）後 307；鍵盤選月份不會每按一次就跳頁。diff 頁換月份時回到該案的單案頁。

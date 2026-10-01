@@ -341,3 +341,44 @@ def test_project_page_dates_and_footnote_are_readable(ingested):
     assert "latest_month =" not in t and "Manpower keyed in through" in t
     hist = t[t.index("<h2>Briefing history"):]
     assert "<td>2026-" in hist and "<td>2026090" not in hist
+
+
+# ---- 首頁（2026-10-01：中英並列 landing page）----
+def test_home_explains_purpose_in_both_languages(ingested):
+    t = html(ingested, "/ui/")
+    assert "BU10 Portfolio Review" in t and "BU10 專案組合檢討" in t
+    assert "Exceptions first, evidence after" in t and "先看例外，再看依據" in t
+    assert "Read-only" in t and "唯讀" in t
+    assert 'lang="zh-Hant"' in t
+
+
+def test_home_summarises_latest_month_and_links_entry_points(ingested):
+    from src.eis_mcp.web.pages_home import exception_titles
+    from src.portfolio.render.page import exceptions_html
+    snap = ingested.state.eis.store.load_snapshot("202609")
+    th = ingested.state.eis.cfg.thresholds
+    t = html(ingested, "/ui/")
+    assert "Report month 2026-09" in t and "Latest" in t
+    titles = exception_titles(snap, th, "en")
+    assert titles and all(x in exceptions_html(snap, "en", th) for x in titles)      # 與月報同一份標題，不另編
+    from html import escape
+    assert all(escape(x) in t for x in titles)
+    for href in ('href="/ui/202609/"', 'href="/ui/202609/projects"', 'href="/ui/202609/loads"',
+                 'href="/ui/202609/corrections"', 'href="/ui/202609/report.html"'):
+        assert href in t, href
+    assert 'action="/ui/202609/projects"' in t[t.index("</nav>"):]                    # 頁面本體有搜尋框，不只 nav
+    assert "<details" in t and "Data history" in t and "Terms" in t
+
+
+def test_home_when_latest_snapshot_is_broken_still_explains(ingested):
+    store = ingested.state.eis.store
+    (store.snapshot_dir("202609") / "portfolio.json").write_text("{not json", encoding="utf-8"); store.invalidate()
+    t = html(ingested, "/ui/")
+    assert "BU10 Portfolio Review" in t and "could not be read" in t and "Data history" in t
+
+
+def test_nav_brand_links_home_on_every_page(ingested):
+    for path in ("/ui/", f"/ui/202609/?today={TODAY}", "/ui/202609/loads"):
+        t = html(ingested, path)
+        nav = t[t.index("<nav"):t.index("</nav>")]
+        assert '<a href="/ui/" class="brand' in nav and "BU10 Portfolio Review" in nav, path

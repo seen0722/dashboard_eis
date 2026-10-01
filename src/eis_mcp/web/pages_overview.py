@@ -6,7 +6,7 @@ from .. import queries
 from .shell import fmt_month
 
 
-def months_body(months: list[dict]) -> str:
+def months_body(months: list[dict], heading: bool = True) -> str:
     """store.months() 的列表：不含原始檔名（Control List 檔名內嵌 PM 姓名）。最新 ok 月份標 latest。"""
     if not months:
         return '<section><p class="empty">Nothing ingested yet. An uploader must upload a month and call ingest_month first.</p></section>'
@@ -20,7 +20,8 @@ def months_body(months: list[dict]) -> str:
         size_kb = f'{sum(u["size"] for u in m["uploads"]) / 1024:,.0f} KB'
         rows.append(f'<tr><td><b>{name}</b>{tag}</td><td>{e(m["status"])}</td><td>{e(str(ing.get("at", "–")))}</td>'
                     f'<td>{e(str(ing.get("status", "–")))}</td><td class="num">{len(m["uploads"])}</td><td class="num">{size_kb}</td><td class="dim">{e(cats)}</td></tr>')
-    return (f'<section><h2>Months</h2><p class="lead">Every month the server knows. Only months with status ok can be browsed.</p>'
+    head = "<h2>Months</h2>" if heading else ""
+    return (f'<section>{head}<p class="lead">Every month the server knows. Only months with status ok can be browsed.</p>'
             f'<div class="wide"><table><thead><tr><th>Month</th><th>Status</th><th>Last ingest</th><th>Ingest status</th>'
             f'<th class="num">Files</th><th class="num">Size</th><th>Categories</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>')
 
@@ -79,7 +80,7 @@ def health_section(snap: dict) -> str:
     decide = [h for h in snap["health"] if h["level"] == "decide"]
     rest = [h for h in snap["health"] if h["level"] != "decide"]
     main = f'<div class="wide">{_linked_health(snap, rest)}</div>' if rest else '<p class="empty">No tracking checks.</p>'
-    dup = (f'<details class="dup"><summary>{len(decide)} decision-level check{"" if len(decide) == 1 else "s"} repeat the Decisions above</summary>'
+    dup = (f'<details class="dup"><summary data-expand="expand" data-collapse="collapse"><span>{len(decide)} decision-level check{"" if len(decide) == 1 else "s"} repeat the Decisions above</span></summary>'
            f'<div class="wide">{_linked_health(snap, decide)}</div></details>') if decide else ""
     return main + dup
 
