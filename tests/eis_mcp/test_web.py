@@ -450,3 +450,9 @@ def test_mcp_markdown_table_and_host_note_are_agent_friendly(ingested):
             assert line.replace("\\|", "").count("|") == 3, line              # 說明裡的 | 要跳脫，表格才不會多出欄位
     head = md[:md.index("## 0.")]
     assert "server 位址已填好：`test`" in head and "只需要向使用者要 `<TOKEN>`" in head and "需要使用者提供兩個值" not in head and "這兩個值" not in head
+
+
+def test_upcoming_milestones_tool_description_matches_inactive_rule(ingested):
+    """tool 說明會顯示在 /ui/mcp，必須與實際規則一致：排除 Terminated 與 Suspended（INACTIVE）。"""
+    t = html(ingested, "/ui/mcp")
+    assert "(in briefing, not terminated or suspended)" in t and "not suspended)" not in t

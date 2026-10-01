@@ -30,7 +30,7 @@ def register(mcp: MCPServer, state: ServerState) -> None:
 
     @mcp.tool()
     def get_upcoming_milestones(ctx: Context, weeks: int = 8, month: str | None = None, today: str | None = None) -> dict:
-        """EVT/DVT/PVT/MP dates within +/- weeks*7 days of today for active (in briefing, not suspended) projects.
+        """EVT/DVT/PVT/MP dates within +/- weeks*7 days of today for active (in briefing, not terminated or suspended) projects.
         days_left < 0 means already passed. Returns {"meta", "today", "weeks", "milestones": [{code, name, stage_cat,
         milestone, date, days_left}]} sorted by days_left. today "YYYY-MM-DD" defaults to the server date."""
         def go(p):
