@@ -7,7 +7,7 @@ from src.portfolio.model.snapshot import build_snapshot
 from src.portfolio.render.page import render_page
 from src.portfolio.render.pii import find_pii
 
-TH = {"mp_slip_days": 60, "mp_typo_days": 300, "spare_capacity_pct": 85, "suspended_fte_min": 0.05, "briefing_stale_days": 60, "upcoming_weeks": 8, "timeline_months": 6}
+TH = {"mp_slip_days": 60, "spare_capacity_pct": 85, "suspended_fte_min": 0.05, "briefing_stale_days": 60, "upcoming_weeks": 8, "timeline_months": 6}
 
 
 def snap():

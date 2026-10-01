@@ -97,7 +97,7 @@ def test_health_rows_and_task_gaps():
     assert rows["budget_missing"].names == []            # 五個案子裡有 Control List 的都填了 plan
     assert rows["milestones_passed"].names == ["THORPE"]
     assert rows["in_briefing_no_cl"].names == ["NOCL"] and rows["in_cl_no_briefing"].names == ["NOBRIEF"]
-    assert rows["mp_typo"].names == ["KILO12"] and rows["customer_blank"].count == 1
+    assert "mp_typo" not in rows and rows["customer_blank"].count == 1     # 2026-10-01 移除：天數大不代表打錯（CPC212 331 天，PM 確認正確）
     assert rows["mp_slipped"].level == "track" and rows["mp_slipped"].names == ["KILO12 2027-08-26 -> 2028-08-12 (352d)"]
     assert rows["name_unresolved"].count == 1 and rows["cl_unreadable"].count == 1 and rows["cross_month_correction"].count == 1
     assert rows["task_description_blank"].names == ["THORPE (8)"]

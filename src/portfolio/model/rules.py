@@ -162,11 +162,13 @@ def build_exceptions(projects: list[Project], loads: list[DeptLoad], latest_mont
 
 
 # (check, level, source_key, from_issues)
+# 2026-10-01 移除 mp_typo（MP 與原訂差 >300 天「疑為輸入錯誤」）：天數大不是打錯的證據，CPC212 差 331 天經 PM 確認正確；
+# 延後天數已在 mp_slipped 列出。舊快照仍有這列，strings.py 的 hc_mp_typo 為顯示舊月份保留（措辭只陳述事實）。
 CHECKS = [
     ("budget_missing", "decide", "control_list", False), ("milestones_passed", "decide", "briefing", False),
     ("suspended_second_identity", "decide", "cross", True),
     ("in_briefing_no_cl", "track", "cross", False), ("in_cl_no_briefing", "track", "cross", False),
-    ("mp_slipped", "track", "briefing", False), ("mp_typo", "track", "briefing", False), ("customer_blank", "track", "briefing", False),
+    ("mp_slipped", "track", "briefing", False), ("customer_blank", "track", "briefing", False),
     ("name_unresolved", "track", "cross", True), ("task_description_blank", "track", "control_list", False),
     ("briefing_stale", "track", "briefing", True), ("cl_unreadable", "track", "control_list", True),
     ("cl_format_drift", "track", "control_list", True), ("duplicate_source", "track", "cross", True),
@@ -188,7 +190,6 @@ def build_health(projects: list[Project], loads: list[DeptLoad], issues: list[Is
         "in_briefing_no_cl": sorted(p.name for p in active if not p.in_control_list),
         "in_cl_no_briefing": sorted(p.name for p in projects if p.in_control_list and not p.in_briefing),
         "mp_slipped": [f"{p.name} {p.dates['mp_orig']} -> {p.dates['mp']} ({n}d)" for p, n in mp_slipped(projects, th["mp_slip_days"])],
-        "mp_typo": [p.name for p, n in mp_slipped(projects, th["mp_typo_days"])],
         "customer_blank": sorted(p.name for p in active if p.customer.strip().upper() in blank),
         "task_description_blank": [f"{n} ({','.join(map(str, ms))})" for n, ms in task_description_gaps(projects)],
     }   # briefing_stale 需要 BriefingRow.updated，由 cli 放進 issues，走 from_issues 這條路
