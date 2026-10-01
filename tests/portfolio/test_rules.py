@@ -113,3 +113,28 @@ def test_every_issue_check_in_the_source_is_wired_into_the_health_table():
     assert found, "no Issue( literals found — the regex stopped matching"
     unwired = {c: where for c, where in found.items() if c not in known}
     assert unwired == {}, f"Issue checks not in CHECKS or DRIFT_CHECKS: {unwired}"
+
+
+def test_terminated_is_inactive_and_counted_with_suspended():
+    """Terminated（結案）與 Suspended（暫停）都不算活躍：不進逾期里程碑；都進 suspended_charging 的 susp 集合。"""
+    from src.portfolio.model.rules import milestones_passed, build_exceptions
+    cfg = load_config()
+    ps = [proj("DEAD", "Terminate", "Terminated", mp="2026-01-01", fte8=0.3), proj("PAUSE", "Suspend", "Suspended", mp="2026-01-01"),
+          proj("LIVE", "PVT", "Execution", mp="2026-07-31")]
+    assert [p.name for p, *_ in milestones_passed(ps, "2026-09-12")] == ["LIVE"]
+    ex = build_exceptions(ps, [], 8, cfg, "2026-09-12")
+    sc = [e for e in ex if e.title == "suspended_charging"][0]
+    assert sc.count == 2 and sc.extra["charging"] == 1 and sc.extra["charging_list"][0]["name"] == "DEAD"
+    assert sc.extra["terminated"] == 1 and sc.extra["suspended"] == 1
+    assert sc.extra["charging_list"][0]["cat"] == "Terminated"
+    assert [(w["name"], w["cat"]) for w in sc.extra["wound_list"]] == [] and [(z["name"], z["cat"]) for z in sc.extra["zero_list"]] == [("PAUSE", "Suspended")]
+    assert sc.extra["briefed"] == 3
+
+
+def test_second_identity_carries_stage_cat():
+    cfg = load_config()
+    kos = proj("KOS", "Terminate", "Terminated", in_cl=False)
+    tr = Project(code="TR_KOS", name="TR_BU10_IPC_KOS", in_control_list=True); tr.fte[7] = 0.49
+    ex = build_exceptions([kos, tr], [], 8, cfg, TODAY)
+    tw = ex[1].extra["twin_list"][0]
+    assert tw["cat"] == "Terminated" and tw["twin"] == "TR_BU10_IPC_KOS"

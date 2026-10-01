@@ -596,6 +596,7 @@ Review 檔疑似**半手工整理**，跨月結構不一致。ingest **不可依
 - 多筆來源落到同一 code 時累加而非覆蓋（Resource Summary 月對月相加、Control List 合併 pva 與 tasks），
   並記 `duplicate_source`。
 - 門檻：config/thresholds.yaml 的 `portfolio:`；stage 分類：config/stages.yaml。
+- stage_cat 自 2026-10 起分 `Terminated`（結案）與 `Suspended`（暫停）：Briefing 2026-09 改版後 PM 統一寫 Terminate / Suspend，兩者處置不同（撤人 vs 保留）。所有「非活躍」判斷用 `entities.INACTIVE`，不要寫死 `== "Suspended"`。
 - PII：不讀「人力」「實名制」分頁；任務文字遮罩；輸出前 find_pii 擋下工號與姓名，命中則不寫檔（exit 2）。
 - 跨月：每月 snapshot JSON 留在 data/snapshots/YYYYMM/，下個月自動比對過去月份數字是否被改。
 - 測試：`python -m pytest tests/portfolio`。

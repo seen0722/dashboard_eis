@@ -2,6 +2,7 @@
 from __future__ import annotations
 import datetime as dt
 from mcp.server.mcpserver import Context, MCPServer
+from ...portfolio.entities import INACTIVE
 from ...portfolio.model.rules import days_between
 from ..state import ServerState
 from ._common import check_date, guarded, resolve_month, with_meta
@@ -10,11 +11,11 @@ MILESTONES = ("evt", "dvt", "pvt", "mp")
 
 
 def upcoming_milestones(snap: dict, today: str, weeks: int) -> list[dict]:
-    """與 rules._active() 同條件：只看 in_briefing 且非 Suspended 的專案；視窗前後各 weeks 週；已過期者 days_left 為負。"""
+    """與 rules._active() 同條件：只看 in_briefing 且非 Terminated/Suspended 的專案；視窗前後各 weeks 週；已過期者 days_left 為負。"""
     span = weeks * 7
     out = []
     for p in snap["projects"]:
-        if not p.get("in_briefing") or p.get("stage_cat") == "Suspended":
+        if not p.get("in_briefing") or p.get("stage_cat") in INACTIVE:
             continue
         for ms in MILESTONES:
             d = p["dates"].get(ms)
@@ -48,7 +49,7 @@ def register(mcp: MCPServer, state: ServerState) -> None:
 
     @mcp.tool()
     def get_upcoming_milestones(ctx: Context, weeks: int = 8, month: str | None = None, today: str | None = None) -> dict:
-        """EVT/DVT/PVT/MP dates within +/- weeks*7 days of today for active (in briefing, not suspended) projects.
+        """EVT/DVT/PVT/MP dates within +/- weeks*7 days of today for active (in briefing, not terminated or suspended) projects.
         days_left < 0 means already passed. Returns {"meta", "today", "weeks", "milestones": [{code, name, stage_cat,
         milestone, date, days_left}]} sorted by days_left. today "YYYY-MM-DD" defaults to the server date."""
         def go(p):

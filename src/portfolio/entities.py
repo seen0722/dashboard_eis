@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 DATE_KEYS = ("kickoff", "evt", "dvt", "pvt", "mp", "mp_orig")
 ROLES = ("FU RD", "BU RD", "PM")
+# 非活躍的 stage_cat：Terminated（結案，掛帳人力該撤）與 Suspended（暫停，可能刻意保留）。兩者都不進里程碑／時程表。
+INACTIVE = ("Terminated", "Suspended")
 
 
 def empty_months() -> list[float]:

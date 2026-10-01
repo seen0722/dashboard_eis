@@ -48,7 +48,7 @@ def register(mcp: MCPServer, state: ServerState) -> None:
     def search_projects(ctx: Context, stage_cat: str | None = None, group: str | None = None, customer: str | None = None,
                         biz_type: str | None = None, category: str | None = None, text: str | None = None,
                         month: str | None = None) -> dict:
-        """List projects, optionally filtered. stage_cat is one of RFQ / RFI, POC, Execution, MP, Sustain / EOP, Suspended, Other
+        """List projects, optionally filtered. stage_cat is one of RFQ / RFI, POC, Execution, MP, Sustain / EOP, Terminated, Suspended, Other
         (case-insensitive). group, customer, biz_type (JDM | ODM | EMS) and category (Tablet, NB, AI PC, Box PC, ...) match whole
         values case-insensitively; text matches a substring of name, customer or product. biz_type / category / panel_size come
         from the PM Briefing's Type / Category / Panel Size columns (added 2026-09) and are empty strings for older briefings.
