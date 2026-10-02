@@ -267,7 +267,7 @@ PLAN_FRAC = 0.55       # plan 短橫寬度＝月份格寬的比例（固定像�
 def _plan_series(name: str, plan: list[float], lang: str, label: bool = True) -> dict:
     """plan 以 custom series 畫短橫（INIT_JS 的 planMark）：寬度隨格寬縮放，最後一個月旁標「Plan N」。"""
     text = f"{t(lang, 'v_fc_plan_label')} {plan[-1]:.0f}" if label and any(plan) else ""
-    return {"name": name, "type": "custom", "renderItem": {"$fn": "planMark", "args": [PLAN_FRAC, text, T.PLAN_MARK, len(plan) - 1]},
+    return {"name": name, "type": "custom", "renderItem": {"$fn": "planMark", "args": [PLAN_FRAC, text, T.PLAN_MARK, len(plan) - 1, T.PLAN_TEXT]},
             "encode": {"x": 0, "y": 1}, "data": [[i, v] for i, v in enumerate(plan)], "itemStyle": {"color": T.PLAN_MARK}, "z": 4}
 
 

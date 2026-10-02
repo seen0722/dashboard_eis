@@ -32,10 +32,10 @@ INIT_JS = """(function(){
 if(typeof echarts==='undefined')return;
 var FN={ganttBar:function(params,api){var s=api.coord([api.value(1),api.value(0)]),f=api.coord([api.value(2),api.value(0)]),h=api.size([0,1])[1]*0.3;
 return{type:'rect',shape:{x:s[0],y:s[1]-h/2,width:Math.max(f[0]-s[0],2),height:h},style:{fill:api.visual('color'),opacity:0.3}};},
-planMark:function(frac,label,color,last){return function(params,api){var v=api.value(1);if(v==null||isNaN(v))return null;
+planMark:function(frac,label,color,last,textColor){return function(params,api){var v=api.value(1);if(v==null||isNaN(v))return null;
 var c=api.coord([api.value(0),v]),w=api.size([1,0])[0]*frac;
 var kids=[{type:'rect',shape:{x:c[0]-w/2,y:c[1]-1.5,width:w,height:3},style:{fill:color}}];
-if(label&&params.dataIndex===last)kids.push({type:'text',x:c[0]+w/2+6,y:c[1],style:{text:label,fill:color,font:'600 11px sans-serif',verticalAlign:'middle'}});
+if(label&&params.dataIndex===last)kids.push({type:'text',x:c[0]+w/2+6,y:c[1],style:{text:label,fill:textColor||color,font:'600 12px sans-serif',verticalAlign:'middle'}});
 return{type:'group',children:kids};};},
 axisTip:function(glyphs,hideWhen,digits){var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
 var g=function(k,c){if(k==='bar')return'<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+c+'"></span>';if(k==='mark')return'<span style="display:inline-block;width:14px;height:3px;background:'+c+'"></span>';return'<span style="display:inline-block;width:14px;border-top:2px '+(k==='dashed'?'dashed':'solid')+' '+c+'"></span>';};

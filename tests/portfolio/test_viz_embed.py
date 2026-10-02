@@ -67,5 +67,10 @@ def test_init_js_supports_factory_functions_for_tooltips():
 
 
 def test_init_js_draws_plan_marks_relative_to_the_band():
-    assert "planMark:function(frac,label,color,last)" in INIT_JS and "api.size([1,0])[0]*frac" in INIT_JS
+    assert "planMark:function(frac,label,color,last,textColor)" in INIT_JS and "api.size([1,0])[0]*frac" in INIT_JS
     assert "Array.isArray(p.value)?p.value[1]:p.value" in INIT_JS          # tooltip 讀 custom series 的 [x, y]
+
+
+def test_plan_label_matches_the_other_chart_labels():
+    """需求方：Plan 標籤看起來比 No budget／Actual 淡——它是 11px、與短橫線同色；改成 12px 並用深一階的紫色。"""
+    assert "planMark:function(frac,label,color,last,textColor)" in INIT_JS and "font:'600 12px sans-serif'" in INIT_JS

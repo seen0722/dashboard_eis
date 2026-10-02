@@ -286,3 +286,8 @@ def test_gantt_table_names_current_mp_and_shows_original_mp():
     ch = O.gantt(snap(), "en", TODAY, 6)
     assert ch.headers == ("Project", "Stage", "EVT", "DVT", "PVT", "MP (current)", "Original MP")
     assert ch.rows[1] == ("THORPE", "PVT", "", "", "2026-09-08", "2026-10-20", "2026-06-01")
+
+
+def test_plan_label_uses_the_darker_violet():
+    plan = next(x for x in O.forecast_capacity(snap(), "en").option["series"] if x["name"] == "Budget plan, BU RD + PM")
+    assert plan["renderItem"]["args"][2] == "#7C3AED" and plan["renderItem"]["args"][4] == "#6D28D9"
