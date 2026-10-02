@@ -2,8 +2,8 @@
 from __future__ import annotations
 from html import escape as e
 from ...portfolio.render.strings import t
-from ...portfolio.render.viz.dash import bar_list_card, card, donut_card, kpi_cards, milestone_table, safe_chart_card, status_html
-from ...portfolio.render.viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, load_heatmap, stage_donut
+from ...portfolio.render.viz.dash import bar_list_card, card, donut_card, kpi_cards, milestone_table, safe_chart_card
+from ...portfolio.render.viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, stage_donut
 from .. import queries
 from .shell import fmt_month
 
@@ -35,23 +35,21 @@ def _milestone_card(month: str, snap: dict, today: str, weeks: int) -> str:
     rows = [{**r, "customer": by_code[r["code"]]["customer"], "late": r["code"] in late} for r in up["milestones"]]
     form = (f'<form method="get" class="filters"><label>Weeks <input type="number" name="weeks" value="{weeks}" min="1" max="52"></label>'
             f'<label>Today <input type="text" name="today" value="{e(today)}" size="10"></label><button>Apply</button></form>')
-    table = (milestone_table(rows, "en", link=lambda c: f"/ui/{month}/projects/{c}") if rows
+    table = (milestone_table(rows, "en", link=lambda c: f"/ui/{month}/projects/{c}", compact=True) if rows
              else f'<p class="empty">No EVT/DVT/PVT/MP within ±{weeks} weeks of {e(today)}.</p>')
     return card(f"Milestones within {weeks} weeks", form + table +
-                '<p class="dim">Negative days left = already passed. Active projects only (in briefing, not terminated or suspended).</p>')
+                '<p class="dim">Passed = the date has gone by; red when the stage has not moved on. Active projects only (in briefing, not terminated or suspended).</p>')
 
 
 def overview_body(snap: dict, th: dict, today: str, weeks: int) -> str:
+    """與月報同一順序：6 張 KPI → Stage｜Customer｜Category → Timeline → Milestones｜BU｜FU。"""
     month = snap["meta"]["report_month"]
-    months = int(th.get("timeline_months", 6)); spare = float(th.get("spare_capacity_pct", 85))
-    link = lambda c: f"/ui/{month}/projects/{c}"  # noqa: E731
-    strip = kpi_cards([k for k in kpis(snap, "en", th) if k["key"] != "risk"], cls="strip")
-    return (f'<section>{status_html(snap, "en", th, link=link, decisions_href=f"/ui/{month}/decisions")}{strip}'
-            f'<div class="grid-2">{safe_chart_card(t("en", "v_c_forecast"), lambda: forecast_capacity(snap, "en"), "en")}'
-            f'{safe_chart_card(t("en", "v_c_fu"), lambda: fu_plan_actual(snap, "en"), "en")}</div>'
+    months = int(th.get("timeline_months", 6))
+    return (f'<section>{kpi_cards(kpis(snap, "en", th), {"risk": f"/ui/{month}/decisions"})}'
             f'<div class="grid-3">{donut_card(stage_donut(snap, "en"), "en", t("en", "v_src_stage"))}'
             f'{bar_list_card(customer_bars(snap, "en"), "en", t("en", "v_src_customer"))}'
             f'{donut_card(category_donut(snap, "en"), "en", t("en", "v_src_category"))}</div>'
-            f'{_milestone_card(month, snap, today, weeks)}'
             f'{safe_chart_card(f"Timeline, next {months} months", lambda: gantt(snap, "en", today, months), "en")}'
-            f'{safe_chart_card("Resource load by function", lambda: load_heatmap(snap, "en", spare), "en")}</section>')
+            f'<div class="grid-3">{_milestone_card(month, snap, today, weeks)}'
+            f'{safe_chart_card(t("en", "v_c_forecast"), lambda: forecast_capacity(snap, "en"), "en")}'
+            f'{safe_chart_card(t("en", "v_c_fu"), lambda: fu_plan_actual(snap, "en"), "en")}</div></section>')

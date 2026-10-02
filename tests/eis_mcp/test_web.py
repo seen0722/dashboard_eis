@@ -129,14 +129,15 @@ def test_nav_forms_are_not_nested():
 # ---- 總覽 ----
 def test_overview_shows_kpis_charts_and_milestones(ingested):
     t = html(ingested, f"/ui/202609/?today={TODAY}")
-    assert '<div class="status">' in t and '<div class="kpis strip">' in t and "Total projects" in t and 'href="/ui/202609/decisions"' in t and "Report month 2026-09" in t
+    assert '<div class="kpis">' in t and "Total projects" in t and 'href="/ui/202609/decisions"' in t and "Report month 2026-09" in t
     assert '<table class="bars-t">' in t                                            # customer：HTML 長條（2026-10-03 選項 3）
-    for cid in ("stage", "category", "gantt", "heat-function", "forecast", "fu"):
+    for cid in ("stage", "category", "gantt", "forecast", "fu"):
         assert f'id="c-{cid}"' in t and f'id="c-{cid}-data"' in t, cid
     assert '<ol class="ex">' not in t and "<h2>Data health" not in t                 # 已移到各自的分頁
-    assert "Milestones within 8 weeks" in t and "THORPE" in t and '<td class="num">-43</td>' in t
+    ms = lambda page: page[page.index("<h3>Milestones"):page.index("</table>", page.index("<h3>Milestones"))]  # noqa: E731
+    assert "Milestones within 8 weeks" in t and "THORPE" in ms(t)                    # MP 2026-07-31：距 2026-09-12 已過 43 天，仍在 ±8 週內
     t2 = html(ingested, f"/ui/202609/?today={TODAY}&weeks=2")
-    assert "Milestones within 2 weeks" in t2 and '<td class="num">-43</td>' not in t2
+    assert "Milestones within 2 weeks" in t2 and "THORPE" not in ms(t2)
     assert get(ingested, "/ui/202609/?weeks=0").status_code == 400
     assert get(ingested, "/ui/202609/?today=13/09/2026").status_code == 400
 
@@ -564,3 +565,10 @@ def test_long_health_lists_collapse_after_six(ingested):
     assert out.count("P0 last updated") == 1 and '<details class="more"><summary>+4 more</summary>' in out
     shown, hidden = out.split('<details class="more">')
     assert "P5 last updated" in shown and "P6 last updated" in hidden
+
+
+def test_overview_web_follows_the_same_order(ingested):
+    t = html(ingested, f"/ui/202609/?today={TODAY}")
+    order = [t.index(x) for x in ('<div class="kpis">', 'id="c-stage"', 'id="c-gantt"', "<h3>Milestones within 8 weeks", 'id="c-forecast"', 'id="c-fu"')]
+    assert order == sorted(order) and 'class="status"' not in t and 'id="c-heat-function"' not in t
+    assert 'href="/ui/202609/decisions"><span class="k-label">At risk</span>' in t

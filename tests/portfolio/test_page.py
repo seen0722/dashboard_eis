@@ -104,10 +104,9 @@ def test_appendix_is_sorted_by_project_name_case_insensitively():
 
 def test_kpis_count_stages_and_at_risk():
     html = render_page(snap(), "en", "2026-09-12", TH)
-    kp = html[html.index('<div class="kpis strip">'):html.index('<div class="grid-2">')]
+    kp = html[html.index('<div class="kpis">'):html.index('<div class="grid-3">')]
     assert '<span class="k-label">Total projects</span><b class="k-value">6</b><span class="k-sub">5 in Briefing, 2 terminated or suspended</span>' in kp
-    st = html[html.index('<div class="status">'):html.index('<div class="kpis strip">')]
-    assert '<span class="s-label">At risk</span><b class="s-num">1</b>' in st and "THORPE" in st    # BR1：passed 且 MP 延後 291 天（2026-10-03 起在重點卡）
+    assert '<a class="kpi bad" href="#decisions"><span class="k-label">At risk</span><b class="k-value">1</b>' in kp    # BR1：passed 且 MP 延後 291 天
 
 
 def test_exception_two_shows_terminated_only_when_still_charging_and_suspended_zero_rows():
@@ -147,7 +146,7 @@ def test_report_is_v2_layout_with_inline_echarts():
     assert '<nav class="side" aria-label="BU10 Portfolio Review">' in html and 'href="#decisions"' in html
     assert html.index('id="overview"') < html.index('id="decisions"') < html.index('id="health"') < html.index('id="appendix"')
     assert "<script src=" not in html and "Apache Software Foundation" in html     # 內嵌，零外部腳本
-    for cid in ("stage", "category", "gantt", "heat-function", "forecast", "fu", "pva-0-burd"):
+    for cid in ("stage", "category", "gantt", "forecast", "fu", "pva-0-burd"):
         assert f'id="c-{cid}"' in html, cid
 
 
@@ -186,14 +185,6 @@ def test_appendix_task_tables_scroll_instead_of_widening_the_page():
     assert '</span></summary><div class="wide"><table><thead><tr><th>Side</th>' in html     # 任務表（不是圖表的資料表）
 
 
-def test_milestones_get_a_full_width_card():
-    """瀏覽器實測：里程碑表放在三欄裡，Status 標籤被截斷；負載與預估兩欄，里程碑獨占一列。"""
-    html = render_page(snap(), "en", "2026-09-12", TH)
-    ov = html[html.index('id="overview"'):html.index('id="decisions"')]
-    assert ov.count('<div class="grid-2">') == 1 and ov.count('<div class="grid-3">') == 1     # BU/FU 人力；stage/customer/category
-    assert ov.index("<h3>Milestones") > ov.index('id="c-category"')                            # 里程碑表在三卡列之後，獨占一列
-
-
 def test_decisions_section_lists_the_at_risk_projects():
     """Review：At Risk KPI 連到 Decisions，落地處必須列得出是哪幾案（含只在健康度追蹤的 MP 延後）。"""
     html = render_page(snap(), "en", "2026-09-12", TH)
@@ -211,19 +202,23 @@ def test_report_has_fu_plan_chart():
     assert 'id="c-fu"' in html
 
 
-
-def test_overview_leads_with_status_then_strip_then_manpower():
-    html = render_page(snap(), "en", "2026-09-12", TH)
-    ov = html[html.index('id="overview"'):html.index('id="decisions"')]
-    order = [ov.index(x) for x in ('<div class="status">', '<div class="kpis strip">', 'id="c-forecast"', 'id="c-stage"', 'id="c-gantt"')]
-    assert order == sorted(order)
-    assert 'id="c-composition"' not in ov and 'id="c-type"' not in ov and "At risk" not in ov[ov.index('<div class="kpis strip">'):ov.index('id="c-forecast"')]
-
-
-
 def test_overview_has_stage_customer_category_in_one_row():
     html = render_page(snap(), "en", "2026-09-12", TH)
     ov = html[html.index('id="overview"'):html.index('id="decisions"')]
     row = ov[ov.index('<div class="grid-3">'):]
     assert row.index('id="c-stage"') < row.index('<table class="bars-t">') < row.index('id="c-category"')
     assert 'id="c-composition"' not in ov
+
+
+def test_overview_follows_the_mock_with_milestones_bu_fu_in_one_row():
+    """2026-10-03 需求方選 C 並調整：6 張 KPI → Stage｜Customer｜Category → Timeline → Milestones｜BU｜FU；不放負載熱度表。"""
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    ov = html[html.index('id="overview"'):html.index('id="decisions"')]
+    order = [ov.index(x) for x in ('<div class="kpis">', 'id="c-stage"', 'id="c-gantt"', "<h3>Milestones", 'id="c-forecast"', 'id="c-fu"')]
+    assert order == sorted(order)
+    last = ov[ov.rindex('<div class="grid-3">'):]
+    assert last.index("<h3>Milestones") < last.index('id="c-forecast"') < last.index('id="c-fu"')
+    assert 'class="status"' not in ov and 'id="c-heat-function"' not in ov
+    assert '<a class="kpi bad" href="#decisions"><span class="k-label">At risk</span><b class="k-value">1</b>' in ov
+    ms = last[last.index("<h3>Milestones"):last.index("</table>")]
+    assert "<th>Status</th>" in ms and "Days left" not in ms and "<th>Customer</th>" not in ms        # 三分之一寬：精簡欄位

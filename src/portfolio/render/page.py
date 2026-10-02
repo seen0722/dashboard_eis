@@ -5,9 +5,9 @@ from html import escape as e
 from ..entities import INACTIVE, MONTHS
 from .css import CSS
 from .strings import t
-from .viz.dash import at_risk_html, bar_list_card, card, donut_card, kpi_cards, milestone_table, safe_chart_card, side_nav, status_html
+from .viz.dash import at_risk_html, bar_list_card, card, donut_card, kpi_cards, milestone_table, safe_chart_card, side_nav
 from .viz.embed import chart_html, scripts
-from .viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, load_heatmap, pva, stage_donut
+from .viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, pva, stage_donut
 
 STAGE_KEYS = [("RFQ / RFI", "stage_rfq"), ("POC", "stage_poc"), ("Execution", "stage_exec"), ("MP", "stage_mp"), ("Sustain / EOP", "stage_sustain"), ("Terminated", "stage_terminated"), ("Suspended", "stage_suspended")]
 
@@ -136,19 +136,18 @@ def _appendix_one(p: dict, lang: str, today: str, latest_month: int, i: int) -> 
 
 
 def _overview(snap: dict, lang: str, today: str, th: dict, late: set[str]) -> str:
+    """2026-10-03 需求方選定：6 張 KPI → Stage｜Customer｜Category → Timeline → Milestones｜BU｜FU。"""
     weeks, months = th["upcoming_weeks"], th["timeline_months"]
     rows = _upcoming_rows(snap, today, weeks, late)
-    ms = milestone_table(rows, lang) if rows else f'<p class="note">{e(t(lang, "none"))}</p>'
-    strip = kpi_cards([k for k in kpis(snap, lang, th) if k["key"] != "risk"], cls="strip")
-    return (status_html(snap, lang, th, decisions_href="#decisions") + strip
-            + f'<div class="grid-2">{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}'
-            + f'{safe_chart_card(t(lang, "v_c_fu"), lambda: fu_plan_actual(snap, lang), lang)}</div>'
+    ms = milestone_table(rows, lang, compact=True) if rows else f'<p class="note">{e(t(lang, "none"))}</p>'
+    return (kpi_cards(kpis(snap, lang, th), {"risk": "#decisions"})
             + f'<div class="grid-3">{donut_card(stage_donut(snap, lang), lang, t(lang, "v_src_stage"))}'
             + f'{bar_list_card(customer_bars(snap, lang), lang, t(lang, "v_src_customer"))}'
             + f'{donut_card(category_donut(snap, lang), lang, t(lang, "v_src_category"))}</div>'
-            + card(t(lang, "v_c_milestones", weeks=weeks), ms)
             + safe_chart_card(t(lang, "v_c_gantt", months=months), lambda: gantt(snap, lang, today, months), lang)
-            + safe_chart_card(t(lang, "v_c_heat"), lambda: load_heatmap(snap, lang, th["spare_capacity_pct"]), lang))
+            + f'<div class="grid-3">{card(t(lang, "v_c_milestones", weeks=weeks), ms)}'
+            + f'{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}'
+            + f'{safe_chart_card(t(lang, "v_c_fu"), lambda: fu_plan_actual(snap, lang), lang)}</div>')
 
 
 def render_page(snap: dict, lang: str, today: str, th: dict, echarts: str = "inline") -> str:

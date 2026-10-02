@@ -56,16 +56,24 @@ def pill(status: str, lang: str, late: bool = True) -> str:
     return f'<span class="pill {tone}">{e(t(lang, "v_st_" + status))}</span>'
 
 
-def milestone_table(rows: list[dict], lang: str, link: Callable[[str], str] | None = None) -> str:
+def milestone_table(rows: list[dict], lang: str, link: Callable[[str], str] | None = None, compact: bool = False) -> str:
+    """compact：三分之一寬的卡片只放 Date／Project／Milestone／Status（Customer 與 Days left 放不下）。"""
     body = []
     for r in rows:
         name = f'<a href="{e(link(r["code"]))}">{e(r["name"])}</a>' if link else f'<b>{e(r["name"])}</b>'
-        body.append(f'<tr><td>{e(r["date"][5:].replace("-", "/"))}</td><td>{name}</td><td>{e(r.get("customer") or "")}</td>'
-                    f'<td>{e(r["milestone"].upper())}</td><td class="num">{r["days_left"]}</td>'
-                    f'<td>{pill(milestone_status(r["days_left"]), lang, r.get("late", False))}</td></tr>')
-    return (f'<div class="wide"><table><thead><tr><th>{e(t(lang, "col_date"))}</th><th>{e(t(lang, "col_project"))}</th>'
-            f'<th>{e(t(lang, "col_customer"))}</th><th>{e(t(lang, "col_milestone"))}</th><th class="num">{e(t(lang, "v_col_days"))}</th>'
-            f'<th>{e(t(lang, "v_col_status"))}</th></tr></thead><tbody>{"".join(body)}</tbody></table></div>')
+        status = pill(milestone_status(r["days_left"]), lang, r.get("late", False))
+        if compact:
+            body.append(f'<tr><td>{e(r["date"][5:].replace("-", "/"))}</td><td>{name}</td><td>{e(r["milestone"].upper())}</td><td>{status}</td></tr>')
+        else:
+            body.append(f'<tr><td>{e(r["date"][5:].replace("-", "/"))}</td><td>{name}</td><td>{e(r.get("customer") or "")}</td>'
+                        f'<td>{e(r["milestone"].upper())}</td><td class="num">{r["days_left"]}</td><td>{status}</td></tr>')
+    if compact:
+        head = (f'<th>{e(t(lang, "col_date"))}</th><th>{e(t(lang, "col_project"))}</th><th>{e(t(lang, "col_milestone"))}</th>'
+                f'<th>{e(t(lang, "v_col_status"))}</th>')
+    else:
+        head = (f'<th>{e(t(lang, "col_date"))}</th><th>{e(t(lang, "col_project"))}</th><th>{e(t(lang, "col_customer"))}</th>'
+                f'<th>{e(t(lang, "col_milestone"))}</th><th class="num">{e(t(lang, "v_col_days"))}</th><th>{e(t(lang, "v_col_status"))}</th>')
+    return f'<div class="wide"><table><thead><tr>{head}</tr></thead><tbody>{"".join(body)}</tbody></table></div>'
 
 
 def at_risk_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | None = None) -> str:
