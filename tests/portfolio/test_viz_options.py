@@ -106,3 +106,13 @@ def test_pva_without_plan_draws_actual_only_and_says_so():
     no_plan = O.pva(ps["TR_KOS"], "BU RD", 8, "en", 5)
     assert no_plan.id == "pva-5-burd" and len(no_plan.option["series"]) == 1 and no_plan.note == "No budget plan for this group."
     assert no_plan.option["series"][0]["data"] == [3.0] * 8 + [None] * 4
+
+
+def test_gantt_visual_fixes_from_browser_check():
+    """2026-10-02 瀏覽器實測：symbol none 讓「no dates yet」標籤不見；Today 標籤壓到月份；375px 下整張圖擠成一團。"""
+    ch = O.gantt(snap(), "en", TODAY, 6)
+    nodate = next(m for m in ch.option["series"][1]["data"] if m["label"]["formatter"] == "RFQ, no dates yet")
+    assert nodate["symbol"] != "none" and nodate["symbolSize"] > 0
+    assert ch.option["series"][1]["markLine"]["label"]["position"] == "start"
+    assert ch.min_width == 720 and O.load_heatmap(snap(), "en", 85).min_width == 560
+    assert ch.option["grid"]["bottom"] >= 24 and O.load_heatmap(snap(), "en", 85).option["grid"]["right"] >= 16   # Today 標籤、Dec 不被裁掉

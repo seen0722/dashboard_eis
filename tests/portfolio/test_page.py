@@ -176,3 +176,17 @@ def test_report_survives_snapshot_without_capacity():
     del sn["capacity"]
     html = render_page(sn, "en", "2026-09-12", TH)
     assert "Not in this snapshot." in html and 'id="c-stage"' in html
+
+
+def test_appendix_task_tables_scroll_instead_of_widening_the_page():
+    """375px 實測：任務描述欄把單案頁撐到 887px；表格要包在 .wide（overflow-x:auto）裡。"""
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    assert '</span></summary><div class="wide"><table><thead><tr><th>Side</th>' in html     # 任務表（不是圖表的資料表）
+
+
+def test_milestones_get_a_full_width_card():
+    """瀏覽器實測：里程碑表放在三欄裡，Status 標籤被截斷；負載與預估兩欄，里程碑獨占一列。"""
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    assert "grid-3" not in html.split("<style>")[1].split("</style>")[1]
+    ov = html[html.index('id="overview"'):html.index('id="decisions"')]
+    assert ov.count('<div class="grid-2">') == 2

@@ -1,7 +1,7 @@
 # EIS Dashboard Redesign（v2 風格＋ECharts）— 設計文件
 
 日期：2026-10-02
-狀態：設計，待審閱
+狀態：已實作（計畫 docs/superpowers/plans/2026-10-02-eis-dashboard-redesign.md）
 相依：`2026-09-12-bu10-portfolio-dashboard-design.md`（月報單頁、快照格式）、`2026-09-21-eis-web-ui-design.md`（`/ui/` 頁面）
 視覺依據：`out/mock_bu10_portfolio_v2.html`（不進版控；本設計採用其版面語彙，不採用其資料口徑）
 

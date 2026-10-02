@@ -116,9 +116,9 @@ def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: 
             marks.append({"value": [_ms(d), y], "symbol": SYMBOL[k], "symbolSize": 10, "itemStyle": {"color": c, "borderColor": c},
                           "label": {"show": True, "position": "right", "formatter": f"{k.upper()} {d[5:7]}/{d[8:10]}", "color": c, "fontSize": 11}})
         if not ds:
-            marks.append({"value": [_ms(today), y], "symbol": "none",
+            marks.append({"value": [_ms(today), y], "symbol": "circle", "symbolSize": 5, "itemStyle": {"color": T.INK3},   # symbol none 會連標籤一起藏掉
                           "label": {"show": True, "position": "right", "formatter": t(lang, "no_dates", stage=p["stage"]), "color": T.INK3, "fontSize": 11}})
-    return {"grid": {"left": 8, "right": 90, "top": 28, "bottom": 8, "containLabel": True}, "tooltip": {"trigger": "item"},
+    return {"grid": {"left": 8, "right": 90, "top": 28, "bottom": 24, "containLabel": True}, "tooltip": {"trigger": "item"},
             "xAxis": {"type": "time", "position": "top", "min": _ms(t0.isoformat()), "max": _ms(t1.isoformat()),
                       "splitLine": {"show": True, "lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK2}},
             "yAxis": {"type": "category", "data": [p["name"] for p in rows][::-1], "axisTick": {"show": False},
@@ -127,7 +127,7 @@ def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: 
                         "itemStyle": {"color": T.ACCENT}, "clip": True, "silent": True},
                        {"type": "scatter", "data": marks, "clip": True, "z": 3,
                         "markLine": {"silent": True, "symbol": "none", "lineStyle": {"color": T.INK, "type": "dashed"},
-                                     "label": {"formatter": t(lang, "v_today"), "color": T.INK2}, "data": [{"xAxis": _ms(today)}]}}]}
+                                     "label": {"formatter": t(lang, "v_today"), "color": T.INK2, "position": "start"}, "data": [{"xAxis": _ms(today)}]}}]}
 
 
 def gantt(snap: dict, lang: str, today: str, months: int) -> Chart:
@@ -138,7 +138,7 @@ def gantt(snap: dict, lang: str, today: str, months: int) -> Chart:
     table = tuple((p["name"], p["customer"], p["stage"], *(p["dates"].get(k) or "" for k in MS)) for p in rows)
     return Chart("gantt", t(lang, "v_c_gantt", months=months), _gantt_option(rows, t0, t1, today, late, lang),
                  (t(lang, "col_project"), t(lang, "col_customer"), t(lang, "col_stage"), "EVT", "DVT", "PVT", "MP"), table,
-                 height=max(160, 30 * len(rows) + 50), variants=variants, note=t(lang, "v_gantt_note"))
+                 height=max(160, 30 * len(rows) + 50), variants=variants, note=t(lang, "v_gantt_note"), min_width=720)
 
 
 def load_heatmap(snap: dict, lang: str, spare_pct: float, by: str = "function") -> Chart:
@@ -169,7 +169,7 @@ def load_heatmap(snap: dict, lang: str, spare_pct: float, by: str = "function") 
             else:
                 v = round(alloc / kin * 100); cells.append([m, ypos[k], v]); pcts.append(v)
         table.append((names[k], *pcts))
-    option = {"grid": {"left": 8, "right": 8, "top": 8, "bottom": 46, "containLabel": True}, "tooltip": {"position": "top"},
+    option = {"grid": {"left": 8, "right": 16, "top": 8, "bottom": 46, "containLabel": True}, "tooltip": {"position": "top"},
               "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
               "yAxis": {"type": "category", "data": [names[k] for k in reversed(keys)], "axisTick": {"show": False}, "axisLabel": {"color": T.INK}},
               "visualMap": {"type": "piecewise", "seriesIndex": 0, "orient": "horizontal", "left": "center", "bottom": 0,
@@ -181,7 +181,7 @@ def load_heatmap(snap: dict, lang: str, spare_pct: float, by: str = "function") 
                           "itemStyle": {"borderColor": "#fff", "borderWidth": 2}},
                          {"type": "heatmap", "name": t(lang, "v_no_data"), "data": nodata, "label": {"show": False},
                           "itemStyle": {"color": T.NODATA, "borderColor": "#fff", "borderWidth": 2}, "tooltip": {"formatter": t(lang, "v_no_data")}}]}
-    return Chart(cid, title, option, (first, *MONTHS), tuple(table), height=24 * len(keys) + 80, note=t(lang, "v_heat_note"))
+    return Chart(cid, title, option, (first, *MONTHS), tuple(table), height=24 * len(keys) + 80, note=t(lang, "v_heat_note"), min_width=560)
 
 
 def forecast_capacity(snap: dict, lang: str) -> Chart:

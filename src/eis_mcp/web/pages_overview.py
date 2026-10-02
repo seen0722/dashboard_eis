@@ -47,6 +47,6 @@ def overview_body(snap: dict, th: dict, today: str, weeks: int) -> str:
             f'<div class="grid-2">{safe_chart_card("Projects by stage", lambda: stage_donut(snap, "en"), "en")}'
             f'{safe_chart_card("Projects by customer", lambda: customer_bars(snap, "en"), "en")}</div>'
             f'{safe_chart_card(f"Timeline, next {months} months", lambda: gantt(snap, "en", today, months), "en")}'
-            f'<div class="grid-3">{safe_chart_card("Resource load by function", lambda: load_heatmap(snap, "en", spare), "en")}'
-            f'{safe_chart_card("Forecast vs capacity", lambda: forecast_capacity(snap, "en"), "en")}'
-            f'{_milestone_card(month, snap, today, weeks)}</div></section>')
+            f'<div class="grid-2">{safe_chart_card("Resource load by function", lambda: load_heatmap(snap, "en", spare), "en")}'
+            f'{safe_chart_card("Forecast vs capacity", lambda: forecast_capacity(snap, "en"), "en")}</div>'
+            f'{_milestone_card(month, snap, today, weeks)}</section>')

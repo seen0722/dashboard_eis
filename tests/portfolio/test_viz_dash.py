@@ -38,3 +38,10 @@ def test_milestone_status_pills_and_table():
     assert h.startswith('<div class="wide"><table>')
     assert '<td>09/08</td><td><a href="/ui/202609/projects/BR6">N1X</a></td><td>Dell</td><td>PVT</td><td class="num">-4</td><td><span class="pill bad">Passed</span></td>' in h
     assert "<b>N1X</b>" in milestone_table(rows, "en")
+
+
+def test_hidden_menu_checkbox_is_not_stretched_by_side_input_width():
+    """375px 實測：.side input{width:100%} 蓋過 .navt{width:1px}，隱藏的 checkbox 撐成整個視窗寬，每頁都溢出到 565px。"""
+    from src.portfolio.render.css import CSS
+    assert ".side .navt{" in CSS and ".side .navt{position:absolute;opacity:0;width:1px;height:1px}" in CSS
+    assert ".side .navbtn{display:none}" in CSS and ".side .navbtn{display:inline-block" in CSS   # .side label{display:flex} 曾讓桌面版也露出 Menu

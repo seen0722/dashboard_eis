@@ -12,7 +12,7 @@ a{color:var(--accent)}
 .side form{display:flex;gap:6px;align-items:end;margin:0 0 10px;padding:0 4px}.side label{color:#94A3B8;font-size:11px;display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
 .side select,.side input{width:100%;min-width:0;font:13px inherit;padding:5px 8px;border:1px solid #334155;border-radius:6px;background:#0F172A;color:#E2E8F0}
 .side button{font:12px inherit;padding:5px 10px;border:0;border-radius:6px;background:#334155;color:#fff;cursor:pointer}
-.navt{position:absolute;opacity:0;width:1px;height:1px}.navbtn{display:none}.navt:focus-visible+.navbtn{outline:2px solid #fff}
+.side .navt{position:absolute;opacity:0;width:1px;height:1px}.side .navbtn{display:none}.navt:focus-visible+.navbtn{outline:2px solid #fff}
 .main{padding:28px 32px 64px;min-width:0;max-width:1480px}
 header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:0 0 16px;margin:0 0 18px;border-bottom:1px solid var(--rule)}
 h1{font-size:24px;font-weight:700;margin:0;line-height:1.25}header p{margin:6px 0 0;color:var(--ink-2);max-width:70ch}
@@ -57,7 +57,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:24px;max-width:80ch}footer p
 svg text{font-family:inherit}
 @media(max-width:1200px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.app{grid-template-columns:minmax(0,1fr)}.side{position:static;height:auto;padding:12px 14px}.side a.brand{display:inline-flex;padding:4px 6px}
-.navbtn{display:inline-block;float:right;color:#fff;font-size:13px;padding:4px 10px;border:1px solid #475569;border-radius:6px;cursor:pointer}.side .links{display:none;padding-top:10px}.navt:checked~.links{display:block}
+.side .navbtn{display:inline-block;float:right;color:#fff;font-size:13px;padding:4px 10px;border:1px solid #475569;border-radius:6px;cursor:pointer}.side .links{display:none;padding-top:10px}.navt:checked~.links{display:block}
 .main{padding:18px 16px 48px}header{flex-direction:column}.tb{min-width:0;width:100%}.grid-2,.grid-3{grid-template-columns:minmax(0,1fr)}.pva{grid-template-columns:minmax(0,1fr)}.ms{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}}
 @media(max-width:640px){.kpis,.kpis.four{grid-template-columns:repeat(2,minmax(0,1fr))}.k-value{font-size:22px}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}

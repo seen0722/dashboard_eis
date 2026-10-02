@@ -23,6 +23,7 @@ class Chart:
     height: int = 280
     variants: dict = field(default_factory=dict)   # {篩選標籤: option}；空 = 不提供篩選
     note: str = ""                            # 圖下方一行口徑／缺口說明
+    min_width: int = 0                        # >0：窄螢幕時圖維持此寬度，在卡片內橫向捲動（不擠壓、不撐開頁面）
 
 
 INIT_JS = """(function(){
@@ -96,7 +97,11 @@ def chart_html(ch: Chart, lang: str) -> str:
     note = f'<p class="note">{e(ch.note)}</p>' if ch.note else ""
     head = "".join(f"<th>{e(h)}</th>" for h in ch.headers)
     body = "".join("<tr>" + "".join(f"<td>{_cell(v)}</td>" for v in r) + "</tr>" for r in ch.rows)
-    return (f'{pick}<div class="chart" id="c-{ch.id}" data-chart style="height:{ch.height}px" role="img" aria-label="{e(ch.title)}"></div>'
+    style = f"height:{ch.height}px" + (f";min-width:{ch.min_width}px" if ch.min_width else "")
+    div = f'<div class="chart" id="c-{ch.id}" data-chart style="{style}" role="img" aria-label="{e(ch.title)}"></div>'
+    if ch.min_width:
+        div = f'<div class="wide">{div}</div>'
+    return (f'{pick}{div}'
             f'<script type="application/json" id="c-{ch.id}-data">{to_json({"option": ch.option, "variants": ch.variants})}</script>'
             f'<noscript><p class="note">{e(t(lang, "v_need_js"))}</p></noscript>{note}'
             f'<details class="data"><summary data-expand="{e(t(lang, "expand"))}" data-collapse="{e(t(lang, "collapse"))}"><span>{e(t(lang, "v_data_table"))}</span></summary>'

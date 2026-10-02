@@ -53,3 +53,9 @@ def test_echarts_tags_and_init_script():
 def test_new_strings_exist_in_both_languages():
     v_en = {k for k in STRINGS["en"] if k.startswith("v_")}
     assert v_en and v_en == {k for k in STRINGS["zh"] if k.startswith("v_")}
+
+
+def test_min_width_chart_scrolls_inside_its_card():
+    h = chart_html(ch(min_width=720), "en")
+    assert '<div class="wide"><div class="chart" id="c-stage" data-chart style="height:280px;min-width:720px"' in h
+    assert '<div class="wide"><div class="chart"' not in chart_html(ch(), "en")

@@ -128,7 +128,7 @@ def _appendix_one(p: dict, lang: str, today: str, latest_month: int, i: int) -> 
             ts = sorted(by_m[m], key=lambda x: -x["fte"]); bu = sum(1 for x in ts if x["side"] == "BU"); fu = len(ts) - bu
             trs = "".join(f'<tr><td>{x["side"]}</td><td>{e(x["function"])}</td><td>{e(x["dept"])}</td><td class="num">{x["fte"]:.2f}</td><td class="desc">{e(x["description"])}</td></tr>' for x in ts)
             dets.append(f'<details><summary data-expand="{e(t(lang, "expand"))}" data-collapse="{e(t(lang, "collapse"))}"><span>{e(t(lang, "task_summary", mon=MONTHS[m - 1], bu=bu, fu=fu, fte=f"{sum(x["fte"] for x in ts):.1f}"))}</span></summary>'
-                        f'<table><thead><tr><th>{e(t(lang, "col_side"))}</th><th>{e(t(lang, "col_function"))}</th><th>{e(t(lang, "col_dept"))}</th><th class="num">{e(t(lang, "col_fte"))}</th><th>{e(t(lang, "col_task"))}</th></tr></thead><tbody>{trs}</tbody></table></details>')
+                        f'<div class="wide"><table><thead><tr><th>{e(t(lang, "col_side"))}</th><th>{e(t(lang, "col_function"))}</th><th>{e(t(lang, "col_dept"))}</th><th class="num">{e(t(lang, "col_fte"))}</th><th>{e(t(lang, "col_task"))}</th></tr></thead><tbody>{trs}</tbody></table></div></details>')
         body = f'<div class="pva">{"".join(cards)}</div><h3 style="font-size:15px;margin:26px 0 6px">{e(t(lang, "s_tasks"))}</h3>{"".join(dets)}'
     # biz_type（JDM/ODM/EMS）來自 2026-09 起的 Briefing Type 欄；product 在新版已是 Category + Panel Size，不再重複列。舊版面為空就略過。
     meta = "  ".join(x for x in (p["code"] if not p["code"].startswith("NAME:") else "", p["customer"], p.get("biz_type", ""), p["product"], p["group"]) if x)
@@ -143,9 +143,9 @@ def _overview(snap: dict, lang: str, today: str, th: dict, late: set[str]) -> st
             + f'<div class="grid-2">{safe_chart_card(t(lang, "v_c_stage"), lambda: stage_donut(snap, lang), lang)}'
             + f'{safe_chart_card(t(lang, "v_c_customer"), lambda: customer_bars(snap, lang), lang)}</div>'
             + safe_chart_card(t(lang, "v_c_gantt", months=months), lambda: gantt(snap, lang, today, months), lang)
-            + f'<div class="grid-3">{safe_chart_card(t(lang, "v_c_heat"), lambda: load_heatmap(snap, lang, th["spare_capacity_pct"]), lang)}'
-            + f'{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}'
-            + f'{card(t(lang, "v_c_milestones", weeks=weeks), ms)}</div>')
+            + f'<div class="grid-2">{safe_chart_card(t(lang, "v_c_heat"), lambda: load_heatmap(snap, lang, th["spare_capacity_pct"]), lang)}'
+            + f'{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}</div>'
+            + card(t(lang, "v_c_milestones", weeks=weeks), ms))
 
 
 def render_page(snap: dict, lang: str, today: str, th: dict, echarts: str = "inline") -> str:
