@@ -2,9 +2,9 @@
 from __future__ import annotations
 import datetime as dt
 from types import SimpleNamespace
-from ...entities import INACTIVE
+from ...entities import INACTIVE, MONTHS
 from ...model.rules import mp_slipped
-from ..charts import _add_months
+from ..charts import _add_months, _sum, carry_forward
 from ..strings import t
 from . import tokens as T
 from .embed import Chart
@@ -139,3 +139,99 @@ def gantt(snap: dict, lang: str, today: str, months: int) -> Chart:
     return Chart("gantt", t(lang, "v_c_gantt", months=months), _gantt_option(rows, t0, t1, today, late, lang),
                  (t(lang, "col_project"), t(lang, "col_customer"), t(lang, "col_stage"), "EVT", "DVT", "PVT", "MP"), table,
                  height=max(160, 30 * len(rows) + 50), variants=variants, note=t(lang, "v_gantt_note"))
+
+
+def load_heatmap(snap: dict, lang: str, spare_pct: float, by: str = "function") -> Chart:
+    """負載 = Σallocated ÷ Σkeyed_in。無人填報（Σkeyed_in = 0）的格放在第二個 series，灰底、不寫 0%。"""
+    loads = snap["loads"]
+    if by == "function":
+        groups: dict[str, list[dict]] = {}
+        for r in loads:
+            groups.setdefault((r.get("function") or "").strip() or "(none)", []).append(r)
+        keys = sorted(groups, key=str.casefold)
+        names = {k: k for k in keys}
+        cid, title, first = "heat-function", t(lang, "v_c_heat"), t(lang, "col_function")
+    else:
+        ordered = sorted(loads, key=lambda r: ((r.get("function") or "").casefold(), r["dept_code"]))
+        groups = {r["dept_code"]: [r] for r in ordered}
+        keys = list(groups)
+        names = {r["dept_code"]: f'{r.get("function") or "–"}  {r["dept_name"]}' for r in ordered}
+        cid, title, first = "heat-dept", t(lang, "v_c_heat_dept"), t(lang, "col_dept")
+    ypos = {k: len(keys) - 1 - i for i, k in enumerate(keys)}          # 第一個在最上面
+    cells, nodata, table = [], [], []
+    for k in keys:
+        pcts = []
+        for m in range(12):
+            kin = sum(r["keyed_in"][m] or 0 for r in groups[k])
+            alloc = sum(r["allocated"][m] or 0 for r in groups[k])
+            if kin <= 0:
+                nodata.append([m, ypos[k], 0]); pcts.append(None)
+            else:
+                v = round(alloc / kin * 100); cells.append([m, ypos[k], v]); pcts.append(v)
+        table.append((names[k], *pcts))
+    option = {"grid": {"left": 8, "right": 8, "top": 8, "bottom": 46, "containLabel": True}, "tooltip": {"position": "top"},
+              "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
+              "yAxis": {"type": "category", "data": [names[k] for k in reversed(keys)], "axisTick": {"show": False}, "axisLabel": {"color": T.INK}},
+              "visualMap": {"type": "piecewise", "seriesIndex": 0, "orient": "horizontal", "left": "center", "bottom": 0,
+                            "itemWidth": 12, "itemHeight": 12, "textStyle": {"color": T.INK2},
+                            "pieces": [{"lt": spare_pct, "label": f"<{spare_pct:g}%", "color": T.HEAT_LOW},
+                                       {"gte": spare_pct, "lt": T.HEAT_HIGH, "label": f"{spare_pct:g}-{T.HEAT_HIGH - 1}%", "color": T.HEAT_MID},
+                                       {"gte": T.HEAT_HIGH, "label": f">={T.HEAT_HIGH}%", "color": T.HEAT_HI}]},
+              "series": [{"type": "heatmap", "data": cells, "label": {"show": True, "formatter": "{@[2]}%", "fontSize": 10, "color": T.INK},
+                          "itemStyle": {"borderColor": "#fff", "borderWidth": 2}},
+                         {"type": "heatmap", "name": t(lang, "v_no_data"), "data": nodata, "label": {"show": False},
+                          "itemStyle": {"color": T.NODATA, "borderColor": "#fff", "borderWidth": 2}, "tooltip": {"formatter": t(lang, "v_no_data")}}]}
+    return Chart(cid, title, option, (first, *MONTHS), tuple(table), height=24 * len(keys) + 80, note=t(lang, "v_heat_note"))
+
+
+def forecast_capacity(snap: dict, lang: str) -> Chart:
+    """與舊 capacity_svg 同口徑：actual／plan＝有 Control List 的專案 BU RD＋PM；plan 只算 has_plan 的專案；最新月之後的人數沿用最新月（虛線）。"""
+    ps, lm = snap["projects"], snap["meta"]["latest_month"]
+    raw = snap["capacity"]
+    cap = carry_forward(raw, lm)
+    cl = [p for p in ps if p.get("pva")]
+    wp = [p for p in cl if p["has_plan"]]
+    add = lambda a, b: [round(x + y, 2) for x, y in zip(a, b)]  # noqa: E731
+    actual = add(_sum(cl, "BU RD", "actual", lm), _sum(cl, "PM", "actual", lm))
+    plan = add(_sum(wp, "BU RD", "plan", only_plan=True), _sum(wp, "PM", "plan", only_plan=True))
+    fu = [round(v, 2) for v in _sum(cl, "FU RD", "actual", lm)]
+    pad = lambda xs: xs + [None] * (12 - len(xs))  # noqa: E731
+    mon = MONTHS[lm - 1]
+    series = [{"name": t(lang, "v_lg_cap"), "type": "line", "data": [v if i < lm else None for i, v in enumerate(cap)], "symbol": "none",
+               "lineStyle": {"color": T.INK, "width": 2.5}, "itemStyle": {"color": T.INK}},
+              {"name": t(lang, "v_lg_cap_carried", mon=mon), "type": "line", "data": [v if i >= lm - 1 else None for i, v in enumerate(cap)],
+               "symbol": "none", "lineStyle": {"color": T.INK, "width": 2, "type": "dashed"}, "itemStyle": {"color": T.INK}},
+              {"name": t(lang, "v_lg_actual"), "type": "bar", "data": pad(actual), "barWidth": "45%", "itemStyle": {"color": T.ACCENT}},
+              {"name": t(lang, "v_lg_plan"), "type": "line", "data": plan, "symbol": "circle", "symbolSize": 5,
+               "lineStyle": {"color": T.PLAN, "type": "dashed", "width": 2}, "itemStyle": {"color": T.PLAN}},
+              {"name": t(lang, "v_lg_fu"), "type": "line", "data": pad(fu), "symbol": "none", "lineStyle": {"color": T.FU, "width": 2},
+               "itemStyle": {"color": T.FU}}]
+    option = {"grid": {"left": 8, "right": 12, "top": 16, "bottom": 64, "containLabel": True}, "tooltip": {"trigger": "axis"},
+              "legend": {"bottom": 0, "itemWidth": 14, "itemHeight": 8, "textStyle": {"color": T.INK2, "fontSize": 11}},
+              "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
+              "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK3}}, "series": series}
+    rows = tuple((m, raw[i] if i < lm else None, actual[i] if i < lm else None, plan[i] if wp else None, fu[i] if i < lm else None)
+                 for i, m in enumerate(MONTHS))
+    return Chart("forecast", t(lang, "v_c_forecast"), option,
+                 (t(lang, "v_col_month"), t(lang, "v_lg_cap"), t(lang, "v_lg_actual"), t(lang, "v_lg_plan"), t(lang, "v_lg_fu")), rows,
+                 height=300, note=t(lang, "cap_budget_note", covered=len(wp), total=len(cl)))
+
+
+def pva(p: dict, role: str, latest_month: int, lang: str, idx: int) -> Chart:
+    v = (p.get("pva") or {}).get(role) or {}
+    plan = [round(x, 2) for x in v.get("plan", [0.0] * 12)]
+    act = [round(x, 2) for x in v.get("actual", [0.0] * 12)]
+    has_plan = any(plan)
+    series = [{"name": t(lang, "v_lg_pva_actual"), "type": "bar", "data": [a if i < latest_month else None for i, a in enumerate(act)],
+               "barWidth": "50%", "itemStyle": {"color": T.FU if role == "FU RD" else T.ACCENT}}]
+    if has_plan:
+        series.append({"name": t(lang, "v_lg_pva_plan"), "type": "line", "data": plan, "symbol": "circle", "symbolSize": 4,
+                       "lineStyle": {"color": T.PLAN, "type": "dashed"}, "itemStyle": {"color": T.PLAN}})
+    option = {"grid": {"left": 4, "right": 4, "top": 24, "bottom": 4, "containLabel": True}, "tooltip": {"trigger": "axis"},
+              "legend": {"top": 0, "right": 0, "itemWidth": 10, "itemHeight": 6, "textStyle": {"fontSize": 10, "color": T.INK2}},
+              "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"fontSize": 10, "color": T.INK3, "interval": 1}},
+              "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"fontSize": 10, "color": T.INK3}}, "series": series}
+    rows = tuple((m, act[i] if i < latest_month else None, plan[i] if has_plan else None) for i, m in enumerate(MONTHS))
+    return Chart(f"pva-{idx}-{role.lower().replace(' ', '')}", role, option,
+                 (t(lang, "v_col_month"), t(lang, "v_lg_pva_actual"), t(lang, "v_lg_pva_plan")), rows, height=150,
+                 note="" if has_plan else t(lang, "v_pva_no_plan"))

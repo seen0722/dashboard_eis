@@ -68,3 +68,41 @@ def test_gantt_rows_markers_and_customer_variants():
     assert set(ch.variants) == {"Axelera", "Dell", "Trimble"}
     assert ch.variants["Trimble"]["yAxis"]["data"] == ["TOMY", "THORPE"]
     assert ch.note.startswith("Red marks a milestone")
+
+
+def test_heatmap_by_function_never_shows_missing_months_as_zero():
+    ch = O.load_heatmap(snap(), "en", 85)
+    assert ch.id == "heat-function" and ch.option["yAxis"]["data"] == ["QTC", "ME"]
+    cells, nodata = ch.option["series"][0]["data"], ch.option["series"][1]["data"]
+    assert cells == [[m, 1, 70] for m in range(8)]                       # (4+3)/(4+6) = 70%
+    assert len(nodata) == 16 and [9, 1, 0] in nodata and all(c[1] == 0 or c[0] >= 8 for c in nodata)
+    assert ch.rows[0] == ("ME", *([70] * 8), None, None, None, None) and ch.rows[1] == ("QTC", *([None] * 12))
+    pieces = ch.option["visualMap"]["pieces"]
+    assert pieces[0]["lt"] == 85 and pieces[2]["gte"] == 95
+    assert "not headcount" in ch.note
+
+
+def test_heatmap_by_department_has_one_row_per_department():
+    ch = O.load_heatmap(snap(), "en", 85, by="dept")
+    assert ch.id == "heat-dept" and ch.option["yAxis"]["data"] == ["QTC  測試課", "ME  研發二課", "ME  研發一課"]
+
+
+def test_forecast_capacity_series_and_budget_coverage():
+    ch = O.forecast_capacity(snap(), "en")
+    s = {x["name"]: x["data"] for x in ch.option["series"]}
+    assert s["Keyed-in BU headcount"] == [10] * 8 + [None] * 4
+    assert s["Headcount carried from Aug"] == [None] * 7 + [10] * 5
+    assert s["Actual, BU RD + PM"] == [13.0] * 8 + [None] * 4         # THORPE 9+1、TR_KOS 3
+    assert s["Budget plan, BU RD + PM"] == [11.0] * 12                 # 只有 has_plan 的 THORPE
+    assert s["Actual, FU RD"] == [2.0] * 8 + [None] * 4
+    assert ch.note == "Budget covers 1 / 2 projects, BU RD + PM only"
+    assert ch.rows[8] == ("Sep", None, None, 11.0, None)
+
+
+def test_pva_without_plan_draws_actual_only_and_says_so():
+    ps = {p["code"]: p for p in snap()["projects"]}
+    with_plan = O.pva(ps["BR1"], "BU RD", 8, "en", 0)
+    assert with_plan.id == "pva-0-burd" and len(with_plan.option["series"]) == 2 and with_plan.note == ""
+    no_plan = O.pva(ps["TR_KOS"], "BU RD", 8, "en", 5)
+    assert no_plan.id == "pva-5-burd" and len(no_plan.option["series"]) == 1 and no_plan.note == "No budget plan for this group."
+    assert no_plan.option["series"][0]["data"] == [3.0] * 8 + [None] * 4
