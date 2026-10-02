@@ -83,7 +83,7 @@ def milestone_table(rows: list[dict], lang: str, link: Callable[[str], str] | No
 def _risk_reason(w: dict, lang: str, stage: str) -> str:
     if w["rule"] == "passed":
         return t(lang, "v_risk_passed", ms=w["ms"], date=w["date"], days=w["days"], stage=stage) if "date" in w else t(lang, "v_risk_passed_bare")
-    return t(lang, "v_risk_slipped", orig=w["orig"], mp=w["mp"], days=w["days"]) + (t(lang, "v_risk_in_mp") if w["in_mp"] else "")
+    return t(lang, "v_risk_slipped", orig=w["orig"], mp=w["mp"], days=w["days"])
 
 
 def at_risk_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | None = None) -> str:

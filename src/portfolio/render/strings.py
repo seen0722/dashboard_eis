@@ -74,7 +74,7 @@ STRINGS = {
         "v_menu": "Menu", "v_nav_overview": "Overview", "v_nav_decisions": "Decisions", "v_nav_health": "Data health", "v_nav_appendix": "Project appendix",
         "v_total": "Total", "v_kpi_total": "Total projects", "v_kpi_total_sub": "{briefed} in Briefing, {inactive} terminated or suspended",
         "v_kpi_rfq": "RFQ / RFI", "v_kpi_poc": "POC", "v_kpi_exec": "Execution", "v_kpi_mp": "MP + Sustain", "v_kpi_mp_sub": "{mp} MP, {sustain} sustain / EOP",
-        "v_kpi_risk": "At risk", "v_kpi_risk_sub": "Milestone passed, or MP slipped over {days} days",
+        "v_kpi_risk": "At risk", "v_kpi_risk_sub": "Milestone passed, or MP slipped over {days} days before MP",
         "v_c_stage": "Projects by stage", "v_c_customer": "Projects by customer", "v_c_gantt": "Timeline, next {months} months",
         "v_c_heat": "Resource load by function", "v_c_heat_dept": "Resource load by department", "v_c_forecast": "BU RD + PM: actual vs headcount",
         "v_c_milestones": "Milestones, next {weeks} weeks",
@@ -101,7 +101,7 @@ STRINGS = {
         "v_col_mp_current": "MP (current)", "v_col_mp_orig": "Original MP",
         "v_risk_head": "At risk ({n}):", "v_risk_col_project": "Project", "v_risk_col_stage": "Stage", "v_risk_col_why": "Why it counts",
         "v_risk_passed": "{ms} {date} passed {days} days ago, stage still {stage}", "v_risk_passed_bare": "Milestone passed without a stage change",
-        "v_risk_slipped": "MP moved from {orig} to {mp} (+{days} days)", "v_risk_in_mp": ", already in MP", "v_risk_note": "Milestone passed without a stage change, or MP slipped over {days} days. Slips the PM already confirmed are also listed under Data health.",
+        "v_risk_slipped": "MP moved from {orig} to {mp} (+{days} days)", "v_risk_note": "Milestone passed without a stage change, or MP slipped over {days} days and not in MP yet. Every slip, shipped or not, stays under Data health.",
     },
     "zh": {
         "html_lang": "zh-Hant", "doc_title": "BU10 專案組合檢討 {ym}",
@@ -176,7 +176,7 @@ STRINGS = {
         "v_menu": "選單", "v_nav_overview": "總覽", "v_nav_decisions": "本月決策", "v_nav_health": "資料健康度", "v_nav_appendix": "各案附錄",
         "v_total": "合計", "v_kpi_total": "專案總數", "v_kpi_total_sub": "Briefing 內 {briefed} 案，結案或暫停 {inactive} 案",
         "v_kpi_rfq": "RFQ / RFI", "v_kpi_poc": "POC", "v_kpi_exec": "Execution", "v_kpi_mp": "MP + Sustain", "v_kpi_mp_sub": "MP {mp} 案，Sustain / EOP {sustain} 案",
-        "v_kpi_risk": "風險", "v_kpi_risk_sub": "里程碑已過未轉階段，或 MP 延後超過 {days} 天",
+        "v_kpi_risk": "風險", "v_kpi_risk_sub": "里程碑已過未轉階段，或量產前 MP 延後超過 {days} 天",
         "v_c_stage": "各階段專案數", "v_c_customer": "各客戶專案數", "v_c_gantt": "未來 {months} 個月時程",
         "v_c_heat": "各 Function 負載", "v_c_heat_dept": "各部門負載", "v_c_forecast": "BU RD + PM：實際與填報人數",
         "v_c_milestones": "未來 {weeks} 週里程碑",
@@ -203,7 +203,7 @@ STRINGS = {
         "v_col_mp_current": "MP（目前）", "v_col_mp_orig": "原訂 MP",
         "v_risk_head": "風險（{n}）：", "v_risk_col_project": "專案", "v_risk_col_stage": "階段", "v_risk_col_why": "列入原因",
         "v_risk_passed": "{ms} {date} 已過 {days} 天，階段仍是 {stage}", "v_risk_passed_bare": "里程碑已過未轉階段",
-        "v_risk_slipped": "MP 由 {orig} 改為 {mp}（+{days} 天）", "v_risk_in_mp": "，已進入 MP", "v_risk_note": "里程碑已過未轉階段，或 MP 延後超過 {days} 天；PM 已確認的延後也列在資料健康度。",
+        "v_risk_slipped": "MP 由 {orig} 改為 {mp}（+{days} 天）", "v_risk_note": "里程碑已過未轉階段，或 MP 延後超過 {days} 天且尚未量產；所有延後（含已量產）都留在資料健康度。",
     },
 }
 

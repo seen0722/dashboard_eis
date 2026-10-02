@@ -116,12 +116,15 @@ def test_at_risk_lists_each_project_with_the_reason_it_counts():
     assert "MP moved from 2025-10-13 to 2026-07-31 (+291 days)" in row
 
 
-def test_at_risk_marks_a_slip_that_already_reached_mp():
+def test_at_risk_leaves_out_slips_that_already_reached_mp():
+    """2026-10-03 使用者拍板：已量產的案子延後是歷史，沒有可做的 action，且名單只增不減 → 不算 At Risk。
+    延後紀錄仍留在 Data health 的 mp_slipped。"""
     from tests.portfolio.test_page import snap, TH
     from src.portfolio.render.viz.dash import at_risk_html
+    from src.portfolio.render.viz.options import at_risk_codes, kpis
     s = snap()
-    ax = next(p for p in s["projects"] if p["code"] == "BR4")
+    ax = next(p for p in s["projects"] if p["code"] == "BR4")      # AX200, stage_cat MP
     ax["dates"].update({"mp": "2026-09-01", "mp_orig": "2025-12-31"})
-    h = at_risk_html(s, "en", TH)
-    row = h[h.index("AX200"):]
-    assert "MP moved from 2025-12-31 to 2026-09-01 (+244 days), already in MP" in row
+    assert "BR4" not in at_risk_codes(s, TH["mp_slip_days"])
+    assert "AX200" not in at_risk_html(s, "en", TH)
+    assert next(k for k in kpis(s, "en", TH) if k["key"] == "risk")["value"] == 1

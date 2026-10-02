@@ -10,6 +10,7 @@ from ..strings import t
 from . import tokens as T
 from .embed import Chart
 
+SHIPPED = ("MP", "Sustain / EOP")
 STAGE_ORDER = ("RFQ / RFI", "POC", "Execution", "MP", "Sustain / EOP", "Terminated", "Suspended", "Other")
 
 
@@ -18,9 +19,10 @@ def late_codes(snap: dict) -> set[str]:
 
 
 def at_risk_codes(snap: dict, mp_slip_days: int) -> list[str]:
-    """不是新規則：Decisions 的 milestones_passed ∪ 健康度的 mp_slipped（同一個 rules 函式）。"""
+    """不是新規則：Decisions 的 milestones_passed ∪ 健康度的 mp_slipped（同一個 rules 函式），
+    但 mp_slipped 只算尚未量產的：已在 MP / Sustain 的延後是歷史，沒有 action（使用者 2026-10-03 拍板），只留在健康度。"""
     passed = [c for x in snap.get("exceptions", []) if x["title"] == "milestones_passed" for c in x["codes"]]
-    slipped = [p.code for p, _ in mp_slipped([SimpleNamespace(**p) for p in snap["projects"]], mp_slip_days)]
+    slipped = [p.code for p, _ in mp_slipped([SimpleNamespace(**p) for p in snap["projects"]], mp_slip_days) if p.stage_cat not in SHIPPED]
     return list(dict.fromkeys(passed + slipped))
 
 
@@ -40,8 +42,7 @@ def at_risk_rows(snap: dict, mp_slip_days: int) -> list[dict]:
         if c in late:
             why.append({"rule": "passed", **({"ms": passed[c][0].upper(), "date": passed[c][1], "days": passed[c][2]} if c in passed else {})})
         if c in slipped:
-            why.append({"rule": "slipped", "orig": p["dates"].get("mp_orig"), "mp": p["dates"].get("mp"), "days": slipped[c],
-                        "in_mp": p["stage_cat"] in ("MP", "Sustain / EOP")})
+            why.append({"rule": "slipped", "orig": p["dates"].get("mp_orig"), "mp": p["dates"].get("mp"), "days": slipped[c]})
         out.append({"code": c, "name": p["name"], "stage": p["stage"], "why": why})
     return out
 
