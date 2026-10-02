@@ -3,6 +3,7 @@ BG, CARD, INK, INK2, INK3, RULE = "#F3F5F8", "#FFFFFF", "#1F2937", "#5B6475", "#
 SIDE, ACCENT, SIGNAL = "#1E2735", "#2563EB", "#E8590C"
 BAD, WARN, OK, NODATA = "#DC2626", "#F59E0B", "#16A34A", "#E5E7EB"
 PLAN, FU = "#93C5FD", "#0D9488"
+PLAN_MARK = "#7C3AED"    # BU plan 短橫線：與人數線（INK）區分
 HEAT_LOW, HEAT_MID, HEAT_HI = "#BBF7D0", "#FDE68A", "#FCA5A5"
 HEAT_HIGH = 95          # 熱度表紅色門檻（顯示用色階，不是規則；低門檻沿用 thresholds 的 spare_capacity_pct）
 NOT_IN_BRIEFING = "Not in Briefing"

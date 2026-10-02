@@ -260,7 +260,7 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
     mon = MONTHS[lm - 1]
     plan_pts: list = list(plan)
     if wp:
-        plan_pts[-1] = {"value": plan[-1], "label": {"show": True, "position": "right", "formatter": f"{t(lang, 'v_fc_plan_label')} {plan[-1]:.0f}", "color": T.INK}}
+        plan_pts[-1] = {"value": plan[-1], "label": {"show": True, "position": "right", "formatter": f"{t(lang, 'v_fc_plan_label')} {plan[-1]:.0f}", "color": T.PLAN_MARK}}
 
     def bars(values: list[float], short: str, color: str) -> list:
         out = [v for v in values] + [None] * (12 - len(values))
@@ -277,12 +277,14 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
               {"name": t(lang, "v_fc_without", n=len(cl) - len(wp)), "type": "bar", "stack": "actual",
                "data": bars(nob, t(lang, "v_fc_without_short"), T.SIGNAL), "itemStyle": {"color": T.SIGNAL}},
               {"name": t(lang, "v_lg_plan"), "type": "line", "data": plan_pts, "symbol": "rect", "symbolSize": [26, 3], "lineStyle": {"width": 0},
-               "itemStyle": {"color": T.INK}, "z": 4},
+               "itemStyle": {"color": T.PLAN_MARK}, "z": 4},
               {"name": t(lang, "v_lg_cap"), "type": "line", "data": [v if i < lm else None for i, v in enumerate(cap)], "symbol": "none",
                "lineStyle": {"color": T.INK, "width": 2.5}, "itemStyle": {"color": T.INK}},
               {"name": t(lang, "v_lg_cap_carried", mon=mon), "type": "line", "data": carried, "symbol": "none",
                "lineStyle": {"color": T.INK, "width": 2, "type": "dashed"}, "itemStyle": {"color": T.INK}}]
-    option = {"grid": {"left": 8, "right": 96, "top": 24, "bottom": 8, "containLabel": True}, "tooltip": {"trigger": "axis"},
+    # tooltip 圖示與圖上形狀一致（長條／短橫／實線／虛線）；推算人數（第 5 條）在實線（第 4 條）有值的月份不列；1 位小數
+    tip = {"trigger": "axis", "formatter": {"$fn": "axisTip", "args": [["bar", "bar", "mark", "line", "dashed"], {"4": 3}, 1]}}
+    option = {"grid": {"left": 8, "right": 96, "top": 24, "bottom": 8, "containLabel": True}, "tooltip": tip,
               "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
               "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK3}}, "series": series}
     used, ceiling = actual[lm - 1], raw[lm - 1]

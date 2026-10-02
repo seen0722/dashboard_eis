@@ -187,3 +187,14 @@ def test_fu_plan_vs_actual_uses_one_denominator():
     assert ch.note == "FU plan covers 1 / 2 projects; both series use those projects. FU RD actual across all 2 projects in Aug: 2.0 FTE."
     assert ch.rows[7] == ("Aug", 3.0, 2.0, 2.0)
     assert O.fu_plan_actual(snap(), "en").note.startswith("FU plan covers 0 / 2 projects")
+
+
+def test_forecast_tooltip_tells_series_apart():
+    """瀏覽器實測：tooltip 裡 plan／人數／推算人數都是同一顆黑點；8 月 209 出現兩次；數字 141.63 與標籤 142 不一致。"""
+    ch = O.forecast_capacity(snap(), "en")
+    names = [x["name"] for x in ch.option["series"]]
+    tip = ch.option["tooltip"]
+    assert tip["formatter"] == {"$fn": "axisTip", "args": [["bar", "bar", "mark", "line", "dashed"], {"4": 3}, 1]}
+    assert names[4] == "Headcount carried from Aug" and names[3] == "Keyed-in BU headcount"     # 推算線在實線有值的月份不列
+    plan = next(x for x in ch.option["series"] if x["name"] == "Budget plan, BU RD + PM")
+    assert plan["itemStyle"]["color"] != next(x for x in ch.option["series"] if x["name"] == "Keyed-in BU headcount")["itemStyle"]["color"]

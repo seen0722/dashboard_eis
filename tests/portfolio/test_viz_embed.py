@@ -59,3 +59,7 @@ def test_min_width_chart_scrolls_inside_its_card():
     h = chart_html(ch(min_width=720), "en")
     assert '<div class="wide"><div class="chart" id="c-stage" data-chart style="height:280px;min-width:720px"' in h
     assert '<div class="wide"><div class="chart"' not in chart_html(ch(), "en")
+
+
+def test_init_js_supports_factory_functions_for_tooltips():
+    assert "axisTip:function(glyphs,hideWhen,digits)" in INIT_JS and "o.args" in INIT_JS

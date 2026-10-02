@@ -30,8 +30,14 @@ class Chart:
 INIT_JS = """(function(){
 if(typeof echarts==='undefined')return;
 var FN={ganttBar:function(params,api){var s=api.coord([api.value(1),api.value(0)]),f=api.coord([api.value(2),api.value(0)]),h=api.size([0,1])[1]*0.3;
-return{type:'rect',shape:{x:s[0],y:s[1]-h/2,width:Math.max(f[0]-s[0],2),height:h},style:{fill:api.visual('color'),opacity:0.3}};}};
-function revive(o){if(Array.isArray(o))return o.map(revive);if(o&&typeof o==='object'){if(typeof o.$fn==='string')return FN[o.$fn];var r={};for(var k in o)r[k]=revive(o[k]);return r;}return o;}
+return{type:'rect',shape:{x:s[0],y:s[1]-h/2,width:Math.max(f[0]-s[0],2),height:h},style:{fill:api.visual('color'),opacity:0.3}};},
+axisTip:function(glyphs,hideWhen,digits){var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
+var g=function(k,c){if(k==='bar')return'<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+c+'"></span>';if(k==='mark')return'<span style="display:inline-block;width:14px;height:3px;background:'+c+'"></span>';return'<span style="display:inline-block;width:14px;border-top:2px '+(k==='dashed'?'dashed':'solid')+' '+c+'"></span>';};
+return function(ps){if(!ps||!ps.length)return'';var has={};ps.forEach(function(p){if(p.value!=null&&p.value!=='-')has[p.seriesIndex]=1;});
+var h='<div style="margin-bottom:4px;font-weight:600">'+esc(ps[0].axisValueLabel)+'</div>';
+ps.forEach(function(p){var v=p.value,hw=hideWhen[String(p.seriesIndex)];if(v==null||v==='-'||(hw!=null&&has[hw]))return;
+h+='<div style="display:flex;align-items:center;gap:8px"><span style="width:16px;display:inline-flex;justify-content:center">'+g(glyphs[p.seriesIndex],p.color)+'</span>'+'<span style="flex:1">'+esc(p.seriesName)+'</span><b style="margin-left:16px">'+Number(v).toFixed(digits)+'</b></div>';});return h;};}};
+function revive(o){if(Array.isArray(o))return o.map(revive);if(o&&typeof o==='object'){if(typeof o.$fn==='string'){var f=FN[o.$fn];return o.args?f.apply(null,revive(o.args)):f;}var r={};for(var k in o)r[k]=revive(o[k]);return r;}return o;}
 var live=[];
 function init(root){(root||document).querySelectorAll('[data-chart]').forEach(function(el){
 if(el._ec||el.offsetParent===null)return;
