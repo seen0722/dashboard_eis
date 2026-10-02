@@ -9,6 +9,7 @@ HEAT_HIGH = 95          # 熱度表紅色門檻（顯示用色階，不是規則
 NOT_IN_BRIEFING = "Not in Briefing"
 BLANK = "(blank)"
 PALETTE = ("#2563EB", "#16A34A", "#F59E0B", "#0EA5E9", "#7C3AED", "#DB2777", "#0D9488", "#64748B")   # 類別用色，依排名分配
+MS_COLORS = {"evt": "#3B82F6", "dvt": "#16A34A", "pvt": "#F59E0B", "mp": "#DC2626"}   # Timeline 里程碑：照 mock（◇ 藍、◆ 綠、▲ 橘、★ 紅）
 TYPE_COLORS = {"ODM": "#2563EB", "EMS": "#0D9488", "JDM": "#F59E0B"}
 STAGE_COLORS = {"RFQ / RFI": "#F59E0B", "POC": "#0EA5E9", "Execution": "#2563EB", "MP": "#16A34A", "Sustain / EOP": "#64748B",
                 "Terminated": "#9CA3AF", "Suspended": "#7C3AED", "Other": "#A8A29E", NOT_IN_BRIEFING: "#D1D5DB"}

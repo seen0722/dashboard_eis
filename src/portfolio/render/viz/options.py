@@ -136,7 +136,9 @@ def customer_bars(snap: dict, lang: str, top: int = 8) -> Chart:
 
 
 MS = ("evt", "dvt", "pvt", "mp")
-SYMBOL = {"evt": "emptyRect", "dvt": "rect", "pvt": "triangle", "mp": "circle"}
+STAR = "path://M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 6.91-1.01z"
+SYMBOL = {"evt": "emptyDiamond", "dvt": "diamond", "pvt": "triangle", "mp": STAR}   # 照 mock：◇ ◆ ▲ ★
+MS_SIZE = {"evt": 12, "dvt": 12, "pvt": 11, "mp": 14}
 LABEL_GAP_DAYS = 30     # 同一列兩個標記相距不到這麼多天，前一個的標籤改放上方（2/3 寬時會被下一個圓點蓋住）
 
 
@@ -158,24 +160,29 @@ def _gantt_rows(snap: dict, today: str, months: int) -> tuple[dt.date, dt.date, 
 
 def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: set[str], lang: str) -> dict:
     n = len(rows)
-    bars, marks = [], []
+    bars: dict[str, list] = {k: [] for k in MS}
+    marks = []
     for i, p in enumerate(rows):
         y = n - 1 - i
         ds = [p["dates"][k] for k in ("kickoff", *MS) if p["dates"].get(k)]
-        if len(ds) >= 2:
-            bars.append([y, _ms(min(ds)), _ms(max(ds))])
+        seq = sorted((p["dates"][k], k) for k in ("kickoff", *MS) if p["dates"].get(k))
+        for (d0, _), (d1, k1) in zip(seq, seq[1:]):          # 每一段依「下一個里程碑」上色（照 mock）
+            if k1 != "kickoff" and d1 > d0:
+                bars[k1].append([y, _ms(d0), _ms(d1)])
         shown = sorted(p["dates"][k] for k in MS if p["dates"].get(k) and t0 <= dt.date.fromisoformat(p["dates"][k]) < t1)
         for k in MS:
             d = p["dates"].get(k)
             if not d or not t0 <= dt.date.fromisoformat(d) < t1:
                 continue
-            c = T.BAD if p["code"] in late and d < today else T.ACCENT
+            overdue = p["code"] in late and d < today            # 逾期用紅色粗體標籤表示；圖示顏色只代表里程碑種類
+            c = T.MS_COLORS[k]
             close = any(0 < (dt.date.fromisoformat(x) - dt.date.fromisoformat(d)).days <= LABEL_GAP_DAYS for x in shown)   # 下一個標記太近：標籤放上方
-            marks.append({"value": [_ms(d), y], "symbol": SYMBOL[k], "symbolSize": 10, "itemStyle": {"color": c, "borderColor": c},
+            marks.append({"value": [_ms(d), y], "symbol": SYMBOL[k], "symbolSize": MS_SIZE[k], "itemStyle": {"color": c, "borderColor": c},
                           "tooltip": {"formatter": f"{escape(p['name'])}: {k.upper()} {d}"},   # 預設 tooltip 會顯示時區換算後的時間與內部 y 索引
-                          "label": {"show": True, "position": "top" if close else "right", "formatter": f"{k.upper()} {d[5:7]}/{d[8:10]}", "color": c, "fontSize": 11}})
+                          "label": {"show": True, "position": "top" if close else "right", "formatter": f"{k.upper()} {d[5:7]}/{d[8:10]}",
+                                    "color": T.BAD if overdue else T.INK, "fontWeight": 700 if overdue else 400, "fontSize": 11}})
         if not ds:
-            marks.append({"value": [_ms(today), y], "symbol": "circle", "symbolSize": 5, "itemStyle": {"color": T.INK3},   # symbol none 會連標籤一起藏掉
+            marks.append({"value": [_ms(today), y], "symbol": "emptyCircle", "symbolSize": 8, "itemStyle": {"color": T.INK3},   # symbol none 會連標籤一起藏掉
                           "tooltip": {"formatter": f"{escape(p['name'])}: {escape(t(lang, 'no_dates', stage=p['stage']))}"},
                           "label": {"show": True, "position": "right", "formatter": t(lang, "no_dates", stage=p["stage"]), "color": T.INK3, "fontSize": 11}})
     return {"useUTC": True, "grid": {"left": 8, "right": 90, "top": 28, "bottom": 24, "containLabel": True}, "tooltip": {"trigger": "item"},
@@ -183,10 +190,10 @@ def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: 
                       "splitLine": {"show": True, "lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK2}},
             "yAxis": {"type": "category", "data": [p["name"] for p in rows][::-1], "axisTick": {"show": False},
                       "axisLabel": {"color": T.INK, "fontWeight": 600}},
-            "series": [{"type": "custom", "renderItem": {"$fn": "ganttBar"}, "encode": {"x": [1, 2], "y": 0}, "data": bars,
-                        "itemStyle": {"color": T.ACCENT}, "clip": True, "silent": True},
+            "series": [*({"name": f"to {k.upper()}", "type": "custom", "renderItem": {"$fn": "ganttBar"}, "encode": {"x": [1, 2], "y": 0},
+                          "data": bars[k], "itemStyle": {"color": T.MS_COLORS[k]}, "clip": True, "silent": True} for k in MS),
                        {"type": "scatter", "data": marks, "clip": True, "z": 3,
-                        "markLine": {"silent": True, "symbol": "none", "lineStyle": {"color": T.INK, "type": "dashed"},
+                        "markLine": {"silent": True, "symbol": "none", "lineStyle": {"color": T.BAD, "type": "dashed"},
                                      "label": {"formatter": t(lang, "v_today"), "color": T.INK2, "position": "start"}, "data": [{"xAxis": _ms(today)}]}}]}
 
 
@@ -198,7 +205,8 @@ def gantt(snap: dict, lang: str, today: str, months: int) -> Chart:
     table = tuple((p["name"], p["customer"], p["stage"], *(p["dates"].get(k) or "" for k in MS)) for p in rows)
     return Chart("gantt", t(lang, "v_c_gantt", months=months), _gantt_option(rows, t0, t1, today, late, lang),
                  (t(lang, "col_project"), t(lang, "col_customer"), t(lang, "col_stage"), "EVT", "DVT", "PVT", "MP"), table,
-                 height=max(160, 30 * len(rows) + 50), variants=variants, note=t(lang, "v_gantt_note"), min_width=720)
+                 height=max(160, 30 * len(rows) + 50), variants=variants, note=t(lang, "v_gantt_note"), min_width=720,
+                 headline=t(lang, "v_gantt_legend"))
 
 
 def load_heatmap(snap: dict, lang: str, spare_pct: float, by: str = "function") -> Chart:

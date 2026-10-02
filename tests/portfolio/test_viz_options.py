@@ -54,20 +54,28 @@ def test_customer_bars_keep_blank_and_na_separate_and_fold_the_tail():
     assert top3.rows == (("Trimble", 2), ("Axelera", 1), ("Dell", 1), ("Others", 3))
 
 
+def _scatter(ch):
+    return next(x for x in ch.option["series"] if x["type"] == "scatter")
+
+
+def _marks(ch):
+    return _scatter(ch)["data"]
+
+
 def test_gantt_rows_markers_and_customer_variants():
     ch = O.gantt(snap(), "en", TODAY, 6)
     assert ch.option["yAxis"]["data"] == ["TOMY", "AX200", "THORPE", "N1X"]      # 依里程碑先後；第一列在最上面
     assert [r[0] for r in ch.rows] == ["N1X", "THORPE", "AX200", "TOMY"]         # Q11（暫停）、KOS（結案）、不在 Briefing 的都不列
-    marks = ch.option["series"][1]["data"]
+    marks = _marks(ch)
     n1x = next(m for m in marks if m["label"]["formatter"] == "PVT 09/02")
-    assert n1x["itemStyle"]["color"] == "#DC2626"                                 # 已過且階段未前進 → 紅
+    assert n1x["itemStyle"]["color"] == "#F59E0B" and n1x["label"]["color"] == "#DC2626"     # 圖示是 PVT 色；逾期改用紅色標籤
     thorpe = next(m for m in marks if m["label"]["formatter"] == "PVT 09/08")
-    assert thorpe["itemStyle"]["color"] == "#2563EB"                              # 已過但不在 milestones_passed → 不標紅
+    assert thorpe["label"]["color"] == "#1F2937"                                   # 已過但不在 milestones_passed → 不標紅
     assert any(m["label"]["formatter"] == "RFQ, no dates yet" for m in marks)
-    assert ch.option["series"][0]["renderItem"] == {"$fn": "ganttBar"}
+    assert all(x["renderItem"] == {"$fn": "ganttBar"} for x in ch.option["series"] if x["type"] == "custom")
     assert set(ch.variants) == {"Axelera", "Dell", "Trimble"}
     assert ch.variants["Trimble"]["yAxis"]["data"] == ["TOMY", "THORPE"]
-    assert ch.note.startswith("Red marks a milestone")
+    assert ch.note.startswith("Red labels mark a milestone")
 
 
 def test_heatmap_by_function_never_shows_missing_months_as_zero():
@@ -130,9 +138,9 @@ def test_pva_without_plan_draws_actual_only_and_says_so():
 def test_gantt_visual_fixes_from_browser_check():
     """2026-10-02 瀏覽器實測：symbol none 讓「no dates yet」標籤不見；Today 標籤壓到月份；375px 下整張圖擠成一團。"""
     ch = O.gantt(snap(), "en", TODAY, 6)
-    nodate = next(m for m in ch.option["series"][1]["data"] if m["label"]["formatter"] == "RFQ, no dates yet")
+    nodate = next(m for m in _marks(ch) if m["label"]["formatter"] == "RFQ, no dates yet")
     assert nodate["symbol"] != "none" and nodate["symbolSize"] > 0
-    assert ch.option["series"][1]["markLine"]["label"]["position"] == "start"
+    assert _scatter(ch)["markLine"]["label"]["position"] == "start"
     assert ch.min_width == 720 and O.load_heatmap(snap(), "en", 85).min_width == 560
     assert ch.option["grid"]["bottom"] >= 24 and O.load_heatmap(snap(), "en", 85).option["grid"]["right"] >= 16   # Today 標籤、Dec 不被裁掉
 
@@ -150,7 +158,7 @@ def test_gantt_tooltips_show_data_not_axis_internals():
     s = snap(); next(p for p in s["projects"] if p["code"] == "BR6")["name"] = "N1X<b>"
     ch = O.gantt(s, "en", TODAY, 6)
     assert ch.option["useUTC"] is True
-    marks = ch.option["series"][1]["data"]
+    marks = _marks(ch)
     assert all("formatter" in m["tooltip"] for m in marks)
     assert any(m["tooltip"]["formatter"] == "N1X&lt;b&gt;: PVT 2026-09-02" for m in marks)
     assert any(m["tooltip"]["formatter"] == "TOMY: RFQ, no dates yet" for m in marks)
@@ -248,7 +256,26 @@ def test_milestone_rows_window_and_overdue_kept():
 def test_gantt_label_moves_above_when_next_marker_is_close():
     """2/3 寬的 Timeline 實測：PVT 09/08 的標籤被 3 週後的 MP 09/29 圓點蓋住；30 天內有下一個標記時標籤改放上方。"""
     s = snap(); next(p for p in s["projects"] if p["code"] == "BR1")["dates"]["mp"] = "2026-09-29"
-    marks = O.gantt(s, "en", TODAY, 6).option["series"][1]["data"]
-    pvt = next(m for m in marks if m["label"]["formatter"] == "PVT 09/08" and m["itemStyle"]["color"] == "#2563EB" and m["value"][1] == 2)
+    marks = _marks(O.gantt(s, "en", TODAY, 6))
+    pvt = next(m for m in marks if m["label"]["formatter"] == "PVT 09/08" and m["value"][1] == 2)
     mp = next(m for m in marks if m["label"]["formatter"] == "MP 09/29")
     assert pvt["label"]["position"] == "top" and mp["label"]["position"] == "right"
+
+
+
+def test_gantt_uses_the_mock_symbols_colours_and_legend():
+    """2026-10-03 需求方：配色、圖示、legend 照 mock：◇ EVT 藍、◆ DVT 綠、▲ PVT 橘、★ MP 紅；長條依下一個里程碑上色；今日線紅色虛線。"""
+    ch = O.gantt(snap(), "en", TODAY, 6)
+    marks = {m["label"]["formatter"]: m for m in _marks(ch)}
+    assert (marks["PVT 09/08"]["symbol"], marks["PVT 09/08"]["itemStyle"]["color"]) == ("triangle", "#F59E0B")
+    assert marks["MP 10/20"]["symbol"].startswith("path://") and marks["MP 10/20"]["itemStyle"]["color"] == "#DC2626"
+    assert marks["RFQ, no dates yet"]["symbol"] == "emptyCircle"
+    assert ch.headline == "◇ EVT  ◆ DVT  ▲ PVT  ★ MP"
+    bars = {x["name"]: x for x in ch.option["series"] if x["type"] == "custom"}
+    assert set(bars) == {"to EVT", "to DVT", "to PVT", "to MP"}
+    assert bars["to PVT"]["itemStyle"]["color"] == "#F59E0B" and bars["to MP"]["itemStyle"]["color"] == "#DC2626"
+    ms = lambda iso: O._ms(iso)  # noqa: E731
+    assert [2, ms("2024-04-02"), ms("2026-09-08")] in bars["to PVT"]["data"]       # THORPE：kickoff → PVT 用 PVT 色
+    assert [2, ms("2026-09-08"), ms("2026-10-20")] in bars["to MP"]["data"]        # PVT → MP 用 MP 色
+    today = _scatter(ch)["markLine"]["lineStyle"]
+    assert today == {"color": "#DC2626", "type": "dashed"}
