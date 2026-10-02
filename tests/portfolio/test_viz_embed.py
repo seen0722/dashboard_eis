@@ -63,3 +63,9 @@ def test_min_width_chart_scrolls_inside_its_card():
 
 def test_init_js_supports_factory_functions_for_tooltips():
     assert "axisTip:function(glyphs,hideWhen,digits)" in INIT_JS and "o.args" in INIT_JS
+
+
+
+def test_init_js_draws_plan_marks_relative_to_the_band():
+    assert "planMark:function(frac,label,color,last)" in INIT_JS and "api.size([1,0])[0]*frac" in INIT_JS
+    assert "Array.isArray(p.value)?p.value[1]:p.value" in INIT_JS          # tooltip 讀 custom series 的 [x, y]

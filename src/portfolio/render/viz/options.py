@@ -251,10 +251,14 @@ def _label_last(values: list, idx: int, text: str, color: str) -> list:
     return out
 
 
-def _plan_series(name: str, plan: list[float], lang: str, label: bool = True, width: int = 26) -> dict:
-    data = _label_last(plan, 11, f"{t(lang, 'v_fc_plan_label')} {plan[-1]:.0f}", T.PLAN_MARK) if label and any(plan) else list(plan)
-    return {"name": name, "type": "line", "data": data, "symbol": "rect", "symbolSize": [width, 3], "lineStyle": {"width": 0},
-            "itemStyle": {"color": T.PLAN_MARK}, "z": 4}
+PLAN_FRAC = 0.55       # plan 短橫寬度＝月份格寬的比例（固定像素在寬螢幕上會比長條窄很多）
+
+
+def _plan_series(name: str, plan: list[float], lang: str, label: bool = True) -> dict:
+    """plan 以 custom series 畫短橫（INIT_JS 的 planMark）：寬度隨格寬縮放，最後一個月旁標「Plan N」。"""
+    text = f"{t(lang, 'v_fc_plan_label')} {plan[-1]:.0f}" if label and any(plan) else ""
+    return {"name": name, "type": "custom", "renderItem": {"$fn": "planMark", "args": [PLAN_FRAC, text, T.PLAN_MARK, len(plan) - 1]},
+            "encode": {"x": 0, "y": 1}, "data": [[i, v] for i, v in enumerate(plan)], "itemStyle": {"color": T.PLAN_MARK}, "z": 4}
 
 
 def _tip(glyphs: list[str], hide: dict | None = None) -> dict:
@@ -345,7 +349,7 @@ def pva(p: dict, role: str, latest_month: int, lang: str, idx: int) -> Chart:
     series = [{"name": t(lang, "v_lg_pva_actual"), "type": "bar", "data": [a if i < latest_month else None for i, a in enumerate(act)],
                "barWidth": "50%", "itemStyle": {"color": T.FU if role == "FU RD" else T.ACCENT}}]
     if has_plan:
-        series.append(_plan_series(t(lang, "v_lg_pva_plan"), plan, lang, label=False, width=12))
+        series.append(_plan_series(t(lang, "v_lg_pva_plan"), plan, lang, label=False))
     option = {"grid": {"left": 4, "right": 4, "top": 8, "bottom": 4, "containLabel": True}, "tooltip": _tip(["bar", "mark"] if has_plan else ["bar"]),
               "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"fontSize": 10, "color": T.INK3, "interval": 1}},
               "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"fontSize": 10, "color": T.INK3}}, "series": series}

@@ -100,8 +100,8 @@ def test_forecast_capacity_series_and_budget_coverage():
     assert [val(d) for d in withb["data"]] == [10.0] * 8 + [None] * 4               # THORPE：BU RD 9 + PM 1
     assert [val(d) for d in nob["data"]] == [3.0] * 8 + [None] * 4                  # TR_KOS：沒有 budget
     plan = s["Budget plan, BU RD + PM"]
-    assert [val(d) for d in plan["data"]] == [11.0] * 12 and plan["symbol"] == "rect"
-    assert plan["data"][11]["label"]["formatter"] == "Plan 11"                     # 拿掉圖例後，短橫線要自己說明是什麼
+    assert [d[1] for d in plan["data"]] == [11.0] * 12 and plan["renderItem"]["$fn"] == "planMark"
+    assert plan["renderItem"]["args"][1] == "Plan 11"                                # 拿掉圖例後，短橫線要自己說明是什麼
     assert nob["data"][7]["label"]["formatter"] == "No budget 3"                    # 最新月直接標在長條旁，不靠圖例
     assert "legend" not in ch.option
     carried = s["Headcount, assumed same as Aug"]
@@ -185,7 +185,7 @@ def test_fu_plan_vs_actual_uses_one_denominator():
     ch = O.fu_plan_actual(s, "en")
     series = {x["name"]: x["data"] for x in ch.option["series"]}
     val = lambda d: d["value"] if isinstance(d, dict) else d  # noqa: E731
-    assert ch.id == "fu" and [val(d) for d in series["FU RD plan"]] == [3.0] * 12
+    assert ch.id == "fu" and [d[1] for d in series["FU RD plan"]] == [3.0] * 12
     assert [val(d) for d in series["FU RD actual, same projects"]] == [2.0] * 8 + [None] * 4
     assert ch.note == "Plan covers 1 / 2 projects, FU RD only. All 2 projects: 2.0 FTE in Aug."
     assert ch.rows[7] == ("Aug", 3.0, 2.0, 2.0)
@@ -214,11 +214,12 @@ def test_plan_vs_actual_charts_share_one_design_language():
         assert "legend" not in ch.option, ch.id
         assert ch.option["tooltip"]["formatter"]["$fn"] == "axisTip", ch.id
         plans = [x for x in ch.option["series"] if x["itemStyle"]["color"] == T.PLAN_MARK]
-        assert len(plans) == 1 and plans[0]["symbol"] == "rect" and plans[0]["lineStyle"] == {"width": 0}, ch.id
+        # 2026-10-03：短橫寬度＝月份格寬 55%（固定像素在寬螢幕上比長條窄很多）
+        assert len(plans) == 1 and plans[0]["type"] == "custom" and plans[0]["renderItem"]["$fn"] == "planMark" and plans[0]["renderItem"]["args"][0] == 0.55, ch.id
     fs = {x["name"]: x for x in fu.option["series"]}
     assert fs["FU RD actual, same projects"]["data"][7]["label"]["formatter"] == "Actual 2"
-    assert fs["FU RD plan"]["data"][11]["label"]["formatter"] == "Plan 3"
-    assert [val(d) for d in fs["FU RD plan"]["data"]] == [3.0] * 12
+    assert fs["FU RD plan"]["renderItem"]["args"][1] == "Plan 3"
+    assert [d[1] for d in fs["FU RD plan"]["data"]] == [3.0] * 12
     assert fu.headline == "Aug: 2 of 3 planned, 67%"
     assert fu.option["tooltip"]["formatter"]["args"][0] == ["bar", "mark"]
 
