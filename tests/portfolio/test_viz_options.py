@@ -232,23 +232,3 @@ def test_paired_charts_use_one_title_and_headline_pattern():
     assert (bu.title, fu.title) == ("BU RD + PM: actual vs headcount", "FU RD: actual vs plan")
     assert bu.headline.startswith("Aug: 13 of 10 ") and fu.headline.startswith("Aug: 2 of 3 ")
     assert bu.note.endswith("projects, BU RD + PM only") and fu.note.startswith("Plan covers 1 / 2 projects, FU RD only")
-
-
-def test_composition_puts_stage_category_and_type_in_one_chart():
-    """2026-10-03：三個甜甜圈合成一張分段長條；每一列加總都是全部專案。"""
-    s = _with_categories()
-    ch = O.composition(s, "en")
-    assert ch.id == "composition" and ch.option["yAxis"]["data"] == ["Type", "Category", "Stage"]     # Stage 在最上面
-    by_dim: dict = {}
-    for dim, label, n in ch.rows:
-        by_dim.setdefault(dim, []).append((label, n))
-    assert [sum(n for _, n in v) for v in by_dim.values()] == [7, 7, 7]
-    assert by_dim["Stage"][-1] == ("Not in Briefing", 1) and ("ODM", 3) in by_dim["Type"] and ("Tablet", 2) in by_dim["Category"]
-    assert all(x["stack"] == "all" for x in ch.option["series"])
-
-
-def test_composition_hides_labels_that_do_not_fit_their_segment():
-    """瀏覽器實測：POC 1、Suspended 1、Conference Component 5 的文字互相重疊；放不下的段不顯示標籤（tooltip 與資料表仍有）。"""
-    assert O._fits(14, 62, "Not in Briefing 14") and not O._fits(1, 62, "POC 1") and not O._fits(5, 62, "Conference Component 5")
-    ch = O.composition(_with_categories(), "en")
-    assert ch.min_width == 720

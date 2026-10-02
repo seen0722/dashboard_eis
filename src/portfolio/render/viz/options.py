@@ -54,24 +54,22 @@ def stage_donut(snap: dict, lang: str) -> Chart:
     total = len(snap["projects"])
     data = [{"name": f"{label(k)}  {counts[k]}", "value": counts[k], "itemStyle": {"color": T.STAGE_COLORS.get(k, T.INK3)}} for k in order]
     option = {"tooltip": {"trigger": "item", "formatter": "{b} ({d}%)"},
-              "legend": {"orient": "vertical", "right": 0, "top": "middle", "itemWidth": 10, "itemHeight": 10, "textStyle": {"color": T.INK2}},
-              "title": {"text": str(total), "subtext": t(lang, "v_total"), "left": "29%", "top": "36%", "textAlign": "center",
-                        "textStyle": {"fontSize": 26, "fontWeight": 700, "color": T.INK}, "subtextStyle": {"color": T.INK2}},
-              "series": [{"type": "pie", "radius": ["52%", "74%"], "center": ["30%", "50%"], "label": {"show": False}, "data": data}]}
+              "title": {"text": str(total), "subtext": t(lang, "v_total"), "left": "center", "top": "34%",
+                        "textStyle": {"fontSize": 20, "fontWeight": 700, "color": T.INK}, "subtextStyle": {"color": T.INK2}},
+              "series": [{"type": "pie", "radius": ["58%", "82%"], "center": ["50%", "50%"], "label": {"show": False}, "data": data}]}
     rows = tuple((label(k), counts[k], f"{counts[k] / max(total, 1) * 100:.0f}%") for k in order)
-    return Chart("stage", t(lang, "v_c_stage"), option, (t(lang, "col_stage"), t(lang, "v_col_projects"), "%"), rows, height=240)
+    return Chart("stage", t(lang, "v_c_stage"), option, (t(lang, "col_stage"), t(lang, "v_col_projects"), "%"), rows, height=128)
 
 
 def _donut(cid: str, title: str, first_col: str, slices: list[tuple[str, int, str]], total: int, lang: str, note: str = "") -> Chart:
     """slices = [(標籤, 數量, 顏色)]，順序即顯示順序。與 stage_donut 同一個版型。"""
     data = [{"name": f"{k}  {n}", "value": n, "itemStyle": {"color": c}} for k, n, c in slices]
     option = {"tooltip": {"trigger": "item", "formatter": "{b} ({d}%)"},
-              "legend": {"orient": "vertical", "right": 0, "top": "middle", "itemWidth": 10, "itemHeight": 10, "textStyle": {"color": T.INK2}},
-              "title": {"text": str(total), "subtext": t(lang, "v_total"), "left": "29%", "top": "36%", "textAlign": "center",
-                        "textStyle": {"fontSize": 26, "fontWeight": 700, "color": T.INK}, "subtextStyle": {"color": T.INK2}},
-              "series": [{"type": "pie", "radius": ["52%", "74%"], "center": ["30%", "50%"], "label": {"show": False}, "data": data}]}
+              "title": {"text": str(total), "subtext": t(lang, "v_total"), "left": "center", "top": "34%",
+                        "textStyle": {"fontSize": 20, "fontWeight": 700, "color": T.INK}, "subtextStyle": {"color": T.INK2}},
+              "series": [{"type": "pie", "radius": ["58%", "82%"], "center": ["50%", "50%"], "label": {"show": False}, "data": data}]}
     rows = tuple((k, n, f"{n / max(total, 1) * 100:.0f}%") for k, n, _ in slices)
-    return Chart(cid, title, option, (first_col, t(lang, "v_col_projects"), "%"), rows, height=240, note=note)
+    return Chart(cid, title, option, (first_col, t(lang, "v_col_projects"), "%"), rows, height=128, note=note)
 
 
 def _briefing_field_counts(snap: dict, field: str) -> tuple[dict[str, int], int, int]:
@@ -357,45 +355,3 @@ def pva(p: dict, role: str, latest_month: int, lang: str, idx: int) -> Chart:
     return Chart(f"pva-{idx}-{role.lower().replace(' ', '')}", role, option,
                  (t(lang, "v_col_month"), t(lang, "v_lg_pva_actual"), t(lang, "v_lg_pva_plan")), rows, height=150,
                  note="" if has_plan else t(lang, "v_pva_no_plan"))
-
-
-
-def _text_on(color: str) -> str:
-    """分段內文字色：淺色底用深字，其餘白字。"""
-    r, g, b = (int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
-    return T.INK if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.6 else "#FFFFFF"
-
-
-MIX_PX = 700          # 組合構成圖的最小長條寬（Chart.min_width 720 扣掉 y 軸標籤）
-
-
-def _fits(n: int, total: int, text: str, px: int = MIX_PX) -> bool:
-    """分段寬度（以最小寬度估）放得下文字才顯示標籤；11px 字約 6.5px／字元，左右留白 10px。"""
-    return n / max(total, 1) * px >= len(text) * 6.5 + 10
-
-
-def composition(snap: dict, lang: str) -> Chart:
-    """Stage／Category／Type 合成一張分段長條（每列加總＝全部專案）；分段與顏色沿用三個甜甜圈的計算。"""
-    dims = [(t(lang, "v_dim_stage"), stage_donut(snap, lang)), (t(lang, "v_dim_category"), category_donut(snap, lang)),
-            (t(lang, "v_dim_type"), type_donut(snap, lang))]
-    yaxis = [d for d, _ in dims][::-1]
-    series, rows = [], []
-    for dim, ch in dims:
-        y = yaxis.index(dim)
-        for row, item in zip(ch.rows, ch.option["series"][0]["data"]):
-            label, n, color = row[0], row[1], item["itemStyle"]["color"]
-            data = [None] * len(yaxis)
-            data[y] = n
-            series.append({"name": f"{dim}: {label}", "type": "bar", "stack": "all", "barWidth": 28, "data": data,
-                           "itemStyle": {"color": color, "borderColor": "#FFFFFF", "borderWidth": 1},
-                           "label": {"show": _fits(n, len(snap["projects"]), f"{label} {n}"), "position": "inside", "formatter": f"{label} {n}",
-                                     "color": _text_on(color), "fontSize": 11}})
-            rows.append((dim, label, n))
-    total = len(snap["projects"])
-    option = {"grid": {"left": 8, "right": 8, "top": 4, "bottom": 4, "containLabel": True}, "tooltip": {"trigger": "item", "formatter": "{a}: {c}"},
-              "labelLayout": {"hideOverlap": True},
-              "xAxis": {"type": "value", "max": total, "show": False},
-              "yAxis": {"type": "category", "data": yaxis, "axisTick": {"show": False}, "axisLine": {"show": False},
-                        "axisLabel": {"color": T.INK2, "fontWeight": 600}}, "series": series}
-    return Chart("composition", t(lang, "v_c_composition"), option, (t(lang, "v_col_dim"), t(lang, "col_stage") + " / " + t(lang, "v_col_category") + " / " + t(lang, "v_col_type"), t(lang, "v_col_projects")),
-                 tuple(rows), height=170, note=dims[1][1].note, headline=t(lang, "v_total") + f" {total}", min_width=720)

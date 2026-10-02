@@ -66,3 +66,28 @@ def test_status_cards_lead_with_at_risk_and_decisions():
     assert 'class="status-card risk"' in risk and '<b class="s-num">1</b>' in risk and '<a class="chip" href="/p/BR1">THORPE</a>' in risk
     dec = h[h.index('class="status-card dec"'):]
     assert '<b class="s-num">5</b>' in dec and "1 milestones passed without a stage change" in dec and 'href="#decisions"' in dec
+
+
+def test_donut_card_has_an_html_legend_with_counts_and_shares():
+    """2026-10-03：回到 mock 的三卡一列；圖例是 HTML 表格（色塊、名稱、數量、百分比），甜甜圈本身不帶圖例。"""
+    from tests.portfolio.test_page import snap
+    from src.portfolio.render.viz.dash import donut_card
+    from src.portfolio.render.viz.options import stage_donut
+    ch = stage_donut(snap(), "en")
+    assert "legend" not in ch.option
+    h = donut_card(ch, "en", sub="Briefing Stage column")
+    assert '<span class="card-sub">Briefing Stage column</span>' in h and 'id="c-stage"' in h
+    assert '<table class="legend-t">' in h
+    assert '<td title="Execution"><i style="background:#2563EB"></i>Execution</td><td class="num"><b>1</b> <span class="dim">(17%)</span></td>' in h
+    # 實機 1440（有側欄）每卡約 370px：名稱曾換行、色塊落單；改為不換行＋省略號（title 留全名），甜甜圈 128px
+    from src.portfolio.render.css import CSS
+    assert "table.legend-t{table-layout:fixed" in CSS and "text-overflow:ellipsis" in CSS and ch.height == 128
+
+
+def test_bar_list_card_is_plain_html():
+    from tests.portfolio.test_page import snap
+    from src.portfolio.render.viz.dash import bar_list_card
+    from src.portfolio.render.viz.options import customer_bars
+    h = bar_list_card(customer_bars(snap(), "en"), "en", sub="Briefing Customer column")
+    assert "data-chart" not in h and '<table class="bars-t">' in h
+    assert '<td>Trimble</td><td class="bar"><span style="width:100%"></span></td><td class="num"><b>2</b></td>' in h

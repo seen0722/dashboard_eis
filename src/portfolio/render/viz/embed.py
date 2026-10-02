@@ -100,6 +100,16 @@ def _cell(v) -> str:
     return e(str(v))
 
 
+def chart_div(ch: Chart, lang: str) -> str:
+    """只有圖本身（div＋JSON＋noscript），給自帶 HTML 圖例的卡片用。"""
+    style = f"height:{ch.height}px" + (f";min-width:{ch.min_width}px" if ch.min_width else "")
+    div = f'<div class="chart" id="c-{ch.id}" data-chart style="{style}" role="img" aria-label="{e(ch.title)}"></div>'
+    if ch.min_width:
+        div = f'<div class="wide">{div}</div>'
+    return (f'{div}<script type="application/json" id="c-{ch.id}-data">{to_json({"option": ch.option, "variants": ch.variants})}</script>'
+            f'<noscript><p class="note">{e(t(lang, "v_need_js"))}</p></noscript>')
+
+
 def chart_html(ch: Chart, lang: str) -> str:
     pick = ""
     if ch.variants:

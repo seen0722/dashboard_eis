@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from html import escape as e
 from ..strings import t
-from .embed import Chart, chart_html
+from .embed import Chart, chart_div, chart_html
 from .options import at_risk_codes
 
 DUE_DAYS = 14
@@ -108,3 +108,21 @@ def status_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | No
     dec = (f'<a class="status-card dec" href="{e(decisions_href)}"><div class="s-head"><span class="s-label">{e(t(lang, "s_decisions"))}</span>'
            f'<b class="s-num">{len(titles)}</b></div><ol class="s-list">{items}</ol></a>')
     return f'<div class="status">{risk}{dec}</div>'
+
+
+
+def donut_card(ch: Chart, lang: str, sub: str = "") -> str:
+    """小甜甜圈＋HTML 圖例表格（色塊、名稱、數量、百分比）。表格就是這張圖的資料表，沒有 JS 也讀得到。"""
+    colors = [d["itemStyle"]["color"] for d in ch.option["series"][0]["data"]]
+    rows = "".join(f'<tr><td title="{e(str(r[0]))}"><i style="background:{e(c)}"></i>{e(str(r[0]))}</td><td class="num"><b>{r[1]}</b> <span class="dim">({e(str(r[2]))})</span></td></tr>'
+                   for r, c in zip(ch.rows, colors))
+    note = f'<p class="note">{e(ch.note)}</p>' if ch.note else ""
+    return card(ch.title, f'<div class="dl">{chart_div(ch, lang)}<table class="legend-t">{rows}</table></div>{note}', sub)
+
+
+def bar_list_card(ch: Chart, lang: str, sub: str = "") -> str:
+    """純 HTML 長條清單（名稱｜長條｜數字），與 mock 同一列樣式；沒有 JS 也完整。"""
+    mx = max((r[1] for r in ch.rows), default=0) or 1
+    rows = "".join(f'<tr><td>{e(str(r[0]))}</td><td class="bar"><span style="width:{r[1] / mx * 100:.0f}%"></span></td><td class="num"><b>{r[1]}</b></td></tr>'
+                   for r in ch.rows)
+    return card(ch.title, f'<table class="bars-t">{rows}</table>', sub)

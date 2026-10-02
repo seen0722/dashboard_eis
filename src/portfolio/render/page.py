@@ -5,9 +5,9 @@ from html import escape as e
 from ..entities import INACTIVE, MONTHS
 from .css import CSS
 from .strings import t
-from .viz.dash import at_risk_html, card, kpi_cards, milestone_table, safe_chart_card, side_nav, status_html
+from .viz.dash import at_risk_html, bar_list_card, card, donut_card, kpi_cards, milestone_table, safe_chart_card, side_nav, status_html
 from .viz.embed import chart_html, scripts
-from .viz.options import category_donut, composition, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, load_heatmap, pva, stage_donut, type_donut
+from .viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, load_heatmap, pva, stage_donut
 
 STAGE_KEYS = [("RFQ / RFI", "stage_rfq"), ("POC", "stage_poc"), ("Execution", "stage_exec"), ("MP", "stage_mp"), ("Sustain / EOP", "stage_sustain"), ("Terminated", "stage_terminated"), ("Suspended", "stage_suspended")]
 
@@ -143,9 +143,10 @@ def _overview(snap: dict, lang: str, today: str, th: dict, late: set[str]) -> st
     return (status_html(snap, lang, th, decisions_href="#decisions") + strip
             + f'<div class="grid-2">{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}'
             + f'{safe_chart_card(t(lang, "v_c_fu"), lambda: fu_plan_actual(snap, lang), lang)}</div>'
-            + safe_chart_card(t(lang, "v_c_composition"), lambda: composition(snap, lang), lang)
-            + f'<div class="grid-2">{safe_chart_card(t(lang, "v_c_customer"), lambda: customer_bars(snap, lang), lang)}'
-            + f'{card(t(lang, "v_c_milestones", weeks=weeks), ms)}</div>'
+            + f'<div class="grid-3">{donut_card(stage_donut(snap, lang), lang, t(lang, "v_src_stage"))}'
+            + f'{bar_list_card(customer_bars(snap, lang), lang, t(lang, "v_src_customer"))}'
+            + f'{donut_card(category_donut(snap, lang), lang, t(lang, "v_src_category"))}</div>'
+            + card(t(lang, "v_c_milestones", weeks=weeks), ms)
             + safe_chart_card(t(lang, "v_c_gantt", months=months), lambda: gantt(snap, lang, today, months), lang)
             + safe_chart_card(t(lang, "v_c_heat"), lambda: load_heatmap(snap, lang, th["spare_capacity_pct"]), lang))
 

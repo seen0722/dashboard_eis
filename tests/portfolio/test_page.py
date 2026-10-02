@@ -147,15 +147,16 @@ def test_report_is_v2_layout_with_inline_echarts():
     assert '<nav class="side" aria-label="BU10 Portfolio Review">' in html and 'href="#decisions"' in html
     assert html.index('id="overview"') < html.index('id="decisions"') < html.index('id="health"') < html.index('id="appendix"')
     assert "<script src=" not in html and "Apache Software Foundation" in html     # 內嵌，零外部腳本
-    for cid in ("composition", "customer", "gantt", "heat-function", "forecast", "fu", "pva-0-burd"):
+    for cid in ("stage", "category", "gantt", "heat-function", "forecast", "fu", "pva-0-burd"):
         assert f'id="c-{cid}"' in html, cid
 
 
 def test_every_chart_has_a_data_table():
     html = render_page(snap(), "en", "2026-09-12", TH)
-    assert html.count('class="chart"') == html.count('<details class="data">') > 5
-    mix_table = html[html.index('id="c-composition-data"'):].split('<details class="data">', 1)[1].split("</details>", 1)[0]
-    assert "<td>Stage</td><td>Execution</td><td>1</td>" in mix_table and "<td>Stage</td><td>Not in Briefing</td><td>1</td>" in mix_table
+    # 每張圖都有同一份數字的表：一般圖是 <details> 資料表，甜甜圈是旁邊的 HTML 圖例表
+    assert html.count('class="chart"') == html.count('<details class="data">') + html.count('<table class="legend-t">') > 5
+    legend = html[html.index('id="c-stage-data"'):].split('<table class="legend-t">', 1)[1].split("</table>", 1)[0]
+    assert "Execution</td><td class=\"num\"><b>1</b>" in legend and "Not in Briefing</td><td class=\"num\"><b>1</b>" in legend
 
 
 def test_appendix_picker_initialises_charts_when_shown():
@@ -176,7 +177,7 @@ def test_report_survives_snapshot_without_capacity():
     sn = snap()
     del sn["capacity"]
     html = render_page(sn, "en", "2026-09-12", TH)
-    assert "Not in this snapshot." in html and 'id="c-composition"' in html
+    assert "Not in this snapshot." in html and 'id="c-stage"' in html
 
 
 def test_appendix_task_tables_scroll_instead_of_widening_the_page():
@@ -188,9 +189,9 @@ def test_appendix_task_tables_scroll_instead_of_widening_the_page():
 def test_milestones_get_a_full_width_card():
     """瀏覽器實測：里程碑表放在三欄裡，Status 標籤被截斷；負載與預估兩欄，里程碑獨占一列。"""
     html = render_page(snap(), "en", "2026-09-12", TH)
-    assert "grid-3" not in html.split("<style>")[1].split("</style>")[1]
     ov = html[html.index('id="overview"'):html.index('id="decisions"')]
-    assert ov.count('<div class="grid-2">') == 2          # BU/FU 人力、customer/milestones（2026-10-03 第一屏重排）
+    assert ov.count('<div class="grid-2">') == 1 and ov.count('<div class="grid-3">') == 1     # BU/FU 人力；stage/customer/category
+    assert ov.index("<h3>Milestones") > ov.index('id="c-category"')                            # 里程碑表在三卡列之後，獨占一列
 
 
 def test_decisions_section_lists_the_at_risk_projects():
@@ -200,10 +201,9 @@ def test_decisions_section_lists_the_at_risk_projects():
     assert "At risk (1):" in dec and "THORPE" in dec.split("At risk (1):")[1][:200]
 
 
-def test_report_has_category_and_type_charts():
-    html = render_page(snap(), "en", "2026-09-12", TH)                    # 2026-10-03 起併入組合構成圖
-    mix = html[html.index('id="c-composition-data"'):html.index("</details>", html.index('id="c-composition-data"'))]
-    assert "<td>Category</td>" in mix and "<td>Type</td>" in mix
+def test_report_has_category_chart_and_no_type_chart():
+    html = render_page(snap(), "en", "2026-09-12", TH)                    # 2026-10-03 回到 mock 的三卡一列：Stage｜Customer｜Category
+    assert 'id="c-category"' in html and 'id="c-type"' not in html
 
 
 def test_report_has_fu_plan_chart():
@@ -215,6 +215,15 @@ def test_report_has_fu_plan_chart():
 def test_overview_leads_with_status_then_strip_then_manpower():
     html = render_page(snap(), "en", "2026-09-12", TH)
     ov = html[html.index('id="overview"'):html.index('id="decisions"')]
-    order = [ov.index(x) for x in ('<div class="status">', '<div class="kpis strip">', 'id="c-forecast"', 'id="c-composition"', 'id="c-gantt"')]
+    order = [ov.index(x) for x in ('<div class="status">', '<div class="kpis strip">', 'id="c-forecast"', 'id="c-stage"', 'id="c-gantt"')]
     assert order == sorted(order)
-    assert 'id="c-stage"' not in ov and 'id="c-type"' not in ov and "At risk" not in ov[ov.index('<div class="kpis strip">'):ov.index('id="c-forecast"')]
+    assert 'id="c-composition"' not in ov and 'id="c-type"' not in ov and "At risk" not in ov[ov.index('<div class="kpis strip">'):ov.index('id="c-forecast"')]
+
+
+
+def test_overview_has_stage_customer_category_in_one_row():
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    ov = html[html.index('id="overview"'):html.index('id="decisions"')]
+    row = ov[ov.index('<div class="grid-3">'):]
+    assert row.index('id="c-stage"') < row.index('<table class="bars-t">') < row.index('id="c-category"')
+    assert 'id="c-composition"' not in ov
