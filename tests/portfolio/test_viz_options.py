@@ -279,3 +279,10 @@ def test_gantt_uses_the_mock_symbols_colours_and_legend():
     assert [2, ms("2026-09-08"), ms("2026-10-20")] in bars["to MP"]["data"]        # PVT → MP 用 MP 色
     today = _scatter(ch)["markLine"]["lineStyle"]
     assert today == {"color": "#DC2626", "type": "dashed"}
+
+
+def test_gantt_table_names_current_mp_and_shows_original_mp():
+    """2026-10-03 需求方：資料表的 MP 欄名說清楚是目前預計（MP Date），加一欄 Original MP Date；拿掉 Customer。"""
+    ch = O.gantt(snap(), "en", TODAY, 6)
+    assert ch.headers == ("Project", "Stage", "EVT", "DVT", "PVT", "MP (current)", "Original MP")
+    assert ch.rows[1] == ("THORPE", "PVT", "", "", "2026-09-08", "2026-10-20", "2026-06-01")

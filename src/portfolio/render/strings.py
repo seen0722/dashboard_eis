@@ -98,6 +98,7 @@ STRINGS = {
         "v_c_composition": "Portfolio mix", "v_dim_stage": "Stage", "v_dim_category": "Category", "v_dim_type": "Type", "v_col_dim": "Dimension",
         "v_src_stage": "Briefing Stage column", "v_src_customer": "Briefing Customer column", "v_src_category": "Briefing Category column",
         "v_ms_sub": "Past 7 days to next {weeks} weeks; overdue stages always shown", "v_ms_note": "Active projects only (in briefing, not terminated or suspended).",
+        "v_col_mp_current": "MP (current)", "v_col_mp_orig": "Original MP",
         "v_risk_head": "At risk ({n}):", "v_risk_note": "Milestone passed without a stage change, or MP slipped over {days} days. Slips the PM already confirmed are also listed under Data health.",
     },
     "zh": {
@@ -197,6 +198,7 @@ STRINGS = {
         "v_c_composition": "專案組合構成", "v_dim_stage": "階段", "v_dim_category": "類別", "v_dim_type": "類型", "v_col_dim": "維度",
         "v_src_stage": "Briefing Stage 欄", "v_src_customer": "Briefing Customer 欄", "v_src_category": "Briefing Category 欄",
         "v_ms_sub": "過去 7 天至未來 {weeks} 週；階段未推進的過期項目一律列出", "v_ms_note": "只列進行中的專案（在 Briefing 內、非結案或暫停）。",
+        "v_col_mp_current": "MP（目前）", "v_col_mp_orig": "原訂 MP",
         "v_risk_head": "風險（{n}）：", "v_risk_note": "里程碑已過未轉階段，或 MP 延後超過 {days} 天；PM 已確認的延後也列在資料健康度。",
     },
 }

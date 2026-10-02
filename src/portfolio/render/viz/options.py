@@ -202,9 +202,10 @@ def gantt(snap: dict, lang: str, today: str, months: int) -> Chart:
     late = late_codes(snap)
     customers = sorted({p["customer"] for p in rows if p["customer"]}, key=str.casefold)
     variants = {c: _gantt_option([p for p in rows if p["customer"] == c], t0, t1, today, late, lang) for c in customers}
-    table = tuple((p["name"], p["customer"], p["stage"], *(p["dates"].get(k) or "" for k in MS)) for p in rows)
+    # MP 欄是 Briefing 的「MP Date」（目前預計），旁邊附「Original MP Date」；客戶已在篩選器，不另列（需求方 2026-10-03）
+    table = tuple((p["name"], p["stage"], *(p["dates"].get(k) or "" for k in MS), p["dates"].get("mp_orig") or "") for p in rows)
     return Chart("gantt", t(lang, "v_c_gantt", months=months), _gantt_option(rows, t0, t1, today, late, lang),
-                 (t(lang, "col_project"), t(lang, "col_customer"), t(lang, "col_stage"), "EVT", "DVT", "PVT", "MP"), table,
+                 (t(lang, "col_project"), t(lang, "col_stage"), "EVT", "DVT", "PVT", t(lang, "v_col_mp_current"), t(lang, "v_col_mp_orig")), table,
                  height=max(160, 30 * len(rows) + 50), variants=variants, note=t(lang, "v_gantt_note"), min_width=720,
                  legend=tuple((g, k.upper(), T.MS_COLORS[k]) for g, k in zip(("◇", "◆", "▲", "★"), MS)))
 
