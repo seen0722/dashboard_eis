@@ -232,3 +232,23 @@ def test_paired_charts_use_one_title_and_headline_pattern():
     assert (bu.title, fu.title) == ("BU RD + PM: actual vs headcount", "FU RD: actual vs plan")
     assert bu.headline.startswith("Aug: 13 of 10 ") and fu.headline.startswith("Aug: 2 of 3 ")
     assert bu.note.endswith("projects, BU RD + PM only") and fu.note.startswith("Plan covers 1 / 2 projects, FU RD only")
+
+
+def test_milestone_rows_window_and_overdue_kept():
+    """過去 7 天到未來 weeks 週；階段沒推進的過期列（milestones_passed）在 ±weeks 內一律保留。"""
+    rows = O.milestone_rows(snap(), TODAY, 8)
+    got = [(r["name"], r["milestone"], r["days_left"], r["late"]) for r in rows]
+    assert ("N1X", "pvt", -10, True) in got                       # -10 < -7，但 N1X 在 milestones_passed：保留
+    assert ("THORPE", "pvt", -4, False) in got and ("AX200", "pvt", -4, False) in got
+    assert all(not (d < -7 and not late) for _, _, d, late in got)
+    assert [r["date"] for r in rows] == sorted(r["date"] for r in rows)
+    assert all(r["name"] not in ("Q11", "KOS") for r in rows)       # 暫停／結案不列
+
+
+def test_gantt_label_moves_above_when_next_marker_is_close():
+    """2/3 寬的 Timeline 實測：PVT 09/08 的標籤被 3 週後的 MP 09/29 圓點蓋住；30 天內有下一個標記時標籤改放上方。"""
+    s = snap(); next(p for p in s["projects"] if p["code"] == "BR1")["dates"]["mp"] = "2026-09-29"
+    marks = O.gantt(s, "en", TODAY, 6).option["series"][1]["data"]
+    pvt = next(m for m in marks if m["label"]["formatter"] == "PVT 09/08" and m["itemStyle"]["color"] == "#2563EB" and m["value"][1] == 2)
+    mp = next(m for m in marks if m["label"]["formatter"] == "MP 09/29")
+    assert pvt["label"]["position"] == "top" and mp["label"]["position"] == "right"

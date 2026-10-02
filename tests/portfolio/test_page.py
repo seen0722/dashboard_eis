@@ -210,15 +210,13 @@ def test_overview_has_stage_customer_category_in_one_row():
     assert 'id="c-composition"' not in ov
 
 
-def test_overview_follows_the_mock_with_milestones_bu_fu_in_one_row():
-    """2026-10-03 需求方選 C 並調整：6 張 KPI → Stage｜Customer｜Category → Timeline → Milestones｜BU｜FU；不放負載熱度表。"""
+def test_overview_timeline_with_milestones_then_bu_fu():
+    """2026-10-03 需求方定版：6 張 KPI → Stage｜Customer｜Category → Timeline(2/3)｜Milestones(1/3) → BU｜FU；不放負載熱度表。"""
     html = render_page(snap(), "en", "2026-09-12", TH)
     ov = html[html.index('id="overview"'):html.index('id="decisions"')]
-    order = [ov.index(x) for x in ('<div class="kpis">', 'id="c-stage"', 'id="c-gantt"', "<h3>Milestones", 'id="c-forecast"', 'id="c-fu"')]
+    order = [ov.index(x) for x in ('<div class="kpis">', 'id="c-stage"', '<div class="tl-row eq">', 'id="c-gantt"', "<h3>Milestones", '<div class="grid-2 eq">', 'id="c-forecast"', 'id="c-fu"')]
     assert order == sorted(order)
-    last = ov[ov.rindex('<div class="grid-3">'):]
-    assert last.index("<h3>Milestones") < last.index('id="c-forecast"') < last.index('id="c-fu"')
     assert 'class="status"' not in ov and 'id="c-heat-function"' not in ov
     assert '<a class="kpi bad" href="#decisions"><span class="k-label">At risk</span><b class="k-value">1</b>' in ov
-    ms = last[last.index("<h3>Milestones"):last.index("</table>")]
-    assert "<th>Status</th>" in ms and "Days left" not in ms and "<th>Customer</th>" not in ms        # 三分之一寬：精簡欄位
+    ms = ov[ov.index("<h3>Milestones"):ov.index('<div class="grid-2 eq">')]
+    assert "Past 7 days to next 8 weeks" in ms and "<form" not in ms and "<th>Status</th>" in ms and "Days left" not in ms

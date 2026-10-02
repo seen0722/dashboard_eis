@@ -60,7 +60,7 @@ def milestone_table(rows: list[dict], lang: str, link: Callable[[str], str] | No
     """compact：三分之一寬的卡片只放 Date／Project／Milestone／Status（Customer 與 Days left 放不下）。"""
     body = []
     for r in rows:
-        name = f'<a href="{e(link(r["code"]))}">{e(r["name"])}</a>' if link else f'<b>{e(r["name"])}</b>'
+        name = f'<a class="plain" href="{e(link(r["code"]))}">{e(r["name"])}</a>' if link else f'<b>{e(r["name"])}</b>'
         status = pill(milestone_status(r["days_left"]), lang, r.get("late", False))
         if compact:
             body.append(f'<tr><td>{e(r["date"][5:].replace("-", "/"))}</td><td>{name}</td><td>{e(r["milestone"].upper())}</td><td>{status}</td></tr>')
@@ -134,3 +134,10 @@ def bar_list_card(ch: Chart, lang: str, sub: str = "") -> str:
     rows = "".join(f'<tr><td>{e(str(r[0]))}</td><td class="bar"><span style="width:{r[1] / mx * 100:.0f}%"></span></td><td class="num"><b>{r[1]}</b></td></tr>'
                    for r in ch.rows)
     return card(ch.title, f'<table class="bars-t">{rows}</table>', sub)
+
+
+
+def milestone_card(rows: list[dict], lang: str, weeks: int, link: Callable[[str], str] | None = None) -> str:
+    """Timeline 旁的精簡里程碑卡：範圍寫在標題下，不放表單；表格只有 Date／Project／Milestone／Status。"""
+    table = milestone_table(rows, lang, link=link, compact=True) if rows else f'<p class="note">{e(t(lang, "none"))}</p>'
+    return card(t(lang, "v_c_milestones", weeks=weeks), table + f'<p class="note">{e(t(lang, "v_ms_note"))}</p>', t(lang, "v_ms_sub", weeks=weeks))

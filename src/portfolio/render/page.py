@@ -5,9 +5,9 @@ from html import escape as e
 from ..entities import INACTIVE, MONTHS
 from .css import CSS
 from .strings import t
-from .viz.dash import at_risk_html, bar_list_card, card, donut_card, kpi_cards, milestone_table, safe_chart_card, side_nav
+from .viz.dash import at_risk_html, bar_list_card, card, donut_card, kpi_cards, milestone_card, safe_chart_card, side_nav
 from .viz.embed import chart_html, scripts
-from .viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, pva, stage_donut
+from .viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, milestone_rows, pva, stage_donut
 
 STAGE_KEYS = [("RFQ / RFI", "stage_rfq"), ("POC", "stage_poc"), ("Execution", "stage_exec"), ("MP", "stage_mp"), ("Sustain / EOP", "stage_sustain"), ("Terminated", "stage_terminated"), ("Suspended", "stage_suspended")]
 
@@ -84,20 +84,6 @@ def _stage_strip(snap: dict, lang: str, latest_month: int) -> str:
     return f'<div class="stages">{"".join(cells)}</div>'
 
 
-def _upcoming_rows(snap: dict, today: str, weeks: int, late: set[str]) -> list[dict]:
-    """與舊版同一個視窗：過去 7 天到未來 weeks 週；只看 Briefing 內、非結案／暫停的專案。"""
-    rows = []
-    for p in snap["projects"]:
-        if not p["in_briefing"] or p["stage_cat"] in INACTIVE:
-            continue
-        for k in ("evt", "dvt", "pvt", "mp"):
-            d = p["dates"][k]
-            if d and -7 <= _days(d, today) <= weeks * 7:
-                rows.append({"date": d, "name": p["name"], "code": p["code"], "customer": p["customer"], "milestone": k,
-                             "days_left": _days(d, today), "late": p["code"] in late})
-    return sorted(rows, key=lambda r: (r["date"], r["name"]))
-
-
 def _health(snap: dict, lang: str) -> str:
     rows = "".join(f'<tr><td><span class="dot {h["level"][0]}"></span>{e(t(lang, "lv_" + h["level"]))}</td><td>{e(t(lang, "hc_" + h["check"]))}</td>'
                    f'<td class="num {"sig" if h["level"] == "decide" and h["count"] else ""}">{h["count"]}</td>'
@@ -136,17 +122,15 @@ def _appendix_one(p: dict, lang: str, today: str, latest_month: int, i: int) -> 
 
 
 def _overview(snap: dict, lang: str, today: str, th: dict, late: set[str]) -> str:
-    """2026-10-03 需求方選定：6 張 KPI → Stage｜Customer｜Category → Timeline → Milestones｜BU｜FU。"""
+    """2026-10-03 需求方定版：6 張 KPI → Stage｜Customer｜Category → Timeline(2/3)｜Milestones(1/3) → BU｜FU。"""
     weeks, months = th["upcoming_weeks"], th["timeline_months"]
-    rows = _upcoming_rows(snap, today, weeks, late)
-    ms = milestone_table(rows, lang, compact=True) if rows else f'<p class="note">{e(t(lang, "none"))}</p>'
     return (kpi_cards(kpis(snap, lang, th), {"risk": "#decisions"})
             + f'<div class="grid-3">{donut_card(stage_donut(snap, lang), lang, t(lang, "v_src_stage"))}'
             + f'{bar_list_card(customer_bars(snap, lang), lang, t(lang, "v_src_customer"))}'
             + f'{donut_card(category_donut(snap, lang), lang, t(lang, "v_src_category"))}</div>'
-            + safe_chart_card(t(lang, "v_c_gantt", months=months), lambda: gantt(snap, lang, today, months), lang)
-            + f'<div class="grid-3">{card(t(lang, "v_c_milestones", weeks=weeks), ms)}'
-            + f'{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}'
+            + f'<div class="tl-row eq">{safe_chart_card(t(lang, "v_c_gantt", months=months), lambda: gantt(snap, lang, today, months), lang)}'
+            + f'{milestone_card(milestone_rows(snap, today, weeks), lang, weeks)}</div>'
+            + f'<div class="grid-2 eq">{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}'
             + f'{safe_chart_card(t(lang, "v_c_fu"), lambda: fu_plan_actual(snap, lang), lang)}</div>')
 
 

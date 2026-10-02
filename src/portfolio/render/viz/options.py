@@ -137,6 +137,7 @@ def customer_bars(snap: dict, lang: str, top: int = 8) -> Chart:
 
 MS = ("evt", "dvt", "pvt", "mp")
 SYMBOL = {"evt": "emptyRect", "dvt": "rect", "pvt": "triangle", "mp": "circle"}
+LABEL_GAP_DAYS = 30     # 同一列兩個標記相距不到這麼多天，前一個的標籤改放上方（2/3 寬時會被下一個圓點蓋住）
 
 
 def _ms(iso: str) -> int:
@@ -163,14 +164,16 @@ def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: 
         ds = [p["dates"][k] for k in ("kickoff", *MS) if p["dates"].get(k)]
         if len(ds) >= 2:
             bars.append([y, _ms(min(ds)), _ms(max(ds))])
+        shown = sorted(p["dates"][k] for k in MS if p["dates"].get(k) and t0 <= dt.date.fromisoformat(p["dates"][k]) < t1)
         for k in MS:
             d = p["dates"].get(k)
             if not d or not t0 <= dt.date.fromisoformat(d) < t1:
                 continue
             c = T.BAD if p["code"] in late and d < today else T.ACCENT
+            close = any(0 < (dt.date.fromisoformat(x) - dt.date.fromisoformat(d)).days <= LABEL_GAP_DAYS for x in shown)   # 下一個標記太近：標籤放上方
             marks.append({"value": [_ms(d), y], "symbol": SYMBOL[k], "symbolSize": 10, "itemStyle": {"color": c, "borderColor": c},
                           "tooltip": {"formatter": f"{escape(p['name'])}: {k.upper()} {d}"},   # 預設 tooltip 會顯示時區換算後的時間與內部 y 索引
-                          "label": {"show": True, "position": "right", "formatter": f"{k.upper()} {d[5:7]}/{d[8:10]}", "color": c, "fontSize": 11}})
+                          "label": {"show": True, "position": "top" if close else "right", "formatter": f"{k.upper()} {d[5:7]}/{d[8:10]}", "color": c, "fontSize": 11}})
         if not ds:
             marks.append({"value": [_ms(today), y], "symbol": "circle", "symbolSize": 5, "itemStyle": {"color": T.INK3},   # symbol none 會連標籤一起藏掉
                           "tooltip": {"formatter": f"{escape(p['name'])}: {escape(t(lang, 'no_dates', stage=p['stage']))}"},
@@ -355,3 +358,25 @@ def pva(p: dict, role: str, latest_month: int, lang: str, idx: int) -> Chart:
     return Chart(f"pva-{idx}-{role.lower().replace(' ', '')}", role, option,
                  (t(lang, "v_col_month"), t(lang, "v_lg_pva_actual"), t(lang, "v_lg_pva_plan")), rows, height=150,
                  note="" if has_plan else t(lang, "v_pva_no_plan"))
+
+
+
+def milestone_rows(snap: dict, today: str, weeks: int) -> list[dict]:
+    """Overview 里程碑卡：過去 7 天到未來 weeks 週；階段沒推進的過期項目（milestones_passed）在過去 weeks 週內一律保留。
+    只看 Briefing 內、非結案／暫停的專案。"""
+    late = late_codes(snap)
+    t0 = dt.date.fromisoformat(today)
+    out = []
+    for p in snap["projects"]:
+        if not p["in_briefing"] or p["stage_cat"] in INACTIVE:
+            continue
+        for k in MS:
+            d = p["dates"].get(k)
+            if not d:
+                continue
+            left = (dt.date.fromisoformat(d) - t0).days
+            is_late = p["code"] in late and left < 0
+            if -7 <= left <= weeks * 7 or (is_late and left >= -weeks * 7):
+                out.append({"date": d, "name": p["name"], "code": p["code"], "customer": p["customer"], "milestone": k,
+                            "days_left": left, "late": is_late})
+    return sorted(out, key=lambda r: (r["date"], r["name"]))

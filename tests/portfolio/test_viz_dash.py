@@ -36,7 +36,7 @@ def test_milestone_status_pills_and_table():
     rows = [{"date": "2026-09-08", "name": "N1X", "code": "BR6", "customer": "Dell", "milestone": "pvt", "days_left": -4, "late": True}]
     h = milestone_table(rows, "en", link=lambda c: f"/ui/202609/projects/{c}")
     assert h.startswith('<div class="wide"><table>')
-    assert '<td>09/08</td><td><a href="/ui/202609/projects/BR6">N1X</a></td><td>Dell</td><td>PVT</td><td class="num">-4</td><td><span class="pill bad">Passed</span></td>' in h
+    assert '<td>09/08</td><td><a class="plain" href="/ui/202609/projects/BR6">N1X</a></td><td>Dell</td><td>PVT</td><td class="num">-4</td><td><span class="pill bad">Passed</span></td>' in h
     assert "<b>N1X</b>" in milestone_table(rows, "en")
 
 
