@@ -59,6 +59,6 @@ svg text{font-family:inherit}
 @media(max-width:900px){.app{grid-template-columns:minmax(0,1fr)}.side{position:static;height:auto;padding:12px 14px}.side a.brand{display:inline-flex;padding:4px 6px}
 .side .navbtn{display:inline-block;float:right;color:#fff;font-size:13px;padding:4px 10px;border:1px solid #475569;border-radius:6px;cursor:pointer}.side .links{display:none;padding-top:10px}.navt:checked~.links{display:block}
 .main{padding:18px 16px 48px}.status{grid-template-columns:minmax(0,1fr)}header{flex-direction:column}.tb{min-width:0;width:100%}.grid-2,.grid-3{grid-template-columns:minmax(0,1fr)}.pva{grid-template-columns:minmax(0,1fr)}.ms{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}}
-@media(max-width:640px){.kpis,.kpis.four,.kpis.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.k-value{font-size:22px}}
+@media(max-width:640px){.kpis,.kpis.four,.kpis.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.card-h{flex-direction:column;align-items:flex-start;gap:2px}.k-value{font-size:22px}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 """

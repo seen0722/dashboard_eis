@@ -31,3 +31,8 @@ def test_css_tokens_present():
 def test_type_scale_tokens():
     for tok in ("--fs-xs:12px", "--fs-sm:13px", "--fs-base:14px", "--fs-md:16px", "--fs-lg:20px", "--fs-xl:28px"):
         assert tok in CSS, tok
+
+
+def test_card_head_stacks_on_phones():
+    """390px 實測：卡片標題與右上結論並排時標題被擠成兩行。"""
+    assert ".card-h{flex-direction:column;align-items:flex-start;gap:2px}" in CSS.split("@media(max-width:640px)")[1]
