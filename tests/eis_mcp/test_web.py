@@ -217,14 +217,14 @@ def test_loads_page_filters_and_capacity_chart(ingested):
 
 
 def test_corrections_page(ingested):
-    t = html(ingested, "/ui/202609/corrections")
+    t = html(ingested, "/ui/202609/health")
     assert "No corrections" in t
     store = ingested.state.eis.store
     f = store.snapshot_dir("202609") / "portfolio.json"
     snap = json.loads(f.read_text(encoding="utf-8"))
     snap["issues"].append({"level": "track", "check": "cross_month_correction", "detail": "THORPE Jul FTE 17.0 -> 12.0", "source": "snapshot", "code": CODE})
     f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
-    t = html(ingested, "/ui/202609/corrections")
+    t = html(ingested, "/ui/202609/health")
     assert "17.0 -&gt; 12.0" in t and f'href="/ui/202609/projects/{CODE}"' in t
 
 
@@ -266,11 +266,12 @@ def test_search_by_code_or_exact_name_goes_to_project(ingested):
 
 
 def test_exceptions_and_health_link_to_projects(ingested):
-    t = html(ingested, f"/ui/202609/?today={TODAY}")
+    t = html(ingested, f"/ui/202609/decisions?today={TODAY}")
     ex = t[t.index('<ol class="ex">'):t.index("</ol>")]
     assert f'href="/ui/202609/projects/{CODE}"' in ex
-    health = t[t.index("<h2>Data health"):]
-    assert "<details" in health and "repeat the Decisions above" in health  # decide 級三項與 Decisions 重複，收合
+    health = html(ingested, "/ui/202609/health")
+    health = health[health.index("<h2>Data health"):]
+    assert "<details" in health and "repeat items on the Decisions page" in health   # decide 級與 Decisions 重複，收合
 
 
 def test_today_defaults_to_snapshot_date(ingested):
@@ -331,7 +332,7 @@ def test_tables_scroll_on_narrow_screens(ingested):
 
 def test_open_links_can_wrap(ingested):
     """連結之間要有空白：沒有斷行點時整串變成一個長字，手機寬度下把例外清單撐到 1000px 以上（2026-10-01 實機看到）。"""
-    t = html(ingested, f"/ui/202609/?today={TODAY}")
+    t = html(ingested, f"/ui/202609/decisions?today={TODAY}")
     opens = [seg[:seg.index("</div>")] for seg in t.split('<div class="open">')[1:]]
     assert opens and all("</a><a" not in o for o in opens)
 
@@ -363,8 +364,8 @@ def test_home_summarises_latest_month_and_links_entry_points(ingested):
     assert titles and all(x in exceptions_html(snap, "en", th) for x in titles)      # 與月報同一份標題，不另編
     from html import escape
     assert all(escape(x) in t for x in titles)
-    for href in ('href="/ui/202609/"', 'href="/ui/202609/projects"', 'href="/ui/202609/loads"',
-                 'href="/ui/202609/corrections"', 'href="/ui/202609/report.html"'):
+    for href in ('href="/ui/202609/"', 'href="/ui/202609/decisions"', 'href="/ui/202609/projects"', 'href="/ui/202609/loads"',
+                 'href="/ui/202609/health"', 'href="/ui/202609/report.html"'):
         assert href in t, href
     assert 'action="/ui/202609/projects"' in t[t.index("</nav>"):]                    # 頁面本體有搜尋框，不只 nav
     assert "<details" in t and "Data history" in t and "Terms" in t
@@ -456,3 +457,36 @@ def test_upcoming_milestones_tool_description_matches_inactive_rule(ingested):
     """tool 說明會顯示在 /ui/mcp，必須與實際規則一致：排除 Terminated 與 Suspended（INACTIVE）。"""
     t = html(ingested, "/ui/mcp")
     assert "(in briefing, not terminated or suspended)" in t and "not suspended)" not in t
+
+
+# ---- v2 外殼（2026-10-02）----
+def test_static_echarts_is_served_with_cache_header(ingested):
+    r = get(ingested, "/ui/static/echarts.min.js")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("application/javascript")
+    assert r.headers["cache-control"] == "public, max-age=86400" and len(r.content) == 1034102
+
+
+def test_shell_is_a_sidebar_that_loads_charts():
+    t = render_shell(title="x", body="", months=["202609"], month="202609", decisions=3)
+    assert '<nav class="side" aria-label="EIS">' in t and '<main class="main">' in t
+    assert '<script src="/ui/static/echarts.min.js"></script>' in t and "window.eisCharts" in t
+    nav = t[t.index("<nav"):t.index("</nav>")]
+    assert [x for x in ("/decisions", "/projects", "/loads", "/health", "/report.html") if f'href="/ui/202609{x}"' in nav] == \
+           ["/decisions", "/projects", "/loads", "/health", "/report.html"]
+    assert '>Decisions<span class="badge">3</span></a>' in nav
+
+
+def test_decisions_page_and_badge_count(ingested):
+    snap = ingested.state.eis.store.load_snapshot("202609")
+    t = html(ingested, f"/ui/202609/decisions?today={TODAY}")
+    assert "Decisions this month" in t and '<ol class="ex">' in t
+    assert f'>Decisions<span class="badge">{len(snap["exceptions"])}</span>' in t
+    ex = t[t.index('<ol class="ex">'):t.index("</ol>")]
+    assert f'href="/ui/202609/projects/{CODE}"' in ex
+
+
+def test_health_page_merges_corrections_and_old_url_redirects(ingested):
+    t = html(ingested, "/ui/202609/health")
+    assert "<h2>Data health" in t and "repeat items on the Decisions page" in t and "No corrections" in t
+    r = get(ingested, "/ui/202609/corrections")
+    assert r.status_code == 301 and r.headers["location"] == "/ui/202609/health"

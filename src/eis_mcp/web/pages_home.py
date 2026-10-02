@@ -17,13 +17,13 @@ READ_ONLY = ("Read-only. Same data as the monthly report and the MCP tools; noth
 
 # (path, 英文名, 中文名, 英文說明, 中文說明)
 ENTRIES = (
-    ("", "Decisions", "本月要決定的事", "What needs a decision this month, with evidence, milestones and data health.",
-     "本月要決定的事，附證據、里程碑與資料健康度。"),
+    ("", "Overview", "總覽", "KPIs, charts and the six-month timeline.", "KPI、圖表與六個月時程。"),
+    ("decisions", "Decisions", "本月要決定的事", "What needs a decision this month, with evidence.", "本月要決定的事，附證據。"),
     ("projects", "Projects", "專案", "Every project; filter by stage, type, category, group or customer.",
      "全部專案，可依階段、類型、類別、產品群或客戶篩選。"),
     ("loads", "Loads", "部門負載", "Department load by month: where spare capacity is left.", "各部門每月負載：哪裡還有餘裕。"),
-    ("corrections", "Corrections", "歷史修正", "Past-month numbers that changed since the previous snapshot.",
-     "與上一份快照相比，被改過的過去月份數字。"),
+    ("health", "Data health", "資料健康度", "What the source files could not answer, and past-month numbers that changed.",
+     "來源檔答不出來的事，以及被改過的過去月份數字。"),
     ("report.html", "Monthly report", "月報", "The single-page report, ready to forward.", "可直接轉寄的單頁月報。"),
 )
 
