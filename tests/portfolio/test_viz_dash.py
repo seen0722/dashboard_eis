@@ -102,3 +102,26 @@ def test_chart_legend_sits_top_right_in_symbol_colours():
     assert '<span><i style="color:#3B82F6">◇</i>EVT</span><span><i style="color:#DC2626">★</i>MP</span>' in h
     from src.portfolio.render.css import CSS
     assert ".eq .card-h.has-legend{flex-direction:row" in CSS
+
+
+def test_at_risk_lists_each_project_with_the_reason_it_counts():
+    """2026-10-03 使用者：At Risk 5 案，Decisions 只寫得出里程碑已過的 2 案，CPC212/Brandy/AX100 看不出為何列入。
+    每案要寫出它是哪一條規則命中、日期多少；MP 延後要附原訂→目前與天數，已在 MP 的要註明。"""
+    from tests.portfolio.test_page import snap, TH
+    from src.portfolio.render.viz.dash import at_risk_html
+    h = at_risk_html(snap(), "en", TH, link=lambda c: f"/p/{c}")
+    assert "At risk (1)" in h and '<a class="plain" href="/p/BR1">THORPE</a>' in h
+    row = h[h.index("THORPE"):]
+    assert "MP 2026-07-31 passed 43 days ago, stage still PVT" in row
+    assert "MP moved from 2025-10-13 to 2026-07-31 (+291 days)" in row
+
+
+def test_at_risk_marks_a_slip_that_already_reached_mp():
+    from tests.portfolio.test_page import snap, TH
+    from src.portfolio.render.viz.dash import at_risk_html
+    s = snap()
+    ax = next(p for p in s["projects"] if p["code"] == "BR4")
+    ax["dates"].update({"mp": "2026-09-01", "mp_orig": "2025-12-31"})
+    h = at_risk_html(s, "en", TH)
+    row = h[h.index("AX200"):]
+    assert "MP moved from 2025-12-31 to 2026-09-01 (+244 days), already in MP" in row

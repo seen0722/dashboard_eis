@@ -4,7 +4,7 @@ from collections.abc import Callable
 from html import escape as e
 from ..strings import t
 from .embed import Chart, chart_div, chart_html
-from .options import at_risk_codes
+from .options import at_risk_codes, at_risk_rows
 
 DUE_DAYS = 14
 
@@ -80,16 +80,23 @@ def milestone_table(rows: list[dict], lang: str, link: Callable[[str], str] | No
     return f'<div class="wide"><table><thead><tr>{head}</tr></thead><tbody>{"".join(body)}</tbody></table></div>'
 
 
-def at_risk_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | None = None) -> str:
-    """At Risk KPI 的落地處：列出 KPI 數到的每一案，含只在健康度追蹤（PM 已確認）的 MP 延後。"""
-    codes = at_risk_codes(snap, th["mp_slip_days"])
-    if not codes:
-        return ""
-    names = {p["code"]: p["name"] for p in snap["projects"]}
-    items = " ".join(f'<a class="chip" href="{e(link(c))}">{e(names.get(c, c))}</a>' if link else f'<span class="chip">{e(names.get(c, c))}</span>' for c in codes)
-    return (f'<p class="lead"><b class="sig">{e(t(lang, "v_risk_head", n=len(codes)))}</b> {items}'
-            f'<br><span class="note">{e(t(lang, "v_risk_note", days=th["mp_slip_days"]))}</span></p>')
+def _risk_reason(w: dict, lang: str, stage: str) -> str:
+    if w["rule"] == "passed":
+        return t(lang, "v_risk_passed", ms=w["ms"], date=w["date"], days=w["days"], stage=stage) if "date" in w else t(lang, "v_risk_passed_bare")
+    return t(lang, "v_risk_slipped", orig=w["orig"], mp=w["mp"], days=w["days"]) + (t(lang, "v_risk_in_mp") if w["in_mp"] else "")
 
+
+def at_risk_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | None = None) -> str:
+    """At Risk KPI 的落地處：逐案列出，並寫出每案命中哪一條規則（里程碑已過／MP 延後）與日期。"""
+    rows = at_risk_rows(snap, th["mp_slip_days"])
+    if not rows:
+        return ""
+    trs = "".join(f'<tr><td>{f"<a class=\"plain\" href=\"{e(link(r["code"]))}\">{e(r["name"])}</a>" if link else e(r["name"])}</td>'
+                  f'<td>{e(r["stage"] or "–")}</td><td>{"<br>".join(e(_risk_reason(w, lang, r["stage"])) for w in r["why"])}</td></tr>' for r in rows)
+    return (f'<div class="card risk-t"><div class="card-h"><b class="sig">{e(t(lang, "v_risk_head", n=len(rows)).rstrip(":："))}</b>'
+            f'<span class="card-sub">{e(t(lang, "v_risk_note", days=th["mp_slip_days"]))}</span></div>'
+            f'<table><thead><tr><th>{e(t(lang, "v_risk_col_project"))}</th><th>{e(t(lang, "v_risk_col_stage"))}</th><th>{e(t(lang, "v_risk_col_why"))}</th></tr></thead>'
+            f'<tbody>{trs}</tbody></table></div>')
 
 
 def exception_titles(snap: dict, th: dict, lang: str) -> list[str]:

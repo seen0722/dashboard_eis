@@ -524,7 +524,7 @@ def test_decisions_page_lists_every_at_risk_project(ingested):
     snap = ingested.state.eis.store.load_snapshot("202609")
     codes = at_risk_codes(snap, ingested.state.eis.cfg.thresholds["mp_slip_days"])
     t = html(ingested, f"/ui/202609/decisions?today={TODAY}")
-    head = t[t.index(f"At risk ({len(codes)}):"):t.index('<ol class="ex">')]
+    head = t[t.index(f"At risk ({len(codes)})"):t.index('<ol class="ex">')]
     assert codes and all(f'href="/ui/202609/projects/{c}"' in head for c in codes)
 
 
@@ -555,7 +555,7 @@ def test_decision_project_links_are_chips(ingested):
     opens = t[t.index('<div class="open">'):]
     assert f'<a class="chip plain" href="/ui/202609/projects/{CODE}">THORPE</a>' in opens
     head = t[t.index("At risk ("):t.index('<ol class="ex">')]
-    assert f'<a class="chip" href="/ui/202609/projects/{CODE}">THORPE</a>' in head
+    assert f'<a class="plain" href="/ui/202609/projects/{CODE}">THORPE</a>' in head
 
 
 def test_long_health_lists_collapse_after_six(ingested):

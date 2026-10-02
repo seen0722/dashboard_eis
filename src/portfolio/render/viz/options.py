@@ -4,7 +4,7 @@ import datetime as dt
 from html import escape
 from types import SimpleNamespace
 from ...entities import INACTIVE, MONTHS
-from ...model.rules import mp_slipped
+from ...model.rules import milestones_passed, mp_slipped
 from ..charts import _add_months, _sum, carry_forward
 from ..strings import t
 from . import tokens as T
@@ -22,6 +22,28 @@ def at_risk_codes(snap: dict, mp_slip_days: int) -> list[str]:
     passed = [c for x in snap.get("exceptions", []) if x["title"] == "milestones_passed" for c in x["codes"]]
     slipped = [p.code for p, _ in mp_slipped([SimpleNamespace(**p) for p in snap["projects"]], mp_slip_days)]
     return list(dict.fromkeys(passed + slipped))
+
+
+def at_risk_rows(snap: dict, mp_slip_days: int) -> list[dict]:
+    """At Risk 每一案為何列入：與 at_risk_codes 同一份名單，逐案附命中的規則與日期。
+    「已過」的天數以快照產生日（generated，例外清單算的那一天）計；重算不到的只寫規則名，不補日期。"""
+    ps = [SimpleNamespace(**p) for p in snap["projects"]]
+    today = snap["meta"].get("generated", "")
+    passed = {p.code: (ms, d, n) for p, ms, d, n in (milestones_passed(ps, today) if today else [])}
+    slipped = {p.code: n for p, n in mp_slipped(ps, mp_slip_days)}
+    late = late_codes(snap)
+    by = {p["code"]: p for p in snap["projects"]}
+    out = []
+    for c in at_risk_codes(snap, mp_slip_days):
+        p = by.get(c, {"code": c, "name": c, "stage": "", "stage_cat": "", "dates": {}})
+        why = []
+        if c in late:
+            why.append({"rule": "passed", **({"ms": passed[c][0].upper(), "date": passed[c][1], "days": passed[c][2]} if c in passed else {})})
+        if c in slipped:
+            why.append({"rule": "slipped", "orig": p["dates"].get("mp_orig"), "mp": p["dates"].get("mp"), "days": slipped[c],
+                        "in_mp": p["stage_cat"] in ("MP", "Sustain / EOP")})
+        out.append({"code": c, "name": p["name"], "stage": p["stage"], "why": why})
+    return out
 
 
 def kpis(snap: dict, lang: str, th: dict) -> list[dict]:

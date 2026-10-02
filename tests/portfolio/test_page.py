@@ -189,7 +189,7 @@ def test_decisions_section_lists_the_at_risk_projects():
     """Review：At Risk KPI 連到 Decisions，落地處必須列得出是哪幾案（含只在健康度追蹤的 MP 延後）。"""
     html = render_page(snap(), "en", "2026-09-12", TH)
     dec = html[html.index('id="decisions"'):html.index('id="health"')]
-    assert "At risk (1):" in dec and "THORPE" in dec.split("At risk (1):")[1][:200]
+    assert "At risk (1)" in dec and "THORPE" in dec.split("At risk (1)")[1][:2000]
 
 
 def test_report_has_category_chart_and_no_type_chart():

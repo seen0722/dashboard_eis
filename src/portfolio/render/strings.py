@@ -99,7 +99,9 @@ STRINGS = {
         "v_src_stage": "Briefing Stage column", "v_src_customer": "Briefing Customer column", "v_src_category": "Briefing Category column",
         "v_ms_sub": "Past 7 days to next {weeks} weeks; overdue stages always shown", "v_ms_note": "Active projects only (in briefing, not terminated or suspended).",
         "v_col_mp_current": "MP (current)", "v_col_mp_orig": "Original MP",
-        "v_risk_head": "At risk ({n}):", "v_risk_note": "Milestone passed without a stage change, or MP slipped over {days} days. Slips the PM already confirmed are also listed under Data health.",
+        "v_risk_head": "At risk ({n}):", "v_risk_col_project": "Project", "v_risk_col_stage": "Stage", "v_risk_col_why": "Why it counts",
+        "v_risk_passed": "{ms} {date} passed {days} days ago, stage still {stage}", "v_risk_passed_bare": "Milestone passed without a stage change",
+        "v_risk_slipped": "MP moved from {orig} to {mp} (+{days} days)", "v_risk_in_mp": ", already in MP", "v_risk_note": "Milestone passed without a stage change, or MP slipped over {days} days. Slips the PM already confirmed are also listed under Data health.",
     },
     "zh": {
         "html_lang": "zh-Hant", "doc_title": "BU10 專案組合檢討 {ym}",
@@ -199,7 +201,9 @@ STRINGS = {
         "v_src_stage": "Briefing Stage 欄", "v_src_customer": "Briefing Customer 欄", "v_src_category": "Briefing Category 欄",
         "v_ms_sub": "過去 7 天至未來 {weeks} 週；階段未推進的過期項目一律列出", "v_ms_note": "只列進行中的專案（在 Briefing 內、非結案或暫停）。",
         "v_col_mp_current": "MP（目前）", "v_col_mp_orig": "原訂 MP",
-        "v_risk_head": "風險（{n}）：", "v_risk_note": "里程碑已過未轉階段，或 MP 延後超過 {days} 天；PM 已確認的延後也列在資料健康度。",
+        "v_risk_head": "風險（{n}）：", "v_risk_col_project": "專案", "v_risk_col_stage": "階段", "v_risk_col_why": "列入原因",
+        "v_risk_passed": "{ms} {date} 已過 {days} 天，階段仍是 {stage}", "v_risk_passed_bare": "里程碑已過未轉階段",
+        "v_risk_slipped": "MP 由 {orig} 改為 {mp}（+{days} 天）", "v_risk_in_mp": "，已進入 MP", "v_risk_note": "里程碑已過未轉階段，或 MP 延後超過 {days} 天；PM 已確認的延後也列在資料健康度。",
     },
 }
 
