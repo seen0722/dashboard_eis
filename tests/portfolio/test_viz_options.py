@@ -94,9 +94,9 @@ def test_forecast_capacity_series_and_budget_coverage():
     assert s["Headcount carried from Aug"] == [None] * 7 + [10] * 5
     assert s["Actual, BU RD + PM"] == [13.0] * 8 + [None] * 4         # THORPE 9+1、TR_KOS 3
     assert s["Budget plan, BU RD + PM"] == [11.0] * 12                 # 只有 has_plan 的 THORPE
-    assert s["Actual, FU RD"] == [2.0] * 8 + [None] * 4
+    assert "Actual, FU RD" not in s                                    # FU 不在 BU 天花板的比較範圍；改在 fu_plan_actual
     assert ch.note == "Budget covers 1 / 2 projects, BU RD + PM only"
-    assert ch.rows[8] == ("Sep", None, None, None, 11.0, None)         # 月、人數、actual、同批 actual、plan、FU
+    assert ch.rows[8] == ("Sep", None, None, None, 11.0)               # 月、人數、actual、同批 actual、plan
 
 
 def test_pva_without_plan_draws_actual_only_and_says_so():

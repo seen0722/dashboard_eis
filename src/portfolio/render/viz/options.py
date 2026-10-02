@@ -244,7 +244,8 @@ def load_heatmap(snap: dict, lang: str, spare_pct: float, by: str = "function") 
 
 
 def forecast_capacity(snap: dict, lang: str) -> Chart:
-    """與舊 capacity_svg 同口徑：actual／plan＝有 Control List 的專案 BU RD＋PM；plan 只算 has_plan 的專案；最新月之後的人數沿用最新月（虛線）。"""
+    """BU RD＋PM 對 BU 填報人數（天花板）。plan 只算 has_plan 的專案，並附同一批專案的 actual；最新月之後的人數沿用最新月（虛線）。
+    FU RD 不在這張圖：天花板是 BU 人數，FU 的 plan 與 actual 在 fu_plan_actual。"""
     ps, lm = snap["projects"], snap["meta"]["latest_month"]
     raw = snap["capacity"]
     cap = carry_forward(raw, lm)
@@ -254,7 +255,6 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
     actual = add(_sum(cl, "BU RD", "actual", lm), _sum(cl, "PM", "actual", lm))
     plan = add(_sum(wp, "BU RD", "plan", only_plan=True), _sum(wp, "PM", "plan", only_plan=True))
     act_wp = add(_sum(wp, "BU RD", "actual", lm), _sum(wp, "PM", "actual", lm))     # 與 plan 同一批專案
-    fu = [round(v, 2) for v in _sum(cl, "FU RD", "actual", lm)]
     pad = lambda xs: xs + [None] * (12 - len(xs))  # noqa: E731
     mon = MONTHS[lm - 1]
     series = [{"name": t(lang, "v_lg_cap"), "type": "line", "data": [v if i < lm else None for i, v in enumerate(cap)], "symbol": "none",
@@ -265,18 +265,15 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
               {"name": t(lang, "v_lg_actual_planned", n=len(wp)), "type": "line", "data": pad(act_wp), "symbol": "circle", "symbolSize": 4,
                "lineStyle": {"color": T.ACCENT, "type": "dotted", "width": 2}, "itemStyle": {"color": T.ACCENT}},
               {"name": t(lang, "v_lg_plan"), "type": "line", "data": plan, "symbol": "circle", "symbolSize": 5,
-               "lineStyle": {"color": T.PLAN, "type": "dashed", "width": 2}, "itemStyle": {"color": T.PLAN}},
-              {"name": t(lang, "v_lg_fu"), "type": "line", "data": pad(fu), "symbol": "none", "lineStyle": {"color": T.FU, "width": 2},
-               "itemStyle": {"color": T.FU}}]
+               "lineStyle": {"color": T.PLAN, "type": "dashed", "width": 2}, "itemStyle": {"color": T.PLAN}}]
     option = {"grid": {"left": 8, "right": 12, "top": 16, "bottom": 64, "containLabel": True}, "tooltip": {"trigger": "axis"},
               "legend": {"bottom": 0, "itemWidth": 14, "itemHeight": 8, "textStyle": {"color": T.INK2, "fontSize": 11}},
               "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
               "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK3}}, "series": series}
-    rows = tuple((m, raw[i] if i < lm else None, actual[i] if i < lm else None, act_wp[i] if i < lm and wp else None, plan[i] if wp else None,
-                  fu[i] if i < lm else None) for i, m in enumerate(MONTHS))
+    rows = tuple((m, raw[i] if i < lm else None, actual[i] if i < lm else None, act_wp[i] if i < lm and wp else None, plan[i] if wp else None)
+                 for i, m in enumerate(MONTHS))
     return Chart("forecast", t(lang, "v_c_forecast"), option,
-                 (t(lang, "v_col_month"), t(lang, "v_lg_cap"), t(lang, "v_lg_actual"), t(lang, "v_lg_actual_planned", n=len(wp)), t(lang, "v_lg_plan"),
-                  t(lang, "v_lg_fu")), rows,
+                 (t(lang, "v_col_month"), t(lang, "v_lg_cap"), t(lang, "v_lg_actual"), t(lang, "v_lg_actual_planned", n=len(wp)), t(lang, "v_lg_plan")), rows,
                  height=300, note=t(lang, "cap_budget_note", covered=len(wp), total=len(cl)))
 
 
