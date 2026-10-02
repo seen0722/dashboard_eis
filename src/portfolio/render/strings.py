@@ -94,7 +94,7 @@ STRINGS = {
         "v_lg_fu_same": "FU RD actual, same projects", "v_lg_fu_all": "FU RD actual, all projects",
         "v_fu_note": "FU plan covers {covered} / {total} projects; both series use those projects. FU RD actual across all {total} projects in {mon}: {all} FTE.",
         "v_fc_with": "With budget, {n} projects", "v_fc_without": "No budget, {n} projects", "v_fc_with_short": "With budget", "v_fc_without_short": "No budget",
-        "v_fc_left": "{mon}: {used} of {cap} in use, {left} left", "v_fc_over": "{mon}: {used} of {cap} in use, {over} over", "v_fc_cap_label": "Headcount", "v_fc_plan_label": "Plan",
+        "v_fc_left": "{mon}: {used} of {cap} in use, {left} left", "v_fc_over": "{mon}: {used} of {cap} in use, {over} over", "v_fc_cap_label": "Headcount", "v_fc_plan_label": "Plan", "v_fc_actual_label": "Actual", "v_fu_headline": "{mon}: FU actual {act} vs plan {plan} ({pct}%)",
         "v_risk_head": "At risk ({n}):", "v_risk_note": "Milestone passed without a stage change, or MP slipped over {days} days. Slips the PM already confirmed are also listed under Data health.",
     },
     "zh": {
@@ -190,7 +190,7 @@ STRINGS = {
         "v_lg_fu_same": "FU RD 實際，同一批專案", "v_lg_fu_all": "FU RD 實際，全部專案",
         "v_fu_note": "FU 計畫涵蓋 {covered} / {total} 案，兩條數列都只算這些專案。{mon} 全部 {total} 案的 FU RD 實際：{all} FTE。",
         "v_fc_with": "有 budget，{n} 案", "v_fc_without": "沒有 budget，{n} 案", "v_fc_with_short": "有 budget", "v_fc_without_short": "沒有 budget",
-        "v_fc_left": "{mon}：{cap} 人中已用 {used}，剩 {left}", "v_fc_over": "{mon}：{cap} 人中已用 {used}，超出 {over}", "v_fc_cap_label": "填報人數", "v_fc_plan_label": "計畫",
+        "v_fc_left": "{mon}：{cap} 人中已用 {used}，剩 {left}", "v_fc_over": "{mon}：{cap} 人中已用 {used}，超出 {over}", "v_fc_cap_label": "填報人數", "v_fc_plan_label": "計畫", "v_fc_actual_label": "實際", "v_fu_headline": "{mon}：FU 實際 {act}，計畫 {plan}（{pct}%）",
         "v_risk_head": "風險（{n}）：", "v_risk_note": "里程碑已過未轉階段，或 MP 延後超過 {days} 天；PM 已確認的延後也列在資料健康度。",
     },
 }

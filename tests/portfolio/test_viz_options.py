@@ -183,7 +183,9 @@ def test_fu_plan_vs_actual_uses_one_denominator():
     a["pva"]["FU RD"]["plan"] = [3.0] * 12
     ch = O.fu_plan_actual(s, "en")
     series = {x["name"]: x["data"] for x in ch.option["series"]}
-    assert ch.id == "fu" and series["FU RD plan"] == [3.0] * 12 and series["FU RD actual, same projects"] == [2.0] * 8 + [None] * 4
+    val = lambda d: d["value"] if isinstance(d, dict) else d  # noqa: E731
+    assert ch.id == "fu" and [val(d) for d in series["FU RD plan"]] == [3.0] * 12
+    assert [val(d) for d in series["FU RD actual, same projects"]] == [2.0] * 8 + [None] * 4
     assert ch.note == "FU plan covers 1 / 2 projects; both series use those projects. FU RD actual across all 2 projects in Aug: 2.0 FTE."
     assert ch.rows[7] == ("Aug", 3.0, 2.0, 2.0)
     assert O.fu_plan_actual(snap(), "en").note.startswith("FU plan covers 0 / 2 projects")
@@ -198,3 +200,23 @@ def test_forecast_tooltip_tells_series_apart():
     assert names[4] == "Headcount carried from Aug" and names[3] == "Keyed-in BU headcount"     # 推算線在實線有值的月份不列
     plan = next(x for x in ch.option["series"] if x["name"] == "Budget plan, BU RD + PM")
     assert plan["itemStyle"]["color"] != next(x for x in ch.option["series"] if x["name"] == "Keyed-in BU headcount")["itemStyle"]["color"]
+
+
+def test_plan_vs_actual_charts_share_one_design_language():
+    """2026-10-02：Forecast、FU、單案 PVA 統一：actual 長條、plan 紫色短橫、無圖例、tooltip 圖示與圖形一致。"""
+    from src.portfolio.render.viz import tokens as T
+    s = snap(); a = next(p for p in s["projects"] if p["code"] == "BR1"); a["pva"]["FU RD"]["plan"] = [3.0] * 12
+    val = lambda d: d["value"] if isinstance(d, dict) else d  # noqa: E731
+    fu = O.fu_plan_actual(s, "en")
+    pva = O.pva(next(p for p in s["projects"] if p["code"] == "BR1"), "BU RD", 8, "en", 0)
+    for ch in (O.forecast_capacity(s, "en"), fu, pva):
+        assert "legend" not in ch.option, ch.id
+        assert ch.option["tooltip"]["formatter"]["$fn"] == "axisTip", ch.id
+        plans = [x for x in ch.option["series"] if x["itemStyle"]["color"] == T.PLAN_MARK]
+        assert len(plans) == 1 and plans[0]["symbol"] == "rect" and plans[0]["lineStyle"] == {"width": 0}, ch.id
+    fs = {x["name"]: x for x in fu.option["series"]}
+    assert fs["FU RD actual, same projects"]["data"][7]["label"]["formatter"] == "Actual 2"
+    assert fs["FU RD plan"]["data"][11]["label"]["formatter"] == "Plan 3"
+    assert [val(d) for d in fs["FU RD plan"]["data"]] == [3.0] * 12
+    assert fu.headline == "Aug: FU actual 2.0 vs plan 3.0 (67%)"
+    assert fu.option["tooltip"]["formatter"]["args"][0] == ["bar", "mark"]

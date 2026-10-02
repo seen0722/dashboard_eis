@@ -243,6 +243,25 @@ def load_heatmap(snap: dict, lang: str, spare_pct: float, by: str = "function") 
     return Chart(cid, title, option, (first, *MONTHS), tuple(table), height=24 * len(keys) + 80, note=t(lang, "v_heat_note"), min_width=560)
 
 
+# ---- plan vs actual 的共用設計語言（Forecast、FU、單案 PVA）：actual 長條、plan 紫色短橫、最新月直接標數字、無圖例 ----
+def _label_last(values: list, idx: int, text: str, color: str) -> list:
+    out = list(values) + [None] * (12 - len(values))
+    if 0 <= idx < len(out) and out[idx] is not None:
+        out[idx] = {"value": out[idx], "label": {"show": True, "position": "right", "formatter": text, "color": color, "fontWeight": 600}}
+    return out
+
+
+def _plan_series(name: str, plan: list[float], lang: str, label: bool = True, width: int = 26) -> dict:
+    data = _label_last(plan, 11, f"{t(lang, 'v_fc_plan_label')} {plan[-1]:.0f}", T.PLAN_MARK) if label and any(plan) else list(plan)
+    return {"name": name, "type": "line", "data": data, "symbol": "rect", "symbolSize": [width, 3], "lineStyle": {"width": 0},
+            "itemStyle": {"color": T.PLAN_MARK}, "z": 4}
+
+
+def _tip(glyphs: list[str], hide: dict | None = None) -> dict:
+    """tooltip 圖示與圖上形狀一致（bar／mark／line／dashed），1 位小數；hide = {被隱藏的序號: 有值時就隱藏它的序號}。"""
+    return {"trigger": "axis", "formatter": {"$fn": "axisTip", "args": [glyphs, hide or {}, 1]}}
+
+
 def forecast_capacity(snap: dict, lang: str) -> Chart:
     """BU RD＋PM 的人力去哪了：長條拆成「有 budget 的專案」與「沒有 budget 的專案」兩段（加總＝實際），
     plan 以短橫線標在有 budget 那段上（同一批專案），天花板是 BU 填報人數（最新月之後沿用，虛線）。
@@ -258,9 +277,6 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
     nob = [round(a - w, 2) for a, w in zip(actual, withb)]
     plan = add(_sum(wp, "BU RD", "plan", only_plan=True), _sum(wp, "PM", "plan", only_plan=True))
     mon = MONTHS[lm - 1]
-    plan_pts: list = list(plan)
-    if wp:
-        plan_pts[-1] = {"value": plan[-1], "label": {"show": True, "position": "right", "formatter": f"{t(lang, 'v_fc_plan_label')} {plan[-1]:.0f}", "color": T.PLAN_MARK}}
 
     def bars(values: list[float], short: str, color: str) -> list:
         out = [v for v in values] + [None] * (12 - len(values))
@@ -276,14 +292,13 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
                "data": bars(withb, t(lang, "v_fc_with_short"), T.ACCENT), "itemStyle": {"color": T.ACCENT}},
               {"name": t(lang, "v_fc_without", n=len(cl) - len(wp)), "type": "bar", "stack": "actual",
                "data": bars(nob, t(lang, "v_fc_without_short"), T.SIGNAL), "itemStyle": {"color": T.SIGNAL}},
-              {"name": t(lang, "v_lg_plan"), "type": "line", "data": plan_pts, "symbol": "rect", "symbolSize": [26, 3], "lineStyle": {"width": 0},
-               "itemStyle": {"color": T.PLAN_MARK}, "z": 4},
+              _plan_series(t(lang, "v_lg_plan"), plan, lang, label=bool(wp)),
               {"name": t(lang, "v_lg_cap"), "type": "line", "data": [v if i < lm else None for i, v in enumerate(cap)], "symbol": "none",
                "lineStyle": {"color": T.INK, "width": 2.5}, "itemStyle": {"color": T.INK}},
               {"name": t(lang, "v_lg_cap_carried", mon=mon), "type": "line", "data": carried, "symbol": "none",
                "lineStyle": {"color": T.INK, "width": 2, "type": "dashed"}, "itemStyle": {"color": T.INK}}]
     # tooltip 圖示與圖上形狀一致（長條／短橫／實線／虛線）；推算人數（第 5 條）在實線（第 4 條）有值的月份不列；1 位小數
-    tip = {"trigger": "axis", "formatter": {"$fn": "axisTip", "args": [["bar", "bar", "mark", "line", "dashed"], {"4": 3}, 1]}}
+    tip = _tip(["bar", "bar", "mark", "line", "dashed"], {"4": 3})
     option = {"grid": {"left": 8, "right": 96, "top": 24, "bottom": 8, "containLabel": True}, "tooltip": tip,
               "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
               "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK3}}, "series": series}
@@ -307,18 +322,19 @@ def fu_plan_actual(snap: dict, lang: str) -> Chart:
     fp = [p for p in cl if any((p["pva"].get("FU RD") or {}).get("plan", [0.0] * 12))]
     fu = lambda group, field, n=12: [round(sum((p["pva"].get("FU RD") or {}).get(field, [0.0] * 12)[i] for p in group), 2) for i in range(n)]  # noqa: E731
     plan, same, every = fu(fp, "plan"), fu(fp, "actual", lm), fu(cl, "actual", lm)
-    pad = lambda xs: xs + [None] * (12 - len(xs))  # noqa: E731
-    series = [{"name": t(lang, "v_lg_fu_same"), "type": "bar", "data": pad(same), "barWidth": "45%", "itemStyle": {"color": T.FU}},
-              {"name": t(lang, "v_lg_fu_plan"), "type": "line", "data": plan, "symbol": "circle", "symbolSize": 5,
-               "lineStyle": {"color": T.FU, "type": "dashed", "width": 2}, "itemStyle": {"color": T.FU}}] if fp else []
-    option = {"grid": {"left": 8, "right": 12, "top": 16, "bottom": 48, "containLabel": True}, "tooltip": {"trigger": "axis"},
-              "legend": {"bottom": 0, "itemWidth": 14, "itemHeight": 8, "textStyle": {"color": T.INK2, "fontSize": 11}},
+    mon = MONTHS[lm - 1]
+    series = [{"name": t(lang, "v_lg_fu_same"), "type": "bar", "barWidth": "45%", "itemStyle": {"color": T.FU},
+               "data": _label_last(same, lm - 1, f"{t(lang, 'v_fc_actual_label')} {same[lm - 1]:.0f}", T.FU)},
+              _plan_series(t(lang, "v_lg_fu_plan"), plan, lang)] if fp else []
+    option = {"grid": {"left": 8, "right": 96, "top": 24, "bottom": 8, "containLabel": True}, "tooltip": _tip(["bar", "mark"]),
               "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
               "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK3}}, "series": series}
+    headline = (t(lang, "v_fu_headline", mon=mon, act=f"{same[lm - 1]:.1f}", plan=f"{plan[lm - 1]:.1f}", pct=round(same[lm - 1] / plan[lm - 1] * 100))
+                if fp and plan[lm - 1] else "")
     rows = tuple((m, plan[i] if fp else None, same[i] if fp and i < lm else None, every[i] if i < lm else None) for i, m in enumerate(MONTHS))
     note = t(lang, "v_fu_note", covered=len(fp), total=len(cl), mon=MONTHS[lm - 1], all=f"{every[lm - 1]:.1f}")
     return Chart("fu", t(lang, "v_c_fu"), option, (t(lang, "v_col_month"), t(lang, "v_lg_fu_plan"), t(lang, "v_lg_fu_same"), t(lang, "v_lg_fu_all")),
-                 rows, height=300, note=note)
+                 rows, height=300, note=note, headline=headline)
 
 
 def pva(p: dict, role: str, latest_month: int, lang: str, idx: int) -> Chart:
@@ -329,10 +345,8 @@ def pva(p: dict, role: str, latest_month: int, lang: str, idx: int) -> Chart:
     series = [{"name": t(lang, "v_lg_pva_actual"), "type": "bar", "data": [a if i < latest_month else None for i, a in enumerate(act)],
                "barWidth": "50%", "itemStyle": {"color": T.FU if role == "FU RD" else T.ACCENT}}]
     if has_plan:
-        series.append({"name": t(lang, "v_lg_pva_plan"), "type": "line", "data": plan, "symbol": "circle", "symbolSize": 4,
-                       "lineStyle": {"color": T.PLAN, "type": "dashed"}, "itemStyle": {"color": T.PLAN}})
-    option = {"grid": {"left": 4, "right": 4, "top": 24, "bottom": 4, "containLabel": True}, "tooltip": {"trigger": "axis"},
-              "legend": {"top": 0, "right": 0, "itemWidth": 10, "itemHeight": 6, "textStyle": {"fontSize": 10, "color": T.INK2}},
+        series.append(_plan_series(t(lang, "v_lg_pva_plan"), plan, lang, label=False, width=12))
+    option = {"grid": {"left": 4, "right": 4, "top": 8, "bottom": 4, "containLabel": True}, "tooltip": _tip(["bar", "mark"] if has_plan else ["bar"]),
               "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"fontSize": 10, "color": T.INK3, "interval": 1}},
               "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"fontSize": 10, "color": T.INK3}}, "series": series}
     rows = tuple((m, act[i] if i < latest_month else None, plan[i] if has_plan else None) for i, m in enumerate(MONTHS))
