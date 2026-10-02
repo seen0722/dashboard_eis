@@ -21,7 +21,7 @@ def test_vendored_echarts_is_the_pinned_build():
 
 def test_to_json_cannot_close_script_and_nan_is_null():
     s = to_json({"name": "</script><!--x", "v": math.nan, "w": [math.inf, 1.5]})
-    assert "</" not in s and "<!--" not in s
+    assert "<" not in s                                   # 所有 < 都寫成 \u003c，script 內容不可能出現任何標籤
     assert json.loads(s) == {"name": "</script><!--x", "v": None, "w": [None, 1.5]}
 
 

@@ -74,9 +74,9 @@ def _clean(v):
 
 
 def to_json(obj) -> str:
-    """嵌進 <script type="application/json"> 的 JSON：NaN/inf 轉 null；「</」與「<!--」跳脫，資料無法提前關閉 script。"""
+    """嵌進 <script type="application/json"> 的 JSON：NaN/inf 轉 null；所有「<」寫成 \\u003c（JSON.parse 還原），資料裡不可能出現任何標籤。"""
     s = json.dumps(_clean(obj), ensure_ascii=False, allow_nan=False, separators=(",", ":"))
-    return s.replace("</", "<\\/").replace("<!--", "\\u003c!--")
+    return s.replace("<", "\\u003c")
 
 
 def _cell(v) -> str:

@@ -41,17 +41,17 @@ def snap():
 def test_page_sections_and_strings():
     html = render_page(snap(), "en", "2026-09-12", TH)
     for s in ("BU10 Portfolio Review", "Decisions this month", "1 milestones passed", "Decision needed:", "Milestones, next 8 weeks",
-              "Six-month timeline", "Manpower and capacity", "Data health", "Project appendix", "Aug: 1 BU tasks, 1 FU tasks, 3.7 FTE",
-              "later months carried from Aug"):
+              "Timeline, next 6 months", "Forecast vs capacity", "Data health", "Project appendix", "Aug: 1 BU tasks, 1 FU tasks, 3.7 FTE",
+              "Headcount carried from Aug"):
         assert s in html, s
     assert "TOMY" in html and "no dates yet" in html
-    assert html.count("<details") == 1 and "<details open" not in html
-    assert "·" not in html and "→" not in html
+    assert html.count("<details><summary") == 1 and "<details open" not in html
+    assert "·" not in html.replace(re.search(r"<script>\s*/\*.*?</script>", html, re.S).group(0), "") and "→" not in html
     assert 'lang="en"' in html
-    timeline = html.split("Six-month timeline")[1].split("Manpower and capacity")[0]
-    assert "Q11" not in timeline and "KOS" not in timeline      # inactive projects are kept out of the timeline
-    assert '<span class="dim">passed</span>' in html
-    assert '<span class="sig">passed</span>' in html
+    gantt = re.search(r'id="c-gantt-data">(.*?)</script>', html).group(1)
+    assert "Q11" not in gantt and "KOS" not in gantt                     # inactive projects are kept out of the timeline
+    assert '<span class="pill bad">Passed</span>' in html                 # THORPE DVT 09/08, in milestones_passed
+    assert '<span class="pill mute">Passed</span>' in html                # AX200 PVT 09/08, stage moved on
     assert "Second identity, likely the same project under another code" in html
     assert "1 suspended of 5 briefed, 0 still charging manpower, 1 booked under a second code" in html
     assert "terminated and" not in html                                            # terminated total lives in the stage strip only
@@ -102,14 +102,11 @@ def test_appendix_is_sorted_by_project_name_case_insensitively():
     assert names[:3] == ["AX200", "KOS", "Q11"]
 
 
-def test_stage_strip_shows_terminated_and_suspended_separately():
+def test_kpis_count_stages_and_at_risk():
     html = render_page(snap(), "en", "2026-09-12", TH)
-    strip = html.split('class="stages"')[1].split("</div></div>")[0]
-    assert "Terminated" in strip and "Suspended" in strip
-    import re
-    cells = re.findall(r'<b class="[^"]*">(\d+)</b><span>([^<]+)</span>', strip)
-    d = {k: int(v) for v, k in cells}
-    assert d["Terminated"] == 1 and d["Suspended"] == 1
+    kp = html[html.index('<div class="kpis">'):html.index('<div class="grid-2">')]
+    assert '<span class="k-label">Total projects</span><b class="k-value">6</b><span class="k-sub">5 in Briefing, 2 terminated or suspended</span>' in kp
+    assert '<a class="kpi bad" href="#decisions"><span class="k-label">At risk</span><b class="k-value">1</b>' in kp    # BR1：passed 且 MP 延後 291 天
 
 
 def test_exception_two_shows_terminated_only_when_still_charging_and_suspended_zero_rows():
@@ -142,3 +139,40 @@ def test_in_briefing_no_cl_label_matches_inactive_rule():
     from src.portfolio.render.strings import t
     assert "not terminated or suspended" in t("en", "hc_in_briefing_no_cl")
     assert "非結案或暫停" in t("zh", "hc_in_briefing_no_cl") and "停案" not in t("zh", "hc_in_briefing_no_cl")
+
+
+def test_report_is_v2_layout_with_inline_echarts():
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    assert '<nav class="side" aria-label="BU10 Portfolio Review">' in html and 'href="#decisions"' in html
+    assert html.index('id="overview"') < html.index('id="decisions"') < html.index('id="health"') < html.index('id="appendix"')
+    assert "<script src=" not in html and "Apache Software Foundation" in html     # 內嵌，零外部腳本
+    for cid in ("stage", "customer", "gantt", "heat-function", "forecast", "pva-0-burd"):
+        assert f'id="c-{cid}"' in html, cid
+
+
+def test_every_chart_has_a_data_table():
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    assert html.count('class="chart"') == html.count('<details class="data">') > 5
+    stage_table = html[html.index('id="c-stage-data"'):].split('<details class="data">', 1)[1].split("</details>", 1)[0]
+    assert "<td>Execution</td><td>1</td>" in stage_table and "<td>Not in Briefing</td><td>1</td>" in stage_table
+
+
+def test_appendix_picker_initialises_charts_when_shown():
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    picker = html[html.rindex("<script>(function(){var s=document.getElementById('pick')"):]
+    assert "window.eisCharts.init(document.getElementById('projects'))" in picker
+
+
+def test_customer_name_cannot_break_the_page():
+    sn = snap()
+    sn["projects"][0]["customer"] = "</script><script>alert(1)</script>"
+    html = render_page(sn, "en", "2026-09-12", TH)
+    assert "<script>alert(1)" not in html
+    assert find_pii(html) == []
+
+
+def test_report_survives_snapshot_without_capacity():
+    sn = snap()
+    del sn["capacity"]
+    html = render_page(sn, "en", "2026-09-12", TH)
+    assert "Not in this snapshot." in html and 'id="c-stage"' in html

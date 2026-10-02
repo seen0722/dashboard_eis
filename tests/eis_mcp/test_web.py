@@ -187,7 +187,7 @@ def test_projects_table_filters_and_single_hit_redirect(ingested):
 
 def test_project_page_candidates_and_not_found(ingested):
     t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
-    assert "THORPE" in t and CODE in t and "<svg" in t and "PVT" in t and "Aug" in t and "12.0" in t
+    assert "THORPE" in t and CODE in t and 'id="c-pva-0-burd"' in t and "PVT" in t and "Aug" in t and "12.0" in t
     assert "compare with previous month" not in t.lower()                     # 只有一個月份
     t = html(ingested, f"/ui/202609/projects/thorpe?today={TODAY}")           # 名稱也可以當 path 參數
     assert CODE in t
@@ -207,7 +207,7 @@ def test_project_page_links_previous_month_when_present(ingested):
 # ---- loads / corrections ----
 def test_loads_page_filters_and_capacity_chart(ingested):
     t = html(ingested, "/ui/202609/loads")
-    assert "<svg" in t and "Capacity" in t and "latest util" in t.lower() and "BA80700R01" in t
+    assert 'id="c-forecast"' in t and "Capacity" in t and "latest util" in t.lower() and "BA80700R01" in t
     assert 'class="num sig">100<' not in t                                     # 100% 不標橘；橘色只給低於 spare_capacity_pct 的
     assert 'class="num sig">62<' in t                                        # 低於 spare_capacity_pct(85) 的部門標橘
     n_rows = t.count("<tr><td>")

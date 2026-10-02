@@ -4,8 +4,10 @@ import datetime as dt
 from html import escape as e
 from ..entities import INACTIVE, MONTHS
 from .css import CSS
-from .charts import timeline_svg, capacity_svg, pva_svg
 from .strings import t
+from .viz.dash import card, kpi_cards, milestone_table, safe_chart_card, side_nav
+from .viz.embed import chart_html, scripts
+from .viz.options import customer_bars, forecast_capacity, gantt, kpis, late_codes, load_heatmap, pva, stage_donut
 
 STAGE_KEYS = [("RFQ / RFI", "stage_rfq"), ("POC", "stage_poc"), ("Execution", "stage_exec"), ("MP", "stage_mp"), ("Sustain / EOP", "stage_sustain"), ("Terminated", "stage_terminated"), ("Suspended", "stage_suspended")]
 
@@ -82,13 +84,8 @@ def _stage_strip(snap: dict, lang: str, latest_month: int) -> str:
     return f'<div class="stages">{"".join(cells)}</div>'
 
 
-def _passed_mark(lang: str, overdue: bool, sig: bool) -> str:
-    if not overdue:
-        return ""
-    return f' <span class="{"sig" if sig else "dim"}">{e(t(lang, "passed"))}</span>'
-
-
-def _upcoming(snap: dict, lang: str, today: str, weeks: int, late: set[str]) -> str:
+def _upcoming_rows(snap: dict, today: str, weeks: int, late: set[str]) -> list[dict]:
+    """與舊版同一個視窗：過去 7 天到未來 weeks 週；只看 Briefing 內、非結案／暫停的專案。"""
     rows = []
     for p in snap["projects"]:
         if not p["in_briefing"] or p["stage_cat"] in INACTIVE:
@@ -96,11 +93,9 @@ def _upcoming(snap: dict, lang: str, today: str, weeks: int, late: set[str]) -> 
         for k in ("evt", "dvt", "pvt", "mp"):
             d = p["dates"][k]
             if d and -7 <= _days(d, today) <= weeks * 7:
-                rows.append((d, p["name"], p["customer"], k.upper(), _days(d, today) < 0, p["code"] in late))
-    rows.sort()
-    body = "".join(f'<tr><td>{d[5:].replace("-", "/")}{_passed_mark(lang, overdue, sig)}</td><td><b>{e(n)}</b></td><td>{e(c)}</td><td>{m}</td></tr>' for d, n, c, m, overdue, sig in rows)
-    return (f'<table><thead><tr><th>{e(t(lang, "col_date"))}</th><th>{e(t(lang, "col_project"))}</th><th>{e(t(lang, "col_customer"))}</th><th>{e(t(lang, "col_milestone"))}</th></tr></thead>'
-            f'<tbody>{body}</tbody></table>')
+                rows.append({"date": d, "name": p["name"], "code": p["code"], "customer": p["customer"], "milestone": k,
+                             "days_left": _days(d, today), "late": p["code"] in late})
+    return sorted(rows, key=lambda r: (r["date"], r["name"]))
 
 
 def _health(snap: dict, lang: str) -> str:
@@ -124,7 +119,7 @@ def _appendix_one(p: dict, lang: str, today: str, latest_month: int, i: int) -> 
         for role in ("BU RD", "FU RD", "PM"):
             v = p["pva"].get(role) or {"plan": [0] * 12, "actual": [0] * 12}
             plan, act = sum(v["plan"]), sum(v["actual"][:latest_month])
-            cards.append(f'<div><h4>{role}</h4><div class="s">{e(t(lang, "pva_line", plan=f"{plan:.1f}", missing="" if plan else t(lang, "pva_missing"), mon=MONTHS[latest_month - 1], actual=f"{act:.1f}"))}</div>{pva_svg(p["pva"], role, latest_month)}</div>')
+            cards.append(f'<div><h4>{role}</h4><div class="s">{e(t(lang, "pva_line", plan=f"{plan:.1f}", missing="" if plan else t(lang, "pva_missing"), mon=MONTHS[latest_month - 1], actual=f"{act:.1f}"))}</div>{chart_html(pva(p, role, latest_month, lang, i), lang)}</div>')
         by_m: dict[int, list] = {}
         for task in p["tasks"]:
             by_m.setdefault(task["month"], []).append(task)
@@ -140,31 +135,42 @@ def _appendix_one(p: dict, lang: str, today: str, latest_month: int, i: int) -> 
     return f'<div class="proj" data-idx="{i}"><div class="dim">{e(meta)}</div><div class="ms">{"".join(ms)}</div>{body}</div>'
 
 
-def render_page(snap: dict, lang: str, today: str, th: dict) -> str:
+def _overview(snap: dict, lang: str, today: str, th: dict, late: set[str]) -> str:
+    weeks, months = th["upcoming_weeks"], th["timeline_months"]
+    rows = _upcoming_rows(snap, today, weeks, late)
+    ms = milestone_table(rows, lang) if rows else f'<p class="note">{e(t(lang, "none"))}</p>'
+    return (kpi_cards(kpis(snap, lang, th), {"risk": "#decisions"})
+            + f'<div class="grid-2">{safe_chart_card(t(lang, "v_c_stage"), lambda: stage_donut(snap, lang), lang)}'
+            + f'{safe_chart_card(t(lang, "v_c_customer"), lambda: customer_bars(snap, lang), lang)}</div>'
+            + safe_chart_card(t(lang, "v_c_gantt", months=months), lambda: gantt(snap, lang, today, months), lang)
+            + f'<div class="grid-3">{safe_chart_card(t(lang, "v_c_heat"), lambda: load_heatmap(snap, lang, th["spare_capacity_pct"]), lang)}'
+            + f'{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}'
+            + f'{card(t(lang, "v_c_milestones", weeks=weeks), ms)}</div>')
+
+
+def render_page(snap: dict, lang: str, today: str, th: dict, echarts: str = "inline") -> str:
     m = snap["meta"]; lm = m["latest_month"]
     if lm < 1:
         raise ValueError("no manpower month in snapshot")   # 整頁都以「最新月」定位，沒有它不該畫出半張報表
     ps = snap["projects"]; cl = [p for p in ps if p["in_control_list"]]
-    late = {c for x in snap["exceptions"] if x["title"] == "milestones_passed" for c in x["codes"]}
-    start = f"{today[:7]}-01"
-    head_svg, rows = timeline_svg(ps, today, start, th["timeline_months"], late, lang)
+    late = late_codes(snap)
     order = sorted(range(len(ps)), key=lambda i: ps[i]["name"].casefold())   # 附錄依專案名稱字母排序（需求方 2026-09-30）
     options = "".join(f'<option value="{i}">{e(ps[i]["name"])}{", " + e(ps[i]["stage"]) if ps[i]["stage"] else ""}</option>' for i in order)
     appendix = "".join(_appendix_one(ps[i], lang, today, lm, i) for i in order)
     ym = f"{m['report_month'][:4]}-{m['report_month'][4:]}"
+    links = "".join(f'<a href="#{a}">{e(t(lang, k))}</a>' for a, k in (("overview", "v_nav_overview"), ("decisions", "v_nav_decisions"),
+                                                                          ("health", "v_nav_health"), ("appendix", "v_nav_appendix")))
+    side = side_nav(f'<a class="brand" href="#overview">{e(t(lang, "h1"))}</a>', links, t(lang, "v_menu"), label=t(lang, "h1"))
     return f"""<!DOCTYPE html><html lang="{t(lang, "html_lang")}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(t(lang, "doc_title", ym=ym))}</title><style>{CSS}</style></head><body>
+<title>{e(t(lang, "doc_title", ym=ym))}</title><style>{CSS}</style></head><body><div class="app">{side}<main class="main">
 <header><div><h1>{e(t(lang, "h1"))}</h1><p>{e(t(lang, "intro"))}</p></div>{_title_block(m, lang, len(cl), lm)}</header>
-<section><h2>{e(t(lang, "s_decisions"))}</h2><p class="lead">{e(t(lang, "s_decisions_lead"))}</p>{_exceptions(snap, lang, th)}</section>
-<section>{_stage_strip(snap, lang, lm)}<div class="two"><div><h2>{e(t(lang, "s_upcoming", weeks=th["upcoming_weeks"]))}</h2><p class="lead">{e(t(lang, "s_upcoming_lead"))}</p>{_upcoming(snap, lang, today, th["upcoming_weeks"], late)}</div>
-<div><h2>{e(t(lang, "s_timeline"))}</h2><p class="lead">{e(t(lang, "s_timeline_lead"))}</p><div class="tl"><table><thead><tr><th>{e(t(lang, "col_project"))}</th><th>{e(t(lang, "col_customer"))}</th><th>{e(t(lang, "col_stage"))}</th><th>{head_svg}</th></tr></thead><tbody>{rows}</tbody></table>
-<div class="legend"><span>{e(t(lang, "legend_marks"))}</span><span><i style="background:#E8590C"></i>{e(t(lang, "legend_late"))}</span><span>{e(t(lang, "legend_today"))}</span></div></div></div></div></section>
-<section><h2>{e(t(lang, "s_capacity"))}</h2><p class="lead">{e(t(lang, "s_capacity_lead"))}</p>{capacity_svg(ps, snap["capacity"], lm, lang)}
-<div class="legend"><span><i style="background:#22262A"></i>{e(t(lang, "lg_capacity"))}</span><span class="dim">{e(t(lang, "lg_capacity_note", mon=MONTHS[lm - 1]))}</span><span><i style="background:#3D5A80"></i>{e(t(lang, "lg_actual"))}</span><span><i style="background:#A9B8CC"></i>{e(t(lang, "lg_budget"))}</span><span><i style="background:#3D5A80;opacity:.6"></i>{e(t(lang, "lg_actual_planned"))}</span><span><i style="background:#5C8D89"></i>{e(t(lang, "lg_fu"))}</span></div></section>
-<section><h2>{e(t(lang, "s_health"))}</h2><p class="lead">{e(t(lang, "s_health_lead"))}</p>{_health(snap, lang)}</section>
-<section><h2>{e(t(lang, "s_appendix"))}</h2><p class="lead">{e(t(lang, "s_appendix_lead"))}</p><select id="pick">{options}</select><div id="projects">{appendix}</div></section>
+<section id="overview">{_overview(snap, lang, today, th, late)}</section>
+<section id="decisions"><h2>{e(t(lang, "s_decisions"))}</h2><p class="lead">{e(t(lang, "s_decisions_lead"))}</p><div class="card">{_exceptions(snap, lang, th)}</div></section>
+<section id="health"><h2>{e(t(lang, "s_health"))}</h2><p class="lead">{e(t(lang, "s_health_lead"))}</p><div class="card"><div class="wide">{_health(snap, lang)}</div></div></section>
+<section id="appendix"><h2>{e(t(lang, "s_appendix"))}</h2><p class="lead">{e(t(lang, "s_appendix_lead"))}</p><select id="pick">{options}</select><div id="projects">{appendix}</div></section>
 <footer><p>{e(t(lang, "foot_1"))}</p><p>{e(t(lang, "foot_2"))}</p><p>{e(t(lang, "foot_3"))}</p></footer>
-<script>(function(){{var s=document.getElementById('pick'),ps=document.querySelectorAll('#projects .proj');function show(i){{ps.forEach(function(p){{p.style.display=p.dataset.idx===String(i)?'':'none';}});}}s.addEventListener('change',function(){{show(s.value);}});show(s.value);}})();</script>
+</main></div>{scripts(echarts)}
+<script>(function(){{var s=document.getElementById('pick'),ps=document.querySelectorAll('#projects .proj');function show(i){{ps.forEach(function(p){{p.style.display=p.dataset.idx===String(i)?'':'none';}});if(window.eisCharts)window.eisCharts.init(document.getElementById('projects'));}}s.addEventListener('change',function(){{show(s.value);}});show(s.value);}})();</script>
 </body></html>"""
 
 

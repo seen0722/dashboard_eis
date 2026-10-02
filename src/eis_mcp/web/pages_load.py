@@ -2,7 +2,8 @@
 from __future__ import annotations
 from html import escape as e
 from ...portfolio.entities import MONTHS
-from ...portfolio.render.charts import capacity_svg
+from ...portfolio.render.viz.dash import chart_card
+from ...portfolio.render.viz.options import forecast_capacity
 
 
 def _cells(values: list, fmt: str) -> str:
@@ -23,7 +24,7 @@ def loads_body(month: str, snap: dict, res: dict, min_util: float | None, spare_
     table = (f'<div class="wide"><table><thead><tr><th>Dept</th><th>Name</th><th>Function</th><th class="num">Latest util %</th>{head}</tr></thead>'
              f'<tbody>{"".join(rows)}</tbody></table></div>') if rows else '<p class="empty">No department matches.</p>'
     return (f'<section><h2>Capacity</h2><p class="lead">Keyed-in people per month across departments; months after {MONTHS[lm - 1]} carry the last value forward.</p>'
-            f'{capacity_svg(snap["projects"], snap["capacity"], lm, "en")}</section>'
+            f'{chart_card(forecast_capacity(snap, "en"), "en")}</section>'
             f'<section><h2>{res["count"]} department{"" if res["count"] == 1 else "s"}</h2>'
             f'<p class="lead">util % = allocated FTE / people who keyed in (not headcount). Sorted by latest util ({MONTHS[lm - 1]}); departments with nobody keyed in come last and are dropped when a minimum is set. <span class="sig">Orange</span> = below {spare_pct:g}%, the spare capacity the report points at.</p>'
             f'{form}{table}</section>')
