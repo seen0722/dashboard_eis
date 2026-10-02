@@ -35,5 +35,5 @@ def health_section(snap: dict) -> str:
 
 
 def health_body(month: str, snap: dict, corrections: dict) -> str:
-    return (f'<section><h2>Data health</h2><p class="lead">What the source files could not answer.</p>'
+    return (f'<section><p class="lead">What the source files could not answer.</p>'
             f'<div class="card">{health_section(snap)}</div></section>{corrections_body(month, corrections)}')

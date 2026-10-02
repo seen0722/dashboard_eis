@@ -307,7 +307,7 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
 
         def build(ok):
             snap = load_snap(state, month)
-            return render_shell(title="Decisions", body=pages_decisions.decisions_body(snap, state.cfg.thresholds), months=ok, month=month,
+            return render_shell(title="Decisions this month", body=pages_decisions.decisions_body(snap, state.cfg.thresholds), months=ok, month=month,
                                 suffix="decisions", meta=snap["meta"], decisions=nav_count(snap), active="decisions")
         return await respond(state, request, build)
 

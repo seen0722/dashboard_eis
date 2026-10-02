@@ -56,9 +56,10 @@ def _nav(months: list[str], month: str | None, suffix: str, active: str, decisio
         badge = f'<span class="badge">{decisions}</span>' if key == "decisions" and decisions else ""
         items.append(f'<a href="/ui/{e(month)}/{path}"{" class=\"on\"" if active == key else ""}>{label}{badge}</a>')
     opts = "".join(f'<option value="{e(m)}"{" selected" if m == month else ""}>{fmt_month(m)}</option>' for m in months)
-    picker = (f'<form method="get" action="/ui/go"><label>Month <select name="month">{opts}</select></label>'
-              f'<input type="hidden" name="page" value="{e(suffix)}"><button>Go</button></form>'
-              f'<form method="get" action="/ui/{e(month)}/projects"><label>Find <input type="search" name="q" placeholder="code or name" aria-label="Search projects"></label><button>Find</button></form>')
+    # 月份選了就跳轉（頁尾腳本，不用 inline onchange）；沒有 JS 時才出現 Go。搜尋按 Enter 送出，按鈕只給螢幕閱讀器。
+    picker = (f'<form method="get" action="/ui/go"><label>Month <select name="month" data-autosubmit>{opts}</select></label>'
+              f'<input type="hidden" name="page" value="{e(suffix)}"><noscript><button>Go</button></noscript></form>'
+              f'<form method="get" action="/ui/{e(month)}/projects"><input type="search" name="q" class="search" placeholder="Find a project: code or name" aria-label="Search projects"><button class="sr">Find</button></form>')
     return side_nav(brand, picker + "".join(items), "Menu")
 
 
@@ -85,7 +86,9 @@ def render_shell(*, title: str, body: str, months: list[str], month: str | None 
             f'{body}'
             f'<footer><p>Values come straight from the monthly EIS snapshot; nothing is inferred or filled in.</p>'
             f'<p>Same data as the MCP tools. Report month is the month the snapshot was built for (report_month in the tools); keyed in through is the last month with reported manpower (latest_month).</p></footer>'
-            f'</main></div>{scripts("static")}</body></html>')
+            f'</main></div>{scripts("static")}'
+            f'<script>document.addEventListener("change",function(e){{var s=e.target;if(s&&s.hasAttribute&&s.hasAttribute("data-autosubmit"))s.form.submit();}});</script>'
+            f'</body></html>')
 
 
 def render_error(status: int, title: str, body: str, months: list[str]) -> str:

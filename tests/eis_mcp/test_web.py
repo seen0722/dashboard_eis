@@ -294,7 +294,7 @@ def test_exceptions_and_health_link_to_projects(ingested):
     ex = t[t.index('<ol class="ex">'):t.index("</ol>")]
     assert f'href="/ui/202609/projects/{CODE}"' in ex
     health = html(ingested, "/ui/202609/health")
-    health = health[health.index("<h2>Data health"):]
+    health = health[health.index("<h1>Data health"):]
     assert "<details" in health and "repeat items on the Decisions page" in health   # decide 級與 Decisions 重複，收合
 
 
@@ -511,7 +511,7 @@ def test_decisions_page_and_badge_count(ingested):
 
 def test_health_page_merges_corrections_and_old_url_redirects(ingested):
     t = html(ingested, "/ui/202609/health")
-    assert "<h2>Data health" in t and "repeat items on the Decisions page" in t and "No corrections" in t
+    assert "<h1>Data health" in t and "<h2>Data health" not in t and "repeat items on the Decisions page" in t and "No corrections" in t
     r = get(ingested, "/ui/202609/corrections")
     assert r.status_code == 301 and r.headers["location"] == "/ui/202609/health"
 
@@ -523,3 +523,18 @@ def test_decisions_page_lists_every_at_risk_project(ingested):
     t = html(ingested, f"/ui/202609/decisions?today={TODAY}")
     head = t[t.index(f"At risk ({len(codes)}):"):t.index('<ol class="ex">')]
     assert codes and all(f'href="/ui/202609/projects/{c}"' in head for c in codes)
+
+
+
+# ---- 專業化 pass 1（2026-10-03）：外框、字級、單一標題 ----
+def test_sidebar_month_picker_jumps_on_change_and_search_is_one_field():
+    t = render_shell(title="x", body="", months=["202609", "202608"], month="202609")
+    nav = t[t.index("<nav"):t.index("</nav>")]
+    assert '<select name="month" data-autosubmit' in nav and "<noscript><button>Go</button></noscript>" in nav
+    assert 'class="search"' in nav and '<button class="sr">Find</button>' in nav
+    assert "data-autosubmit" in t[t.index("</nav>"):]                                   # 頁尾腳本處理自動送出（不用 inline onchange）
+
+
+def test_each_page_has_one_heading_for_its_subject(ingested):
+    t = html(ingested, f"/ui/202609/decisions?today={TODAY}")
+    assert "<h1>Decisions this month" in t and "<h2>Decisions this month" not in t

@@ -25,3 +25,9 @@ def test_css_tokens_present():
     for tok in ("#F3F5F8", "#1F2937", "#2563EB", "#1E2735", "#E8590C"):
         assert tok.lower() in CSS.lower()
     assert ".kpis{" in CSS and ".navt:checked~.links" in CSS and "@media(max-width:900px)" in CSS
+
+
+
+def test_type_scale_tokens():
+    for tok in ("--fs-xs:12px", "--fs-sm:13px", "--fs-base:14px", "--fs-md:16px", "--fs-lg:20px", "--fs-xl:28px"):
+        assert tok in CSS, tok
