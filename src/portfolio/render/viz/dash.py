@@ -28,13 +28,17 @@ def kpi_cards(items: list[dict], href: dict | None = None, cls: str = "") -> str
     return f'<div class="{f"kpis {cls}".strip()}">{"".join(out)}</div>'
 
 
-def card(title: str, body: str, sub: str = "", cls: str = "") -> str:
+def card(title: str, body: str, sub: str = "", cls: str = "", legend: tuple = ()) -> str:
     s = f'<span class="card-sub">{e(sub)}</span>' if sub else ""
-    return f'<div class="{f"card {cls}".strip()}"><div class="card-h"><h3>{e(title)}</h3>{s}</div>{body}</div>'
+    if legend:   # 圖例在右上角、與標題同一行（mock 樣式）；符號用圖上的顏色
+        items = "".join(f'<span><i style="color:{e(c)}">{e(g)}</i>{e(n)}</span>' for g, n, c in legend)
+        s += f'<span class="lg-i">{items}</span>'
+    h = "card-h has-legend" if legend else "card-h"
+    return f'<div class="{f"card {cls}".strip()}"><div class="{h}"><h3>{e(title)}</h3>{s}</div>{body}</div>'
 
 
 def chart_card(ch: Chart, lang: str, sub: str = "", cls: str = "") -> str:
-    return card(ch.title, chart_html(ch, lang), sub or ch.headline, cls)
+    return card(ch.title, chart_html(ch, lang), sub or ch.headline, cls, ch.legend)
 
 
 def safe_chart_card(title: str, build: Callable[[], Chart], lang: str, cls: str = "") -> str:

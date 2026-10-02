@@ -24,6 +24,7 @@ class Chart:
     variants: dict = field(default_factory=dict)   # {篩選標籤: option}；空 = 不提供篩選
     note: str = ""                            # 圖下方一行口徑／缺口說明
     headline: str = ""                         # 卡片右上角的一句結論（程式算出的數字）
+    legend: tuple = ()                         # ((符號, 名稱, 顏色), ...)：卡片右上角的圖例，符號與圖上同色
     min_width: int = 0                        # >0：窄螢幕時圖維持此寬度，在卡片內橫向捲動（不擠壓、不撐開頁面）
 
 

@@ -206,7 +206,7 @@ def gantt(snap: dict, lang: str, today: str, months: int) -> Chart:
     return Chart("gantt", t(lang, "v_c_gantt", months=months), _gantt_option(rows, t0, t1, today, late, lang),
                  (t(lang, "col_project"), t(lang, "col_customer"), t(lang, "col_stage"), "EVT", "DVT", "PVT", "MP"), table,
                  height=max(160, 30 * len(rows) + 50), variants=variants, note=t(lang, "v_gantt_note"), min_width=720,
-                 headline=t(lang, "v_gantt_legend"))
+                 legend=tuple((g, k.upper(), T.MS_COLORS[k]) for g, k in zip(("◇", "◆", "▲", "★"), MS)))
 
 
 def load_heatmap(snap: dict, lang: str, spare_pct: float, by: str = "function") -> Chart:

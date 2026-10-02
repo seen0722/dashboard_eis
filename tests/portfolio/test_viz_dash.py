@@ -91,3 +91,14 @@ def test_bar_list_card_is_plain_html():
     h = bar_list_card(customer_bars(snap(), "en"), "en", sub="Briefing Customer column")
     assert "data-chart" not in h and '<table class="bars-t">' in h
     assert '<td>Trimble</td><td class="bar"><span style="width:100%"></span></td><td class="num"><b>2</b></td>' in h
+
+
+
+def test_chart_legend_sits_top_right_in_symbol_colours():
+    """2026-10-03 需求方：Timeline legend 位置與顏色要照 mock——右上角、符號與圖上同色。"""
+    ch = Chart("gantt", "Timeline", {"series": []}, ("a",), (), legend=(("◇", "EVT", "#3B82F6"), ("★", "MP", "#DC2626")))
+    h = chart_card(ch, "en")
+    assert '<div class="card-h has-legend"><h3>Timeline</h3><span class="lg-i">' in h
+    assert '<span><i style="color:#3B82F6">◇</i>EVT</span><span><i style="color:#DC2626">★</i>MP</span>' in h
+    from src.portfolio.render.css import CSS
+    assert ".eq .card-h.has-legend{flex-direction:row" in CSS

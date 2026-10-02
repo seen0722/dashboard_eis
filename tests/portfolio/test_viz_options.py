@@ -270,7 +270,7 @@ def test_gantt_uses_the_mock_symbols_colours_and_legend():
     assert (marks["PVT 09/08"]["symbol"], marks["PVT 09/08"]["itemStyle"]["color"]) == ("triangle", "#F59E0B")
     assert marks["MP 10/20"]["symbol"].startswith("path://") and marks["MP 10/20"]["itemStyle"]["color"] == "#DC2626"
     assert marks["RFQ, no dates yet"]["symbol"] == "emptyCircle"
-    assert ch.headline == "◇ EVT  ◆ DVT  ▲ PVT  ★ MP"
+    assert ch.headline == "" and ch.legend == (("◇", "EVT", "#3B82F6"), ("◆", "DVT", "#16A34A"), ("▲", "PVT", "#F59E0B"), ("★", "MP", "#DC2626"))
     bars = {x["name"]: x for x in ch.option["series"] if x["type"] == "custom"}
     assert set(bars) == {"to EVT", "to DVT", "to PVT", "to MP"}
     assert bars["to PVT"]["itemStyle"]["color"] == "#F59E0B" and bars["to MP"]["itemStyle"]["color"] == "#DC2626"
