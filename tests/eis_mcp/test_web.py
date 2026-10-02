@@ -129,8 +129,8 @@ def test_nav_forms_are_not_nested():
 # ---- 總覽 ----
 def test_overview_shows_kpis_charts_and_milestones(ingested):
     t = html(ingested, f"/ui/202609/?today={TODAY}")
-    assert '<div class="kpis">' in t and "Total projects" in t and 'href="/ui/202609/decisions"' in t and "Report month 2026-09" in t
-    for cid in ("stage", "customer", "category", "type", "gantt", "heat-function", "forecast", "fu"):
+    assert '<div class="status">' in t and '<div class="kpis strip">' in t and "Total projects" in t and 'href="/ui/202609/decisions"' in t and "Report month 2026-09" in t
+    for cid in ("composition", "customer", "gantt", "heat-function", "forecast", "fu"):
         assert f'id="c-{cid}"' in t and f'id="c-{cid}-data"' in t, cid
     assert '<ol class="ex">' not in t and "<h2>Data health" not in t                 # 已移到各自的分頁
     assert "Milestones within 8 weeks" in t and "THORPE" in t and '<td class="num">-43</td>' in t
@@ -147,7 +147,7 @@ def test_overview_survives_snapshot_without_capacity(ingested):
     del snap["capacity"]
     f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
     t = html(ingested, f"/ui/202609/?today={TODAY}")
-    assert "Not in this snapshot." in t and 'id="c-stage"' in t
+    assert "Not in this snapshot." in t and 'id="c-composition"' in t
 
 
 def test_loads_page_has_department_heatmap(ingested):
@@ -531,7 +531,7 @@ def test_sidebar_month_picker_jumps_on_change_and_search_is_one_field():
     t = render_shell(title="x", body="", months=["202609", "202608"], month="202609")
     nav = t[t.index("<nav"):t.index("</nav>")]
     assert '<select name="month" data-autosubmit' in nav and "<noscript><button>Go</button></noscript>" in nav
-    assert 'class="search"' in nav and '<button class="sr">Find</button>' in nav
+    assert 'class="search" placeholder="Find project"' in nav and '<button class="sr">Find</button>' in nav
     assert "data-autosubmit" in t[t.index("</nav>"):]                                   # 頁尾腳本處理自動送出（不用 inline onchange）
 
 

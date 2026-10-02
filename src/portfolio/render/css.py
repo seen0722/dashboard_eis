@@ -25,7 +25,7 @@ h2{font-size:var(--fs-lg);font-weight:700;margin:20px 0 4px;letter-spacing:-.005
 a.kpi:hover,a.kpi:focus-visible{box-shadow:0 4px 14px rgba(15,23,42,.10);outline:none}
 .kpi.bad{border-top-color:var(--bad)}.kpi.bad .k-value{color:var(--bad)}
 .k-label{font-size:var(--fs-xs);color:var(--ink-2)}.k-value{font-size:26px;font-weight:700;line-height:1.2;overflow-wrap:anywhere}.k-sub{font-size:var(--fs-xs);color:var(--ink-3)}
-.grid-2,.grid-3{display:grid;gap:14px;margin:0 0 14px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.status{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:14px;margin:0 0 14px}.status-card{display:block;min-width:0;background:var(--card);border:1px solid var(--rule);border-top:4px solid var(--bad);border-radius:12px;padding:16px 20px;color:var(--ink);text-decoration:none}.status-card.dec{border-top-color:var(--signal)}a.status-card:hover,a.status-card:focus-visible{box-shadow:0 4px 16px rgba(15,23,42,.10);outline:none}.s-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.s-label{font-size:var(--fs-md);font-weight:650}.s-num{font-size:40px;font-weight:700;line-height:1;letter-spacing:-.02em}.risk .s-num{color:var(--bad)}.dec .s-num{color:var(--signal)}.chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}.chip{font-size:var(--fs-sm);font-weight:600;padding:3px 10px;border-radius:999px;background:#FEE2E2;color:#B91C1C;text-decoration:none}a.chip:hover,a.chip:focus-visible{background:#FECACA}.s-list{margin:10px 0 0;padding-left:20px;font-size:var(--fs-sm);color:var(--ink-2)}.s-list li{margin:3px 0}.s-list li::marker{color:var(--signal);font-weight:700}.kpis.strip{grid-template-columns:repeat(5,minmax(0,1fr))}.kpis.strip .kpi{border-top:1px solid var(--rule);padding:10px 14px}.kpis.strip .k-value{font-size:22px}.grid-2,.grid-3{display:grid;gap:14px;margin:0 0 14px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .card{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:14px 16px;min-width:0;margin:0 0 14px}.grid-2>.card,.grid-3>.card{margin:0}
 .card-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 8px}.card-h h3{font-size:var(--fs-md);font-weight:650;margin:0}.card-sub{font-size:var(--fs-sm);color:var(--ink-2)}
 .chart{width:100%}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.note{font-size:var(--fs-xs);color:var(--ink-2);margin:6px 0 0}
@@ -55,10 +55,10 @@ details td.desc{white-space:pre-line;max-width:70ch;color:var(--ink-2);font-size
 .wide{overflow-x:auto}
 footer{color:var(--ink-3);font-size:12px;margin-top:24px;max-width:80ch}footer p{margin:4px 0}
 svg text{font-family:inherit}
-@media(max-width:1200px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1200px){.kpis,.kpis.strip{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.app{grid-template-columns:minmax(0,1fr)}.side{position:static;height:auto;padding:12px 14px}.side a.brand{display:inline-flex;padding:4px 6px}
 .side .navbtn{display:inline-block;float:right;color:#fff;font-size:13px;padding:4px 10px;border:1px solid #475569;border-radius:6px;cursor:pointer}.side .links{display:none;padding-top:10px}.navt:checked~.links{display:block}
-.main{padding:18px 16px 48px}header{flex-direction:column}.tb{min-width:0;width:100%}.grid-2,.grid-3{grid-template-columns:minmax(0,1fr)}.pva{grid-template-columns:minmax(0,1fr)}.ms{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}}
-@media(max-width:640px){.kpis,.kpis.four{grid-template-columns:repeat(2,minmax(0,1fr))}.k-value{font-size:22px}}
+.main{padding:18px 16px 48px}.status{grid-template-columns:minmax(0,1fr)}header{flex-direction:column}.tb{min-width:0;width:100%}.grid-2,.grid-3{grid-template-columns:minmax(0,1fr)}.pva{grid-template-columns:minmax(0,1fr)}.ms{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}}
+@media(max-width:640px){.kpis,.kpis.four,.kpis.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.k-value{font-size:22px}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 """

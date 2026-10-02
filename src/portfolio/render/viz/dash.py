@@ -77,3 +77,34 @@ def at_risk_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | N
     items = ", ".join(f'<a href="{e(link(c))}">{e(names.get(c, c))}</a>' if link else f'<b>{e(names.get(c, c))}</b>' for c in codes)
     return (f'<p class="lead"><b class="sig">{e(t(lang, "v_risk_head", n=len(codes)))}</b> {items}'
             f'<br><span class="note">{e(t(lang, "v_risk_note", days=th["mp_slip_days"]))}</span></p>')
+
+
+
+def exception_titles(snap: dict, th: dict, lang: str) -> list[str]:
+    """與 render/page.py::_exceptions 相同的標題組法（同一組 kw、同一個 legacy 退路），只取標題。
+    tests 以「每個標題都出現在 exceptions_html 輸出裡」守住兩邊不漂移。"""
+    out = []
+    for x in snap["exceptions"]:
+        k = x["title"]
+        kw = {"n": x["count"], "days": th["mp_slip_days"], "pct": th["spare_capacity_pct"], "full": x.get("ask_data", "")}
+        kw.update(x.get("extra", {}))
+        if k == "suspended_charging" and "suspended" not in kw:
+            k = "suspended_charging_legacy"
+        out.append(t(lang, f"ex_{k}_title", **kw))
+    return out
+
+
+def status_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | None = None, decisions_href: str = "#decisions") -> str:
+    """Overview 第一屏：At risk（列出每一案）與本月決策（列出標題），兩張重點卡並排。"""
+    codes = at_risk_codes(snap, th["mp_slip_days"])
+    names = {p["code"]: p["name"] for p in snap["projects"]}
+    chips = "".join(f'<a class="chip" href="{e(link(c))}">{e(names.get(c, c))}</a>' if link else f'<span class="chip">{e(names.get(c, c))}</span>'
+                    for c in codes)
+    risk = (f'<div class="status-card risk"><div class="s-head"><span class="s-label">{e(t(lang, "v_kpi_risk"))}</span>'
+            f'<b class="s-num">{len(codes)}</b></div><div class="chips">{chips}</div>'
+            f'<p class="note">{e(t(lang, "v_kpi_risk_sub", days=th["mp_slip_days"]))}</p></div>')
+    titles = exception_titles(snap, th, lang)
+    items = "".join(f"<li>{e(x)}</li>" for x in titles)
+    dec = (f'<a class="status-card dec" href="{e(decisions_href)}"><div class="s-head"><span class="s-label">{e(t(lang, "s_decisions"))}</span>'
+           f'<b class="s-num">{len(titles)}</b></div><ol class="s-list">{items}</ol></a>')
+    return f'<div class="status">{risk}{dec}</div>'

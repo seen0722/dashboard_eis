@@ -8,6 +8,7 @@ from html import escape as e
 from ...portfolio.render.page import stage_strip_html
 from ...portfolio.render.strings import t
 from .pages_overview import months_body
+from ...portfolio.render.viz.dash import exception_titles  # noqa: F401  （月報、Overview 共用；首頁沿用原名）
 from .shell import meta_line
 
 ZH = "zh-Hant"
@@ -32,20 +33,6 @@ def bi(en: str, zh: str, cls: str = "") -> str:
     """一段中英並列文字：英文在上、中文在下（標 lang，螢幕閱讀器才會用中文發音）。輸入是純文字，這裡負責跳脫。"""
     c = f' class="{cls}"' if cls else ""
     return f'<p{c}><span>{e(en)}</span><span class="zh" lang="{ZH}">{e(zh)}</span></p>'
-
-
-def exception_titles(snap: dict, th: dict, lang: str) -> list[str]:
-    """與 render/page.py::_exceptions 相同的標題組法（同一組 kw、同一個 legacy 退路），只取標題。
-    tests 以「每個標題都出現在 exceptions_html 輸出裡」守住兩邊不漂移。"""
-    out = []
-    for x in snap["exceptions"]:
-        k = x["title"]
-        kw = {"n": x["count"], "days": th["mp_slip_days"], "pct": th["spare_capacity_pct"], "full": x.get("ask_data", "")}
-        kw.update(x.get("extra", {}))
-        if k == "suspended_charging" and "suspended" not in kw:
-            k = "suspended_charging_legacy"
-        out.append(t(lang, f"ex_{k}_title", **kw))
-    return out
 
 
 SUMMARY_ATTRS = 'data-expand="expand · 展開" data-collapse="collapse · 收合"'   # 與月報 task 表的 summary 同一形狀：左標題、右動作字樣

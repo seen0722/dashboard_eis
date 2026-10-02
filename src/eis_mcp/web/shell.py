@@ -59,7 +59,7 @@ def _nav(months: list[str], month: str | None, suffix: str, active: str, decisio
     # 月份選了就跳轉（頁尾腳本，不用 inline onchange）；沒有 JS 時才出現 Go。搜尋按 Enter 送出，按鈕只給螢幕閱讀器。
     picker = (f'<form method="get" action="/ui/go"><label>Month <select name="month" data-autosubmit>{opts}</select></label>'
               f'<input type="hidden" name="page" value="{e(suffix)}"><noscript><button>Go</button></noscript></form>'
-              f'<form method="get" action="/ui/{e(month)}/projects"><input type="search" name="q" class="search" placeholder="Find a project: code or name" aria-label="Search projects"><button class="sr">Find</button></form>')
+              f'<form method="get" action="/ui/{e(month)}/projects"><input type="search" name="q" class="search" placeholder="Find project" aria-label="Search projects"><button class="sr">Find</button></form>')
     return side_nav(brand, picker + "".join(items), "Menu")
 
 

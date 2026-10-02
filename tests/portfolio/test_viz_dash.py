@@ -55,3 +55,14 @@ def test_upcoming_pill_does_not_claim_on_track():
 def test_chart_card_shows_the_chart_headline():
     ch = Chart("x", "T", {"series": []}, ("a",), (), headline="Aug: 205 of 209 in use, 4 left")
     assert '<span class="card-sub">Aug: 205 of 209 in use, 4 left</span>' in chart_card(ch, "en")
+
+
+def test_status_cards_lead_with_at_risk_and_decisions():
+    from tests.portfolio.test_page import snap, TH
+    from src.portfolio.render.viz.dash import status_html
+    h = status_html(snap(), "en", TH, link=lambda c: f"/p/{c}", decisions_href="#decisions")
+    assert h.startswith('<div class="status">')
+    risk = h[:h.index('class="status-card dec"')]
+    assert 'class="status-card risk"' in risk and '<b class="s-num">1</b>' in risk and '<a class="chip" href="/p/BR1">THORPE</a>' in risk
+    dec = h[h.index('class="status-card dec"'):]
+    assert '<b class="s-num">5</b>' in dec and "1 milestones passed without a stage change" in dec and 'href="#decisions"' in dec

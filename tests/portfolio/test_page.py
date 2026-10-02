@@ -104,9 +104,10 @@ def test_appendix_is_sorted_by_project_name_case_insensitively():
 
 def test_kpis_count_stages_and_at_risk():
     html = render_page(snap(), "en", "2026-09-12", TH)
-    kp = html[html.index('<div class="kpis">'):html.index('<div class="grid-2">')]
+    kp = html[html.index('<div class="kpis strip">'):html.index('<div class="grid-2">')]
     assert '<span class="k-label">Total projects</span><b class="k-value">6</b><span class="k-sub">5 in Briefing, 2 terminated or suspended</span>' in kp
-    assert '<a class="kpi bad" href="#decisions"><span class="k-label">At risk</span><b class="k-value">1</b>' in kp    # BR1：passed 且 MP 延後 291 天
+    st = html[html.index('<div class="status">'):html.index('<div class="kpis strip">')]
+    assert '<span class="s-label">At risk</span><b class="s-num">1</b>' in st and "THORPE" in st    # BR1：passed 且 MP 延後 291 天（2026-10-03 起在重點卡）
 
 
 def test_exception_two_shows_terminated_only_when_still_charging_and_suspended_zero_rows():
@@ -146,15 +147,15 @@ def test_report_is_v2_layout_with_inline_echarts():
     assert '<nav class="side" aria-label="BU10 Portfolio Review">' in html and 'href="#decisions"' in html
     assert html.index('id="overview"') < html.index('id="decisions"') < html.index('id="health"') < html.index('id="appendix"')
     assert "<script src=" not in html and "Apache Software Foundation" in html     # 內嵌，零外部腳本
-    for cid in ("stage", "customer", "gantt", "heat-function", "forecast", "pva-0-burd"):
+    for cid in ("composition", "customer", "gantt", "heat-function", "forecast", "fu", "pva-0-burd"):
         assert f'id="c-{cid}"' in html, cid
 
 
 def test_every_chart_has_a_data_table():
     html = render_page(snap(), "en", "2026-09-12", TH)
     assert html.count('class="chart"') == html.count('<details class="data">') > 5
-    stage_table = html[html.index('id="c-stage-data"'):].split('<details class="data">', 1)[1].split("</details>", 1)[0]
-    assert "<td>Execution</td><td>1</td>" in stage_table and "<td>Not in Briefing</td><td>1</td>" in stage_table
+    mix_table = html[html.index('id="c-composition-data"'):].split('<details class="data">', 1)[1].split("</details>", 1)[0]
+    assert "<td>Stage</td><td>Execution</td><td>1</td>" in mix_table and "<td>Stage</td><td>Not in Briefing</td><td>1</td>" in mix_table
 
 
 def test_appendix_picker_initialises_charts_when_shown():
@@ -175,7 +176,7 @@ def test_report_survives_snapshot_without_capacity():
     sn = snap()
     del sn["capacity"]
     html = render_page(sn, "en", "2026-09-12", TH)
-    assert "Not in this snapshot." in html and 'id="c-stage"' in html
+    assert "Not in this snapshot." in html and 'id="c-composition"' in html
 
 
 def test_appendix_task_tables_scroll_instead_of_widening_the_page():
@@ -189,7 +190,7 @@ def test_milestones_get_a_full_width_card():
     html = render_page(snap(), "en", "2026-09-12", TH)
     assert "grid-3" not in html.split("<style>")[1].split("</style>")[1]
     ov = html[html.index('id="overview"'):html.index('id="decisions"')]
-    assert ov.count('<div class="grid-2">') == 3          # stage/customer、category/type、load/forecast
+    assert ov.count('<div class="grid-2">') == 2          # BU/FU 人力、customer/milestones（2026-10-03 第一屏重排）
 
 
 def test_decisions_section_lists_the_at_risk_projects():
@@ -200,10 +201,20 @@ def test_decisions_section_lists_the_at_risk_projects():
 
 
 def test_report_has_category_and_type_charts():
-    html = render_page(snap(), "en", "2026-09-12", TH)
-    assert 'id="c-category"' in html and 'id="c-type"' in html
+    html = render_page(snap(), "en", "2026-09-12", TH)                    # 2026-10-03 起併入組合構成圖
+    mix = html[html.index('id="c-composition-data"'):html.index("</details>", html.index('id="c-composition-data"'))]
+    assert "<td>Category</td>" in mix and "<td>Type</td>" in mix
 
 
 def test_report_has_fu_plan_chart():
     html = render_page(snap(), "en", "2026-09-12", TH)
     assert 'id="c-fu"' in html
+
+
+
+def test_overview_leads_with_status_then_strip_then_manpower():
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    ov = html[html.index('id="overview"'):html.index('id="decisions"')]
+    order = [ov.index(x) for x in ('<div class="status">', '<div class="kpis strip">', 'id="c-forecast"', 'id="c-composition"', 'id="c-gantt"')]
+    assert order == sorted(order)
+    assert 'id="c-stage"' not in ov and 'id="c-type"' not in ov and "At risk" not in ov[ov.index('<div class="kpis strip">'):ov.index('id="c-forecast"')]
