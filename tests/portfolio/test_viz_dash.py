@@ -50,3 +50,8 @@ def test_hidden_menu_checkbox_is_not_stretched_by_side_input_width():
 def test_upcoming_pill_does_not_claim_on_track():
     """Review：資料只知道「超過 14 天」，不知道是否正常；標籤不能推論。"""
     assert pill("ok", "en") == '<span class="pill mute">Upcoming</span>'
+
+
+def test_chart_card_shows_the_chart_headline():
+    ch = Chart("x", "T", {"series": []}, ("a",), (), headline="Aug: 205 of 209 in use, 4 left")
+    assert '<span class="card-sub">Aug: 205 of 209 in use, 4 left</span>' in chart_card(ch, "en")

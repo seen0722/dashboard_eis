@@ -244,7 +244,8 @@ def load_heatmap(snap: dict, lang: str, spare_pct: float, by: str = "function") 
 
 
 def forecast_capacity(snap: dict, lang: str) -> Chart:
-    """BU RD＋PM 對 BU 填報人數（天花板）。plan 只算 has_plan 的專案，並附同一批專案的 actual；最新月之後的人數沿用最新月（虛線）。
+    """BU RD＋PM 的人力去哪了：長條拆成「有 budget 的專案」與「沒有 budget 的專案」兩段（加總＝實際），
+    plan 以短橫線標在有 budget 那段上（同一批專案），天花板是 BU 填報人數（最新月之後沿用，虛線）。
     FU RD 不在這張圖：天花板是 BU 人數，FU 的 plan 與 actual 在 fu_plan_actual。"""
     ps, lm = snap["projects"], snap["meta"]["latest_month"]
     raw = snap["capacity"]
@@ -253,28 +254,48 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
     wp = [p for p in cl if p["has_plan"]]
     add = lambda a, b: [round(x + y, 2) for x, y in zip(a, b)]  # noqa: E731
     actual = add(_sum(cl, "BU RD", "actual", lm), _sum(cl, "PM", "actual", lm))
+    withb = add(_sum(wp, "BU RD", "actual", lm), _sum(wp, "PM", "actual", lm))
+    nob = [round(a - w, 2) for a, w in zip(actual, withb)]
     plan = add(_sum(wp, "BU RD", "plan", only_plan=True), _sum(wp, "PM", "plan", only_plan=True))
-    act_wp = add(_sum(wp, "BU RD", "actual", lm), _sum(wp, "PM", "actual", lm))     # 與 plan 同一批專案
-    pad = lambda xs: xs + [None] * (12 - len(xs))  # noqa: E731
     mon = MONTHS[lm - 1]
-    series = [{"name": t(lang, "v_lg_cap"), "type": "line", "data": [v if i < lm else None for i, v in enumerate(cap)], "symbol": "none",
+    plan_pts: list = list(plan)
+    if wp:
+        plan_pts[-1] = {"value": plan[-1], "label": {"show": True, "position": "right", "formatter": f"{t(lang, 'v_fc_plan_label')} {plan[-1]:.0f}", "color": T.INK}}
+
+    def bars(values: list[float], short: str, color: str) -> list:
+        out = [v for v in values] + [None] * (12 - len(values))
+        last = lm - 1
+        out[last] = {"value": values[last], "label": {"show": True, "position": "right", "formatter": f"{short} {values[last]:.0f}",
+                                                      "color": color, "fontWeight": 600}}
+        return out
+
+    # 標籤掛在最後一點；endLabel 遇到前段 null 會在瀏覽器算出 NaN 座標
+    carried: list = [v if i >= lm - 1 else None for i, v in enumerate(cap)]
+    carried[-1] = {"value": cap[-1], "symbol": "circle", "symbolSize": 5, "label": {"show": True, "position": "right", "formatter": f"{t(lang, 'v_fc_cap_label')} {cap[-1]:.0f}", "color": T.INK2}}
+    series = [{"name": t(lang, "v_fc_with", n=len(wp)), "type": "bar", "stack": "actual", "barWidth": "45%",
+               "data": bars(withb, t(lang, "v_fc_with_short"), T.ACCENT), "itemStyle": {"color": T.ACCENT}},
+              {"name": t(lang, "v_fc_without", n=len(cl) - len(wp)), "type": "bar", "stack": "actual",
+               "data": bars(nob, t(lang, "v_fc_without_short"), T.SIGNAL), "itemStyle": {"color": T.SIGNAL}},
+              {"name": t(lang, "v_lg_plan"), "type": "line", "data": plan_pts, "symbol": "rect", "symbolSize": [26, 3], "lineStyle": {"width": 0},
+               "itemStyle": {"color": T.INK}, "z": 4},
+              {"name": t(lang, "v_lg_cap"), "type": "line", "data": [v if i < lm else None for i, v in enumerate(cap)], "symbol": "none",
                "lineStyle": {"color": T.INK, "width": 2.5}, "itemStyle": {"color": T.INK}},
-              {"name": t(lang, "v_lg_cap_carried", mon=mon), "type": "line", "data": [v if i >= lm - 1 else None for i, v in enumerate(cap)],
-               "symbol": "none", "lineStyle": {"color": T.INK, "width": 2, "type": "dashed"}, "itemStyle": {"color": T.INK}},
-              {"name": t(lang, "v_lg_actual"), "type": "bar", "data": pad(actual), "barWidth": "45%", "itemStyle": {"color": T.ACCENT}},
-              {"name": t(lang, "v_lg_actual_planned", n=len(wp)), "type": "line", "data": pad(act_wp), "symbol": "circle", "symbolSize": 4,
-               "lineStyle": {"color": T.ACCENT, "type": "dotted", "width": 2}, "itemStyle": {"color": T.ACCENT}},
-              {"name": t(lang, "v_lg_plan"), "type": "line", "data": plan, "symbol": "circle", "symbolSize": 5,
-               "lineStyle": {"color": T.PLAN, "type": "dashed", "width": 2}, "itemStyle": {"color": T.PLAN}}]
-    option = {"grid": {"left": 8, "right": 12, "top": 16, "bottom": 64, "containLabel": True}, "tooltip": {"trigger": "axis"},
-              "legend": {"bottom": 0, "itemWidth": 14, "itemHeight": 8, "textStyle": {"color": T.INK2, "fontSize": 11}},
+              {"name": t(lang, "v_lg_cap_carried", mon=mon), "type": "line", "data": carried, "symbol": "none",
+               "lineStyle": {"color": T.INK, "width": 2, "type": "dashed"}, "itemStyle": {"color": T.INK}}]
+    option = {"grid": {"left": 8, "right": 96, "top": 24, "bottom": 8, "containLabel": True}, "tooltip": {"trigger": "axis"},
               "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
               "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK3}}, "series": series}
-    rows = tuple((m, raw[i] if i < lm else None, actual[i] if i < lm else None, act_wp[i] if i < lm and wp else None, plan[i] if wp else None)
-                 for i, m in enumerate(MONTHS))
+    used, ceiling = actual[lm - 1], raw[lm - 1]
+    headline = ""
+    if ceiling:
+        key, kw = ("v_fc_left", {"left": f"{ceiling - used:.0f}"}) if used <= ceiling else ("v_fc_over", {"over": f"{used - ceiling:.0f}"})
+        headline = t(lang, key, mon=mon, used=f"{used:.0f}", cap=f"{ceiling:.0f}", **kw)
+    rows = tuple((m, raw[i] if i < lm else None, actual[i] if i < lm else None, withb[i] if i < lm and wp else None,
+                  nob[i] if i < lm else None, plan[i] if wp else None) for i, m in enumerate(MONTHS))
     return Chart("forecast", t(lang, "v_c_forecast"), option,
-                 (t(lang, "v_col_month"), t(lang, "v_lg_cap"), t(lang, "v_lg_actual"), t(lang, "v_lg_actual_planned", n=len(wp)), t(lang, "v_lg_plan")), rows,
-                 height=300, note=t(lang, "cap_budget_note", covered=len(wp), total=len(cl)))
+                 (t(lang, "v_col_month"), t(lang, "v_lg_cap"), t(lang, "v_lg_actual"), t(lang, "v_fc_with", n=len(wp)),
+                  t(lang, "v_fc_without", n=len(cl) - len(wp)), t(lang, "v_lg_plan")), rows,
+                 height=300, note=t(lang, "cap_budget_note", covered=len(wp), total=len(cl)), headline=headline)
 
 
 def fu_plan_actual(snap: dict, lang: str) -> Chart:

@@ -34,7 +34,7 @@ def card(title: str, body: str, sub: str = "", cls: str = "") -> str:
 
 
 def chart_card(ch: Chart, lang: str, sub: str = "", cls: str = "") -> str:
-    return card(ch.title, chart_html(ch, lang), sub, cls)
+    return card(ch.title, chart_html(ch, lang), sub or ch.headline, cls)
 
 
 def safe_chart_card(title: str, build: Callable[[], Chart], lang: str, cls: str = "") -> str:

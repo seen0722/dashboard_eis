@@ -88,15 +88,33 @@ def test_heatmap_by_department_has_one_row_per_department():
 
 
 def test_forecast_capacity_series_and_budget_coverage():
+    """2026-10-02 改為「人力去哪了」：長條拆成有 budget／沒 budget 兩段（加總＝實際），plan 只與有 budget 那段比。"""
     ch = O.forecast_capacity(snap(), "en")
-    s = {x["name"]: x["data"] for x in ch.option["series"]}
-    assert s["Keyed-in BU headcount"] == [10] * 8 + [None] * 4
-    assert s["Headcount carried from Aug"] == [None] * 7 + [10] * 5
-    assert s["Actual, BU RD + PM"] == [13.0] * 8 + [None] * 4         # THORPE 9+1、TR_KOS 3
-    assert s["Budget plan, BU RD + PM"] == [11.0] * 12                 # 只有 has_plan 的 THORPE
-    assert "Actual, FU RD" not in s                                    # FU 不在 BU 天花板的比較範圍；改在 fu_plan_actual
+    s = {x["name"]: x for x in ch.option["series"]}
+    val = lambda d: d["value"] if isinstance(d, dict) else d  # noqa: E731
+    assert s["Keyed-in BU headcount"]["data"] == [10] * 8 + [None] * 4
+    assert [val(d) for d in s["Headcount carried from Aug"]["data"]] == [None] * 7 + [10] * 5
+    val = lambda d: d["value"] if isinstance(d, dict) else d  # noqa: E731
+    withb, nob = s["With budget, 1 projects"], s["No budget, 1 projects"]
+    assert withb["stack"] == nob["stack"] == "actual"
+    assert [val(d) for d in withb["data"]] == [10.0] * 8 + [None] * 4               # THORPE：BU RD 9 + PM 1
+    assert [val(d) for d in nob["data"]] == [3.0] * 8 + [None] * 4                  # TR_KOS：沒有 budget
+    plan = s["Budget plan, BU RD + PM"]
+    assert [val(d) for d in plan["data"]] == [11.0] * 12 and plan["symbol"] == "rect"
+    assert plan["data"][11]["label"]["formatter"] == "Plan 11"                     # 拿掉圖例後，短橫線要自己說明是什麼
+    assert nob["data"][7]["label"]["formatter"] == "No budget 3"                    # 最新月直接標在長條旁，不靠圖例
+    assert "legend" not in ch.option
+    carried = s["Headcount carried from Aug"]
+    assert "endLabel" not in carried and carried["data"][11]["label"]["formatter"] == "Headcount 10" and carried["data"][11]["symbol"] != "none"   # endLabel 遇到前段 null 會算出 NaN（瀏覽器實測）
+    assert ch.headline == "Aug: 13 of 10 in use, 3 over"
     assert ch.note == "Budget covers 1 / 2 projects, BU RD + PM only"
-    assert ch.rows[8] == ("Sep", None, None, None, 11.0)               # 月、人數、actual、同批 actual、plan
+    assert ch.rows[7] == ("Aug", 10, 13.0, 10.0, 3.0, 11.0)
+    assert ch.rows[8] == ("Sep", None, None, None, None, 11.0)
+
+
+def test_forecast_headline_counts_what_is_left():
+    s = snap(); s["capacity"] = [20] * 8 + [0] * 4
+    assert O.forecast_capacity(s, "en").headline == "Aug: 13 of 20 in use, 7 left"
 
 
 def test_pva_without_plan_draws_actual_only_and_says_so():
@@ -158,12 +176,6 @@ def test_category_donut_uses_the_briefing_column_and_names_what_others_holds():
 def test_type_donut_counts_odm_ems_jdm_and_keeps_blank_visible():
     ch = O.type_donut(_with_categories(), "en")
     assert ch.id == "type" and dict((r[0], r[1]) for r in ch.rows) == {"ODM": 3, "EMS": 1, "JDM": 1, "(blank)": 1, "Not in Briefing": 1}
-
-
-def test_forecast_has_actual_on_the_same_planned_projects():
-    """plan 只涵蓋有 budget 的專案；要與同一批專案的 actual 比，不能拿全部專案的長條比（舊 SVG 有這條線，2026-10-02 補回）。"""
-    s = {x["name"]: x["data"] for x in O.forecast_capacity(snap(), "en").option["series"]}
-    assert s["Actual, same 1 planned projects"] == [10.0] * 8 + [None] * 4      # 只有 THORPE 有 plan：BU RD 9 + PM 1
 
 
 def test_fu_plan_vs_actual_uses_one_denominator():
