@@ -1,10 +1,9 @@
 """月份清單與總覽頁的 body。所有數字來自 snapshot / store.months()。"""
 from __future__ import annotations
 from html import escape as e
-from ...portfolio.render.page import stage_strip_html
+from ...portfolio.render.viz.dash import card, kpi_cards, milestone_table, safe_chart_card
+from ...portfolio.render.viz.options import customer_bars, forecast_capacity, gantt, kpis, late_codes, load_heatmap, stage_donut
 from .. import queries
-from .pages_decisions import linked_exceptions
-from .pages_health import health_section
 from .shell import fmt_month
 
 
@@ -28,21 +27,26 @@ def months_body(months: list[dict], heading: bool = True) -> str:
             f'<th class="num">Files</th><th class="num">Size</th><th>Categories</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>')
 
 
-def _milestones(month: str, res: dict) -> str:
-    rows = "".join(f'<tr><td>{e(r["date"])}</td><td class="num {"sig" if r["days_left"] < 0 else ""}">{r["days_left"]}</td>'
-                   f'<td><a href="/ui/{month}/projects/{e(r["code"])}">{e(r["name"])}</a></td><td>{e(r["stage_cat"])}</td><td>{r["milestone"].upper()}</td></tr>'
-                   for r in res["milestones"])
-    if not rows:
-        return f'<p class="empty">No EVT/DVT/PVT/MP within ±{res["weeks"]} weeks of {e(res["today"])}.</p>'
-    return (f'<div class="wide"><table><thead><tr><th>Date</th><th class="num">Days left</th><th>Project</th><th>Stage</th><th>Milestone</th></tr></thead>'
-            f'<tbody>{rows}</tbody></table></div><p class="dim">Negative days left = already passed. Active projects only (in briefing, not terminated or suspended).</p>')
+def _milestone_card(month: str, snap: dict, today: str, weeks: int) -> str:
+    up = queries.upcoming(snap, today, weeks)
+    late = late_codes(snap)
+    by_code = {p["code"]: p for p in snap["projects"]}
+    rows = [{**r, "customer": by_code[r["code"]]["customer"], "late": r["code"] in late} for r in up["milestones"]]
+    form = (f'<form method="get" class="filters"><label>Weeks <input type="number" name="weeks" value="{weeks}" min="1" max="52"></label>'
+            f'<label>Today <input type="text" name="today" value="{e(today)}" size="10"></label><button>Apply</button></form>')
+    table = (milestone_table(rows, "en", link=lambda c: f"/ui/{month}/projects/{c}") if rows
+             else f'<p class="empty">No EVT/DVT/PVT/MP within ±{weeks} weeks of {e(today)}.</p>')
+    return card(f"Milestones within {weeks} weeks", form + table +
+                '<p class="dim">Negative days left = already passed. Active projects only (in briefing, not terminated or suspended).</p>')
 
 
 def overview_body(snap: dict, th: dict, today: str, weeks: int) -> str:
-    month = snap["meta"]["report_month"]; lm = snap["meta"]["latest_month"]
-    up = queries.upcoming(snap, today, weeks)
-    form = (f'<form method="get" class="filters"><label>Weeks <input type="number" name="weeks" value="{weeks}" min="1" max="52"></label>'
-            f'<label>Today <input type="text" name="today" value="{e(today)}" size="10"></label><button>Apply</button></form>')
-    return (f'<section><h2>Decisions this month</h2><p class="lead">Exceptions the rules found, ranked; each names the decision asked for.</p>{linked_exceptions(snap, th)}</section>'
-            f'<section>{stage_strip_html(snap, "en", lm)}<h2>Milestones within {weeks} weeks</h2>{form}{_milestones(month, up)}</section>'
-            f'<section><h2>Data health</h2><p class="lead">What the source files could not answer.</p>{health_section(snap)}</section>')
+    month = snap["meta"]["report_month"]
+    months = int(th.get("timeline_months", 6)); spare = float(th.get("spare_capacity_pct", 85))
+    return (f'<section>{kpi_cards(kpis(snap, "en", th), {"risk": f"/ui/{month}/decisions"})}'
+            f'<div class="grid-2">{safe_chart_card("Projects by stage", lambda: stage_donut(snap, "en"), "en")}'
+            f'{safe_chart_card("Projects by customer", lambda: customer_bars(snap, "en"), "en")}</div>'
+            f'{safe_chart_card(f"Timeline, next {months} months", lambda: gantt(snap, "en", today, months), "en")}'
+            f'<div class="grid-3">{safe_chart_card("Resource load by function", lambda: load_heatmap(snap, "en", spare), "en")}'
+            f'{safe_chart_card("Forecast vs capacity", lambda: forecast_capacity(snap, "en"), "en")}'
+            f'{_milestone_card(month, snap, today, weeks)}</div></section>')

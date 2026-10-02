@@ -127,14 +127,38 @@ def test_nav_forms_are_not_nested():
 
 
 # ---- 總覽 ----
-def test_overview_shows_decisions_health_and_milestones(ingested):
+def test_overview_shows_kpis_charts_and_milestones(ingested):
     t = html(ingested, f"/ui/202609/?today={TODAY}")
-    assert "Decisions this month" in t and "Data health" in t and '<ol class="ex">' in t and "Report month 2026-09" in t
-    assert "Milestones within 8 weeks" in t and "THORPE" in t and "-43" in t          # MP 2026-07-31 距 2026-09-12 已過 43 天
+    assert '<div class="kpis">' in t and "Total projects" in t and 'href="/ui/202609/decisions"' in t and "Report month 2026-09" in t
+    for cid in ("stage", "customer", "gantt", "heat-function", "forecast"):
+        assert f'id="c-{cid}"' in t and f'id="c-{cid}-data"' in t, cid
+    assert '<ol class="ex">' not in t and "<h2>Data health" not in t                 # 已移到各自的分頁
+    assert "Milestones within 8 weeks" in t and "THORPE" in t and '<td class="num">-43</td>' in t
     t2 = html(ingested, f"/ui/202609/?today={TODAY}&weeks=2")
-    assert "Milestones within 2 weeks" in t2 and "-43" not in t2
+    assert "Milestones within 2 weeks" in t2 and '<td class="num">-43</td>' not in t2
     assert get(ingested, "/ui/202609/?weeks=0").status_code == 400
     assert get(ingested, "/ui/202609/?today=13/09/2026").status_code == 400
+
+
+def test_overview_survives_snapshot_without_capacity(ingested):
+    store = ingested.state.eis.store
+    f = store.snapshot_dir("202609") / "portfolio.json"
+    snap = json.loads(f.read_text(encoding="utf-8"))
+    del snap["capacity"]
+    f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
+    t = html(ingested, f"/ui/202609/?today={TODAY}")
+    assert "Not in this snapshot." in t and 'id="c-stage"' in t
+
+
+def test_loads_page_has_department_heatmap(ingested):
+    t = html(ingested, "/ui/202609/loads")
+    assert 'id="c-heat-dept"' in t and "Grey cells: nobody keyed in." in t
+
+
+def test_project_page_top_cards(ingested):
+    t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
+    top = t[t.index('<div class="kpis four">'):t.index("</div></section>")]
+    assert '<span class="k-label">Stage</span>' in top and '<span class="k-label">FTE, Aug</span><b class="k-value">12.0</b>' in top
 
 
 # ---- 專案 ----
@@ -322,7 +346,7 @@ def test_latest_task_month_is_open(ingested):
 
 def test_tables_scroll_on_narrow_screens(ingested):
     t = html(ingested, f"/ui/202609/?today={TODAY}")
-    ms = t[t.index("<h2>Milestones"):t.index("<h2>Data health")]
+    ms = t[t.index("<h3>Milestones"):]
     assert '<div class="wide"><table>' in ms
     assert "@media(max-width:640px)" in t
     add_twin(ingested)

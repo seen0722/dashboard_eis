@@ -1,8 +1,10 @@
 """專案表、候選清單、單案頁、跨月 diff 的 body。數字全部來自快照；里程碑/PVA/tasks 卡片重用月報的 project_card_html。"""
 from __future__ import annotations
+import datetime as dt
 from html import escape as e
 from ...portfolio.entities import MONTHS
 from ...portfolio.render.page import project_card_html
+from ...portfolio.render.viz.dash import kpi_cards
 
 STAGE_CATS = ("RFQ / RFI", "POC", "Execution", "MP", "Sustain / EOP", "Terminated", "Suspended", "Other")
 BIZ_TYPES = ("JDM", "ODM", "EMS")
@@ -47,6 +49,17 @@ def _ymd(s: str) -> str:
     return f"{s[:4]}-{s[4:6]}-{s[6:]}" if len(s) == 8 and s.isdigit() else s
 
 
+def _top_cards(p: dict, lm: int, today: str) -> str:
+    nxt = next(((k, p["dates"][k]) for k in ("evt", "dvt", "pvt", "mp") if p["dates"].get(k) and p["dates"][k] >= today), None)
+    days = (dt.date.fromisoformat(nxt[1]) - dt.date.fromisoformat(today)).days if nxt else None
+    items = [{"key": "stage", "label": "Stage", "value": p["stage"] or "–", "sub": p["stage_cat"] or "not in briefing"},
+             {"key": "customer", "label": "Customer", "value": p["customer"] or "–", "sub": p.get("biz_type", "")},
+             {"key": "next", "label": "Next milestone", "value": f"{nxt[0].upper()} {nxt[1]}" if nxt else "–",
+              "sub": f"in {days} days" if nxt else "none ahead in the briefing"},
+             {"key": "fte", "label": f"FTE, {MONTHS[lm - 1]}", "value": f'{p["fte"][lm - 1]:.1f}', "sub": "Resource Summary"}]
+    return kpi_cards(items, cls="four")
+
+
 def project_body(month: str, p: dict, today: str, lm: int, prev: str | None) -> str:
     yn = lambda b: "yes" if b else "no"  # noqa: E731
     kv = (f'<div class="kv"><span>Code</span><span>{e(p["code"])}</span><span>Customer</span><span>{e(p["customer"]) or "–"}</span>'
@@ -63,7 +76,7 @@ def project_body(month: str, p: dict, today: str, lm: int, prev: str | None) -> 
                 if hist else '<p class="empty">No earlier briefing snapshots.</p>')
     # 月報的卡片把每月 task 表都收在 <details>（新到舊）；網頁只有這一案，最新月預設展開，其餘仍收合。
     card = project_card_html(p, "en", today, lm, 0).replace("<details>", "<details open>", 1)
-    return (f'<section>{kv}{cmp_}</section>'
+    return (f'<section>{_top_cards(p, lm, today)}{kv}{cmp_}</section>'
             f'<section><h2>Milestones, plan vs actual, tasks</h2>{card}</section>'
             f'<section><h2>FTE and NTD by month</h2>{months_tbl}</section>'
             f'<section><h2>Briefing history</h2>{hist_tbl}</section>')
