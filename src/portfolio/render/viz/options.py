@@ -253,6 +253,7 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
     add = lambda a, b: [round(x + y, 2) for x, y in zip(a, b)]  # noqa: E731
     actual = add(_sum(cl, "BU RD", "actual", lm), _sum(cl, "PM", "actual", lm))
     plan = add(_sum(wp, "BU RD", "plan", only_plan=True), _sum(wp, "PM", "plan", only_plan=True))
+    act_wp = add(_sum(wp, "BU RD", "actual", lm), _sum(wp, "PM", "actual", lm))     # 與 plan 同一批專案
     fu = [round(v, 2) for v in _sum(cl, "FU RD", "actual", lm)]
     pad = lambda xs: xs + [None] * (12 - len(xs))  # noqa: E731
     mon = MONTHS[lm - 1]
@@ -261,6 +262,8 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
               {"name": t(lang, "v_lg_cap_carried", mon=mon), "type": "line", "data": [v if i >= lm - 1 else None for i, v in enumerate(cap)],
                "symbol": "none", "lineStyle": {"color": T.INK, "width": 2, "type": "dashed"}, "itemStyle": {"color": T.INK}},
               {"name": t(lang, "v_lg_actual"), "type": "bar", "data": pad(actual), "barWidth": "45%", "itemStyle": {"color": T.ACCENT}},
+              {"name": t(lang, "v_lg_actual_planned", n=len(wp)), "type": "line", "data": pad(act_wp), "symbol": "circle", "symbolSize": 4,
+               "lineStyle": {"color": T.ACCENT, "type": "dotted", "width": 2}, "itemStyle": {"color": T.ACCENT}},
               {"name": t(lang, "v_lg_plan"), "type": "line", "data": plan, "symbol": "circle", "symbolSize": 5,
                "lineStyle": {"color": T.PLAN, "type": "dashed", "width": 2}, "itemStyle": {"color": T.PLAN}},
               {"name": t(lang, "v_lg_fu"), "type": "line", "data": pad(fu), "symbol": "none", "lineStyle": {"color": T.FU, "width": 2},
@@ -269,11 +272,33 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
               "legend": {"bottom": 0, "itemWidth": 14, "itemHeight": 8, "textStyle": {"color": T.INK2, "fontSize": 11}},
               "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
               "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK3}}, "series": series}
-    rows = tuple((m, raw[i] if i < lm else None, actual[i] if i < lm else None, plan[i] if wp else None, fu[i] if i < lm else None)
-                 for i, m in enumerate(MONTHS))
+    rows = tuple((m, raw[i] if i < lm else None, actual[i] if i < lm else None, act_wp[i] if i < lm and wp else None, plan[i] if wp else None,
+                  fu[i] if i < lm else None) for i, m in enumerate(MONTHS))
     return Chart("forecast", t(lang, "v_c_forecast"), option,
-                 (t(lang, "v_col_month"), t(lang, "v_lg_cap"), t(lang, "v_lg_actual"), t(lang, "v_lg_plan"), t(lang, "v_lg_fu")), rows,
+                 (t(lang, "v_col_month"), t(lang, "v_lg_cap"), t(lang, "v_lg_actual"), t(lang, "v_lg_actual_planned", n=len(wp)), t(lang, "v_lg_plan"),
+                  t(lang, "v_lg_fu")), rows,
                  height=300, note=t(lang, "cap_budget_note", covered=len(wp), total=len(cl)))
+
+
+def fu_plan_actual(snap: dict, lang: str) -> Chart:
+    """FU RD 的 plan 只有部分專案有填：plan 與 actual 都只算這些專案（同分母）；全部專案的 FU actual 另列為參考，不與 plan 比。"""
+    ps, lm = snap["projects"], snap["meta"]["latest_month"]
+    cl = [p for p in ps if p.get("pva")]
+    fp = [p for p in cl if any((p["pva"].get("FU RD") or {}).get("plan", [0.0] * 12))]
+    fu = lambda group, field, n=12: [round(sum((p["pva"].get("FU RD") or {}).get(field, [0.0] * 12)[i] for p in group), 2) for i in range(n)]  # noqa: E731
+    plan, same, every = fu(fp, "plan"), fu(fp, "actual", lm), fu(cl, "actual", lm)
+    pad = lambda xs: xs + [None] * (12 - len(xs))  # noqa: E731
+    series = [{"name": t(lang, "v_lg_fu_same"), "type": "bar", "data": pad(same), "barWidth": "45%", "itemStyle": {"color": T.FU}},
+              {"name": t(lang, "v_lg_fu_plan"), "type": "line", "data": plan, "symbol": "circle", "symbolSize": 5,
+               "lineStyle": {"color": T.FU, "type": "dashed", "width": 2}, "itemStyle": {"color": T.FU}}] if fp else []
+    option = {"grid": {"left": 8, "right": 12, "top": 16, "bottom": 48, "containLabel": True}, "tooltip": {"trigger": "axis"},
+              "legend": {"bottom": 0, "itemWidth": 14, "itemHeight": 8, "textStyle": {"color": T.INK2, "fontSize": 11}},
+              "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
+              "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK3}}, "series": series}
+    rows = tuple((m, plan[i] if fp else None, same[i] if fp and i < lm else None, every[i] if i < lm else None) for i, m in enumerate(MONTHS))
+    note = t(lang, "v_fu_note", covered=len(fp), total=len(cl), mon=MONTHS[lm - 1], all=f"{every[lm - 1]:.1f}")
+    return Chart("fu", t(lang, "v_c_fu"), option, (t(lang, "v_col_month"), t(lang, "v_lg_fu_plan"), t(lang, "v_lg_fu_same"), t(lang, "v_lg_fu_all")),
+                 rows, height=300, note=note)
 
 
 def pva(p: dict, role: str, latest_month: int, lang: str, idx: int) -> Chart:

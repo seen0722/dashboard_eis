@@ -90,6 +90,9 @@ STRINGS = {
         "v_filter_customer": "Customer", "v_filter_all": "All", "v_not_in_snapshot": "Not in this snapshot.",
         "v_c_category": "Projects by category", "v_c_type": "Projects by type", "v_others_note": "Others: {names}",
         "v_col_category": "Category", "v_col_type": "Type",
+        "v_lg_actual_planned": "Actual, same {n} planned projects", "v_c_fu": "FU RD: plan vs actual", "v_lg_fu_plan": "FU RD plan",
+        "v_lg_fu_same": "FU RD actual, same projects", "v_lg_fu_all": "FU RD actual, all projects",
+        "v_fu_note": "FU plan covers {covered} / {total} projects; both series use those projects. FU RD actual across all {total} projects in {mon}: {all} FTE.",
         "v_risk_head": "At risk ({n}):", "v_risk_note": "Milestone passed without a stage change, or MP slipped over {days} days. Slips the PM already confirmed are also listed under Data health.",
     },
     "zh": {
@@ -181,6 +184,9 @@ STRINGS = {
         "v_filter_customer": "客戶", "v_filter_all": "全部", "v_not_in_snapshot": "這份快照沒有這項資料。",
         "v_c_category": "各類別專案數", "v_c_type": "各類型專案數", "v_others_note": "其他：{names}",
         "v_col_category": "類別", "v_col_type": "類型",
+        "v_lg_actual_planned": "實際，同 {n} 個有 budget 的專案", "v_c_fu": "FU RD 計畫與實際", "v_lg_fu_plan": "FU RD 計畫",
+        "v_lg_fu_same": "FU RD 實際，同一批專案", "v_lg_fu_all": "FU RD 實際，全部專案",
+        "v_fu_note": "FU 計畫涵蓋 {covered} / {total} 案，兩條數列都只算這些專案。{mon} 全部 {total} 案的 FU RD 實際：{all} FTE。",
         "v_risk_head": "風險（{n}）：", "v_risk_note": "里程碑已過未轉階段，或 MP 延後超過 {days} 天；PM 已確認的延後也列在資料健康度。",
     },
 }

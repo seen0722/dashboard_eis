@@ -7,7 +7,7 @@ from .css import CSS
 from .strings import t
 from .viz.dash import at_risk_html, card, kpi_cards, milestone_table, safe_chart_card, side_nav
 from .viz.embed import chart_html, scripts
-from .viz.options import category_donut, customer_bars, forecast_capacity, gantt, kpis, late_codes, load_heatmap, pva, stage_donut, type_donut
+from .viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, load_heatmap, pva, stage_donut, type_donut
 
 STAGE_KEYS = [("RFQ / RFI", "stage_rfq"), ("POC", "stage_poc"), ("Execution", "stage_exec"), ("MP", "stage_mp"), ("Sustain / EOP", "stage_sustain"), ("Terminated", "stage_terminated"), ("Suspended", "stage_suspended")]
 
@@ -145,8 +145,9 @@ def _overview(snap: dict, lang: str, today: str, th: dict, late: set[str]) -> st
             + f'<div class="grid-2">{safe_chart_card(t(lang, "v_c_category"), lambda: category_donut(snap, lang), lang)}'
             + f'{safe_chart_card(t(lang, "v_c_type"), lambda: type_donut(snap, lang), lang)}</div>'
             + safe_chart_card(t(lang, "v_c_gantt", months=months), lambda: gantt(snap, lang, today, months), lang)
-            + f'<div class="grid-2">{safe_chart_card(t(lang, "v_c_heat"), lambda: load_heatmap(snap, lang, th["spare_capacity_pct"]), lang)}'
-            + f'{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}</div>'
+            + f'<div class="grid-2">{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}'
+            + f'{safe_chart_card(t(lang, "v_c_fu"), lambda: fu_plan_actual(snap, lang), lang)}</div>'
+            + safe_chart_card(t(lang, "v_c_heat"), lambda: load_heatmap(snap, lang, th["spare_capacity_pct"]), lang)
             + card(t(lang, "v_c_milestones", weeks=weeks), ms))
 
 

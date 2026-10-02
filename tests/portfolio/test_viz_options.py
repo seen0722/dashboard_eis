@@ -96,7 +96,7 @@ def test_forecast_capacity_series_and_budget_coverage():
     assert s["Budget plan, BU RD + PM"] == [11.0] * 12                 # 只有 has_plan 的 THORPE
     assert s["Actual, FU RD"] == [2.0] * 8 + [None] * 4
     assert ch.note == "Budget covers 1 / 2 projects, BU RD + PM only"
-    assert ch.rows[8] == ("Sep", None, None, 11.0, None)
+    assert ch.rows[8] == ("Sep", None, None, None, 11.0, None)         # 月、人數、actual、同批 actual、plan、FU
 
 
 def test_pva_without_plan_draws_actual_only_and_says_so():
@@ -158,3 +158,20 @@ def test_category_donut_uses_the_briefing_column_and_names_what_others_holds():
 def test_type_donut_counts_odm_ems_jdm_and_keeps_blank_visible():
     ch = O.type_donut(_with_categories(), "en")
     assert ch.id == "type" and dict((r[0], r[1]) for r in ch.rows) == {"ODM": 3, "EMS": 1, "JDM": 1, "(blank)": 1, "Not in Briefing": 1}
+
+
+def test_forecast_has_actual_on_the_same_planned_projects():
+    """plan 只涵蓋有 budget 的專案；要與同一批專案的 actual 比，不能拿全部專案的長條比（舊 SVG 有這條線，2026-10-02 補回）。"""
+    s = {x["name"]: x["data"] for x in O.forecast_capacity(snap(), "en").option["series"]}
+    assert s["Actual, same 1 planned projects"] == [10.0] * 8 + [None] * 4      # 只有 THORPE 有 plan：BU RD 9 + PM 1
+
+
+def test_fu_plan_vs_actual_uses_one_denominator():
+    s = snap(); a = next(p for p in s["projects"] if p["code"] == "BR1")
+    a["pva"]["FU RD"]["plan"] = [3.0] * 12
+    ch = O.fu_plan_actual(s, "en")
+    series = {x["name"]: x["data"] for x in ch.option["series"]}
+    assert ch.id == "fu" and series["FU RD plan"] == [3.0] * 12 and series["FU RD actual, same projects"] == [2.0] * 8 + [None] * 4
+    assert ch.note == "FU plan covers 1 / 2 projects; both series use those projects. FU RD actual across all 2 projects in Aug: 2.0 FTE."
+    assert ch.rows[7] == ("Aug", 3.0, 2.0, 2.0)
+    assert O.fu_plan_actual(snap(), "en").note.startswith("FU plan covers 0 / 2 projects")

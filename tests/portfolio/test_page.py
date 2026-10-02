@@ -202,3 +202,8 @@ def test_decisions_section_lists_the_at_risk_projects():
 def test_report_has_category_and_type_charts():
     html = render_page(snap(), "en", "2026-09-12", TH)
     assert 'id="c-category"' in html and 'id="c-type"' in html
+
+
+def test_report_has_fu_plan_chart():
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    assert 'id="c-fu"' in html

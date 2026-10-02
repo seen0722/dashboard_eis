@@ -130,7 +130,7 @@ def test_nav_forms_are_not_nested():
 def test_overview_shows_kpis_charts_and_milestones(ingested):
     t = html(ingested, f"/ui/202609/?today={TODAY}")
     assert '<div class="kpis">' in t and "Total projects" in t and 'href="/ui/202609/decisions"' in t and "Report month 2026-09" in t
-    for cid in ("stage", "customer", "category", "type", "gantt", "heat-function", "forecast"):
+    for cid in ("stage", "customer", "category", "type", "gantt", "heat-function", "forecast", "fu"):
         assert f'id="c-{cid}"' in t and f'id="c-{cid}-data"' in t, cid
     assert '<ol class="ex">' not in t and "<h2>Data health" not in t                 # 已移到各自的分頁
     assert "Milestones within 8 weeks" in t and "THORPE" in t and '<td class="num">-43</td>' in t
