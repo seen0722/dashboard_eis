@@ -5,7 +5,7 @@ from html import escape as e
 from ..entities import INACTIVE, MONTHS
 from .css import CSS
 from .strings import t
-from .viz.dash import card, kpi_cards, milestone_table, safe_chart_card, side_nav
+from .viz.dash import at_risk_html, card, kpi_cards, milestone_table, safe_chart_card, side_nav
 from .viz.embed import chart_html, scripts
 from .viz.options import customer_bars, forecast_capacity, gantt, kpis, late_codes, load_heatmap, pva, stage_donut
 
@@ -165,7 +165,7 @@ def render_page(snap: dict, lang: str, today: str, th: dict, echarts: str = "inl
 <title>{e(t(lang, "doc_title", ym=ym))}</title><style>{CSS}</style></head><body><div class="app">{side}<main class="main">
 <header><div><h1>{e(t(lang, "h1"))}</h1><p>{e(t(lang, "intro"))}</p></div>{_title_block(m, lang, len(cl), lm)}</header>
 <section id="overview">{_overview(snap, lang, today, th, late)}</section>
-<section id="decisions"><h2>{e(t(lang, "s_decisions"))}</h2><p class="lead">{e(t(lang, "s_decisions_lead"))}</p><div class="card">{_exceptions(snap, lang, th)}</div></section>
+<section id="decisions"><h2>{e(t(lang, "s_decisions"))}</h2><p class="lead">{e(t(lang, "s_decisions_lead"))}</p>{at_risk_html(snap, lang, th)}<div class="card">{_exceptions(snap, lang, th)}</div></section>
 <section id="health"><h2>{e(t(lang, "s_health"))}</h2><p class="lead">{e(t(lang, "s_health_lead"))}</p><div class="card"><div class="wide">{_health(snap, lang)}</div></div></section>
 <section id="appendix"><h2>{e(t(lang, "s_appendix"))}</h2><p class="lead">{e(t(lang, "s_appendix_lead"))}</p><select id="pick">{options}</select><div id="projects">{appendix}</div></section>
 <footer><p>{e(t(lang, "foot_1"))}</p><p>{e(t(lang, "foot_2"))}</p><p>{e(t(lang, "foot_3"))}</p></footer>

@@ -1,6 +1,7 @@
 """快照 → 圖（Chart）。只讀 snapshot dict；數字全部在這裡算好，圖與資料表共用同一份結果。"""
 from __future__ import annotations
 import datetime as dt
+from html import escape
 from types import SimpleNamespace
 from ...entities import INACTIVE, MONTHS
 from ...model.rules import mp_slipped
@@ -64,7 +65,8 @@ def stage_donut(snap: dict, lang: str) -> Chart:
 def customer_bars(snap: dict, lang: str, top: int = 8) -> Chart:
     counts: dict[str, int] = {}
     for p in snap["projects"]:
-        c = (p.get("customer") or "").strip() or t(lang, "v_cat_blank")
+        # 不在 Briefing 的專案本來就沒有客戶欄：歸成與甜甜圈同一類，(blank) 只留給 Briefing 內真正空白的
+        c = t(lang, "v_cat_not_in_briefing") if not p["in_briefing"] else ((p.get("customer") or "").strip() or t(lang, "v_cat_blank"))
         counts[c] = counts.get(c, 0) + 1
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].casefold()))
     head = list(ranked[:top])
@@ -114,11 +116,13 @@ def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: 
                 continue
             c = T.BAD if p["code"] in late and d < today else T.ACCENT
             marks.append({"value": [_ms(d), y], "symbol": SYMBOL[k], "symbolSize": 10, "itemStyle": {"color": c, "borderColor": c},
+                          "tooltip": {"formatter": f"{escape(p['name'])}: {k.upper()} {d}"},   # 預設 tooltip 會顯示時區換算後的時間與內部 y 索引
                           "label": {"show": True, "position": "right", "formatter": f"{k.upper()} {d[5:7]}/{d[8:10]}", "color": c, "fontSize": 11}})
         if not ds:
             marks.append({"value": [_ms(today), y], "symbol": "circle", "symbolSize": 5, "itemStyle": {"color": T.INK3},   # symbol none 會連標籤一起藏掉
+                          "tooltip": {"formatter": f"{escape(p['name'])}: {escape(t(lang, 'no_dates', stage=p['stage']))}"},
                           "label": {"show": True, "position": "right", "formatter": t(lang, "no_dates", stage=p["stage"]), "color": T.INK3, "fontSize": 11}})
-    return {"grid": {"left": 8, "right": 90, "top": 28, "bottom": 24, "containLabel": True}, "tooltip": {"trigger": "item"},
+    return {"useUTC": True, "grid": {"left": 8, "right": 90, "top": 28, "bottom": 24, "containLabel": True}, "tooltip": {"trigger": "item"},
             "xAxis": {"type": "time", "position": "top", "min": _ms(t0.isoformat()), "max": _ms(t1.isoformat()),
                       "splitLine": {"show": True, "lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK2}},
             "yAxis": {"type": "category", "data": [p["name"] for p in rows][::-1], "axisTick": {"show": False},

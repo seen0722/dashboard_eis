@@ -45,3 +45,8 @@ def test_hidden_menu_checkbox_is_not_stretched_by_side_input_width():
     from src.portfolio.render.css import CSS
     assert ".side .navt{" in CSS and ".side .navt{position:absolute;opacity:0;width:1px;height:1px}" in CSS
     assert ".side .navbtn{display:none}" in CSS and ".side .navbtn{display:inline-block" in CSS   # .side label{display:flex} 曾讓桌面版也露出 Menu
+
+
+def test_upcoming_pill_does_not_claim_on_track():
+    """Review：資料只知道「超過 14 天」，不知道是否正常；標籤不能推論。"""
+    assert pill("ok", "en") == '<span class="pill mute">Upcoming</span>'

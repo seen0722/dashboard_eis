@@ -2,6 +2,7 @@
 from __future__ import annotations
 from html import escape as e
 from ...portfolio.render.page import exceptions_html
+from ...portfolio.render.viz.dash import at_risk_html
 
 
 def _project_link(month: str, code: str, label: str) -> str:
@@ -27,4 +28,5 @@ def linked_exceptions(snap: dict, th: dict) -> str:
 
 def decisions_body(snap: dict, th: dict) -> str:
     return (f'<section><h2>Decisions this month</h2><p class="lead">Exceptions the rules found, ranked; each names the decision asked for.</p>'
+            f'{at_risk_html(snap, "en", th, link=lambda c: f"/ui/{snap["meta"]["report_month"]}/projects/{c}")}'
             f'<div class="card">{linked_exceptions(snap, th)}</div></section>')

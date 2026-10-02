@@ -4,6 +4,7 @@ from collections.abc import Callable
 from html import escape as e
 from ..strings import t
 from .embed import Chart, chart_html
+from .options import at_risk_codes
 
 DUE_DAYS = 14
 
@@ -51,7 +52,7 @@ def milestone_status(days_left: int) -> str:
 
 def pill(status: str, lang: str, late: bool = True) -> str:
     """已過的里程碑：階段沒前進（late）才用紅色；已正常往下走的用灰色，與舊版 sig／dim 同一語意。"""
-    tone = {"passed": "bad" if late else "mute", "due": "warn", "ok": "ok"}[status]
+    tone = {"passed": "bad" if late else "mute", "due": "warn", "ok": "mute"}[status]   # 「ok」只代表超過 14 天，不代表進度正常
     return f'<span class="pill {tone}">{e(t(lang, "v_st_" + status))}</span>'
 
 
@@ -65,3 +66,14 @@ def milestone_table(rows: list[dict], lang: str, link: Callable[[str], str] | No
     return (f'<div class="wide"><table><thead><tr><th>{e(t(lang, "col_date"))}</th><th>{e(t(lang, "col_project"))}</th>'
             f'<th>{e(t(lang, "col_customer"))}</th><th>{e(t(lang, "col_milestone"))}</th><th class="num">{e(t(lang, "v_col_days"))}</th>'
             f'<th>{e(t(lang, "v_col_status"))}</th></tr></thead><tbody>{"".join(body)}</tbody></table></div>')
+
+
+def at_risk_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | None = None) -> str:
+    """At Risk KPI 的落地處：列出 KPI 數到的每一案，含只在健康度追蹤（PM 已確認）的 MP 延後。"""
+    codes = at_risk_codes(snap, th["mp_slip_days"])
+    if not codes:
+        return ""
+    names = {p["code"]: p["name"] for p in snap["projects"]}
+    items = ", ".join(f'<a href="{e(link(c))}">{e(names.get(c, c))}</a>' if link else f'<b>{e(names.get(c, c))}</b>' for c in codes)
+    return (f'<p class="lead"><b class="sig">{e(t(lang, "v_risk_head", n=len(codes)))}</b> {items}'
+            f'<br><span class="note">{e(t(lang, "v_risk_note", days=th["mp_slip_days"]))}</span></p>')

@@ -514,3 +514,12 @@ def test_health_page_merges_corrections_and_old_url_redirects(ingested):
     assert "<h2>Data health" in t and "repeat items on the Decisions page" in t and "No corrections" in t
     r = get(ingested, "/ui/202609/corrections")
     assert r.status_code == 301 and r.headers["location"] == "/ui/202609/health"
+
+
+def test_decisions_page_lists_every_at_risk_project(ingested):
+    from src.portfolio.render.viz.options import at_risk_codes
+    snap = ingested.state.eis.store.load_snapshot("202609")
+    codes = at_risk_codes(snap, ingested.state.eis.cfg.thresholds["mp_slip_days"])
+    t = html(ingested, f"/ui/202609/decisions?today={TODAY}")
+    head = t[t.index(f"At risk ({len(codes)}):"):t.index('<ol class="ex">')]
+    assert codes and all(f'href="/ui/202609/projects/{c}"' in head for c in codes)

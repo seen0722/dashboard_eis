@@ -48,10 +48,10 @@ def test_stage_donut_keeps_not_in_briefing_as_its_own_slice():
 
 def test_customer_bars_keep_blank_and_na_separate_and_fold_the_tail():
     ch = O.customer_bars(snap(), "en")
-    assert dict(ch.rows) == {"Trimble": 2, "(blank)": 1, "Axelera": 1, "Dell": 1, "NA": 1, "TBD": 1}
+    assert dict(ch.rows) == {"Trimble": 2, "Not in Briefing": 1, "Axelera": 1, "Dell": 1, "NA": 1, "TBD": 1}
     assert ch.option["yAxis"]["data"][-1] == "Trimble"                      # 最大的在最上面
     top3 = O.customer_bars(snap(), "en", top=3)
-    assert top3.rows == (("Trimble", 2), ("(blank)", 1), ("Axelera", 1), ("Others", 3))
+    assert top3.rows == (("Trimble", 2), ("Axelera", 1), ("Dell", 1), ("Others", 3))
 
 
 def test_gantt_rows_markers_and_customer_variants():
@@ -116,3 +116,22 @@ def test_gantt_visual_fixes_from_browser_check():
     assert ch.option["series"][1]["markLine"]["label"]["position"] == "start"
     assert ch.min_width == 720 and O.load_heatmap(snap(), "en", 85).min_width == 560
     assert ch.option["grid"]["bottom"] >= 24 and O.load_heatmap(snap(), "en", 85).option["grid"]["right"] >= 16   # Today 標籤、Dec 不被裁掉
+
+
+def test_customer_bars_put_projects_outside_briefing_in_their_own_bar():
+    """Review 2026-10-02：「(blank) 14」其實全是不在 Briefing 的專案；圖上的標籤要指得回資料。"""
+    rows = dict(O.customer_bars(snap(), "en").rows)
+    assert rows.get("Not in Briefing") == 1 and "(blank)" not in rows
+    s = snap(); next(p for p in s["projects"] if p["code"] == "BR2")["customer"] = "  "
+    assert dict(O.customer_bars(s, "en").rows)["(blank)"] == 1                 # Briefing 內真正空白的仍標 (blank)
+
+
+def test_gantt_tooltips_show_data_not_axis_internals():
+    """Review：預設 tooltip 顯示「2026-09-01 08:00:00  15」（時區換算＋內部 y 索引）。"""
+    s = snap(); next(p for p in s["projects"] if p["code"] == "BR6")["name"] = "N1X<b>"
+    ch = O.gantt(s, "en", TODAY, 6)
+    assert ch.option["useUTC"] is True
+    marks = ch.option["series"][1]["data"]
+    assert all("formatter" in m["tooltip"] for m in marks)
+    assert any(m["tooltip"]["formatter"] == "N1X&lt;b&gt;: PVT 2026-09-02" for m in marks)
+    assert any(m["tooltip"]["formatter"] == "TOMY: RFQ, no dates yet" for m in marks)
