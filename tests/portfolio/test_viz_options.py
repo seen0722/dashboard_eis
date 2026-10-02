@@ -52,3 +52,19 @@ def test_customer_bars_keep_blank_and_na_separate_and_fold_the_tail():
     assert ch.option["yAxis"]["data"][-1] == "Trimble"                      # 最大的在最上面
     top3 = O.customer_bars(snap(), "en", top=3)
     assert top3.rows == (("Trimble", 2), ("(blank)", 1), ("Axelera", 1), ("Others", 3))
+
+
+def test_gantt_rows_markers_and_customer_variants():
+    ch = O.gantt(snap(), "en", TODAY, 6)
+    assert ch.option["yAxis"]["data"] == ["TOMY", "AX200", "THORPE", "N1X"]      # 依里程碑先後；第一列在最上面
+    assert [r[0] for r in ch.rows] == ["N1X", "THORPE", "AX200", "TOMY"]         # Q11（暫停）、KOS（結案）、不在 Briefing 的都不列
+    marks = ch.option["series"][1]["data"]
+    n1x = next(m for m in marks if m["label"]["formatter"] == "PVT 09/02")
+    assert n1x["itemStyle"]["color"] == "#DC2626"                                 # 已過且階段未前進 → 紅
+    thorpe = next(m for m in marks if m["label"]["formatter"] == "PVT 09/08")
+    assert thorpe["itemStyle"]["color"] == "#2563EB"                              # 已過但不在 milestones_passed → 不標紅
+    assert any(m["label"]["formatter"] == "RFQ, no dates yet" for m in marks)
+    assert ch.option["series"][0]["renderItem"] == {"$fn": "ganttBar"}
+    assert set(ch.variants) == {"Axelera", "Dell", "Trimble"}
+    assert ch.variants["Trimble"]["yAxis"]["data"] == ["TOMY", "THORPE"]
+    assert ch.note.startswith("Red marks a milestone")
