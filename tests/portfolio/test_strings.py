@@ -22,5 +22,6 @@ def test_no_middle_dots_or_all_caps_labels():
 
 
 def test_css_tokens_present():
-    for tok in ("#F5F6F4", "#22262A", "#3D5A80", "#5C8D89", "#E8590C"):
+    for tok in ("#F3F5F8", "#1F2937", "#2563EB", "#1E2735", "#E8590C"):
         assert tok.lower() in CSS.lower()
+    assert ".kpis{" in CSS and ".navt:checked~.links" in CSS and "@media(max-width:900px)" in CSS
