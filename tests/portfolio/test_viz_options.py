@@ -135,3 +135,26 @@ def test_gantt_tooltips_show_data_not_axis_internals():
     assert all("formatter" in m["tooltip"] for m in marks)
     assert any(m["tooltip"]["formatter"] == "N1X&lt;b&gt;: PVT 2026-09-02" for m in marks)
     assert any(m["tooltip"]["formatter"] == "TOMY: RFQ, no dates yet" for m in marks)
+
+
+def _with_categories():
+    s = snap()
+    cat = {"BR1": ("Tablet", "ODM"), "BR2": ("Tablet", "ODM"), "BR3": ("NB", "EMS"), "BR4": ("Box PC", "JDM"), "BR5": ("Dock", "ODM"), "BR6": ("", "")}
+    for p in s["projects"]:
+        if p["code"] in cat:
+            p["category"], p["biz_type"] = cat[p["code"]]
+    return s
+
+
+def test_category_donut_uses_the_briefing_column_and_names_what_others_holds():
+    ch = O.category_donut(_with_categories(), "en", top=2)
+    # (blank) 與 Not in Briefing 永遠單獨一塊，不參與排名、不會被併進 Others
+    assert ch.id == "category" and ch.rows == (("Tablet", 2, "29%"), ("Box PC", 1, "14%"), ("Others", 2, "29%"), ("(blank)", 1, "14%"), ("Not in Briefing", 1, "14%"))
+    assert ch.note == "Others: Dock, NB"
+    assert sum(d["value"] for d in ch.option["series"][0]["data"]) == 7 and ch.option["title"]["text"] == "7"
+    assert O.category_donut(_with_categories(), "en").note == ""                      # 類別不多於 top 時不併 Others
+
+
+def test_type_donut_counts_odm_ems_jdm_and_keeps_blank_visible():
+    ch = O.type_donut(_with_categories(), "en")
+    assert ch.id == "type" and dict((r[0], r[1]) for r in ch.rows) == {"ODM": 3, "EMS": 1, "JDM": 1, "(blank)": 1, "Not in Briefing": 1}

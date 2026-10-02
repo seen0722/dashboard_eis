@@ -88,6 +88,8 @@ STRINGS = {
         "v_col_projects": "Projects", "v_col_month": "Month", "v_col_days": "Days left", "v_col_status": "Status",
         "v_data_table": "Data table", "v_need_js": "This chart needs JavaScript; the data table below has the same numbers.",
         "v_filter_customer": "Customer", "v_filter_all": "All", "v_not_in_snapshot": "Not in this snapshot.",
+        "v_c_category": "Projects by category", "v_c_type": "Projects by type", "v_others_note": "Others: {names}",
+        "v_col_category": "Category", "v_col_type": "Type",
         "v_risk_head": "At risk ({n}):", "v_risk_note": "Milestone passed without a stage change, or MP slipped over {days} days. Slips the PM already confirmed are also listed under Data health.",
     },
     "zh": {
@@ -177,6 +179,8 @@ STRINGS = {
         "v_col_projects": "專案數", "v_col_month": "月份", "v_col_days": "剩餘天數", "v_col_status": "狀態",
         "v_data_table": "資料表", "v_need_js": "圖表需要 JavaScript；下方資料表有相同數字。",
         "v_filter_customer": "客戶", "v_filter_all": "全部", "v_not_in_snapshot": "這份快照沒有這項資料。",
+        "v_c_category": "各類別專案數", "v_c_type": "各類型專案數", "v_others_note": "其他：{names}",
+        "v_col_category": "類別", "v_col_type": "類型",
         "v_risk_head": "風險（{n}）：", "v_risk_note": "里程碑已過未轉階段，或 MP 延後超過 {days} 天；PM 已確認的延後也列在資料健康度。",
     },
 }

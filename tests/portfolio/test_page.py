@@ -189,7 +189,7 @@ def test_milestones_get_a_full_width_card():
     html = render_page(snap(), "en", "2026-09-12", TH)
     assert "grid-3" not in html.split("<style>")[1].split("</style>")[1]
     ov = html[html.index('id="overview"'):html.index('id="decisions"')]
-    assert ov.count('<div class="grid-2">') == 2
+    assert ov.count('<div class="grid-2">') == 3          # stage/customer、category/type、load/forecast
 
 
 def test_decisions_section_lists_the_at_risk_projects():
@@ -197,3 +197,8 @@ def test_decisions_section_lists_the_at_risk_projects():
     html = render_page(snap(), "en", "2026-09-12", TH)
     dec = html[html.index('id="decisions"'):html.index('id="health"')]
     assert "At risk (1):" in dec and "THORPE" in dec.split("At risk (1):")[1][:200]
+
+
+def test_report_has_category_and_type_charts():
+    html = render_page(snap(), "en", "2026-09-12", TH)
+    assert 'id="c-category"' in html and 'id="c-type"' in html

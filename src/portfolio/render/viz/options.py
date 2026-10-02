@@ -62,6 +62,61 @@ def stage_donut(snap: dict, lang: str) -> Chart:
     return Chart("stage", t(lang, "v_c_stage"), option, (t(lang, "col_stage"), t(lang, "v_col_projects"), "%"), rows, height=240)
 
 
+def _donut(cid: str, title: str, first_col: str, slices: list[tuple[str, int, str]], total: int, lang: str, note: str = "") -> Chart:
+    """slices = [(標籤, 數量, 顏色)]，順序即顯示順序。與 stage_donut 同一個版型。"""
+    data = [{"name": f"{k}  {n}", "value": n, "itemStyle": {"color": c}} for k, n, c in slices]
+    option = {"tooltip": {"trigger": "item", "formatter": "{b} ({d}%)"},
+              "legend": {"orient": "vertical", "right": 0, "top": "middle", "itemWidth": 10, "itemHeight": 10, "textStyle": {"color": T.INK2}},
+              "title": {"text": str(total), "subtext": t(lang, "v_total"), "left": "29%", "top": "36%", "textAlign": "center",
+                        "textStyle": {"fontSize": 26, "fontWeight": 700, "color": T.INK}, "subtextStyle": {"color": T.INK2}},
+              "series": [{"type": "pie", "radius": ["52%", "74%"], "center": ["30%", "50%"], "label": {"show": False}, "data": data}]}
+    rows = tuple((k, n, f"{n / max(total, 1) * 100:.0f}%") for k, n, _ in slices)
+    return Chart(cid, title, option, (first_col, t(lang, "v_col_projects"), "%"), rows, height=240, note=note)
+
+
+def _briefing_field_counts(snap: dict, field: str) -> tuple[dict[str, int], int, int]:
+    """Briefing 內各值的計數；空白與不在 Briefing 分開數，不參與排名。"""
+    counts: dict[str, int] = {}
+    blank = outside = 0
+    for p in snap["projects"]:
+        if not p["in_briefing"]:
+            outside += 1
+            continue
+        v = (p.get(field) or "").strip()
+        if not v:
+            blank += 1
+        else:
+            counts[v] = counts.get(v, 0) + 1
+    return counts, blank, outside
+
+
+def _tail_slices(blank: int, outside: int, lang: str) -> list[tuple[str, int, str]]:
+    return ([(t(lang, "v_cat_blank"), blank, T.INK3)] if blank else []) + \
+           ([(t(lang, "v_cat_not_in_briefing"), outside, T.STAGE_COLORS[T.NOT_IN_BRIEFING])] if outside else [])
+
+
+def category_donut(snap: dict, lang: str, top: int = 7) -> Chart:
+    """Briefing 的 Category 欄（2026-09 改版後新增）。前 top 類以外併成 Others，並在圖下寫明 Others 含哪些。"""
+    counts, blank, outside = _briefing_field_counts(snap, "category")
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].casefold()))
+    head, rest = ranked[:top], ranked[top:]
+    slices = [(k, n, T.PALETTE[i % len(T.PALETTE)]) for i, (k, n) in enumerate(head)]
+    note = ""
+    if rest:
+        slices.append((t(lang, "v_cat_others"), sum(n for _, n in rest), "#CBD5E1"))
+        note = t(lang, "v_others_note", names=", ".join(k for k, _ in sorted(rest, key=lambda kv: kv[0].casefold())))
+    slices += _tail_slices(blank, outside, lang)
+    return _donut("category", t(lang, "v_c_category"), t(lang, "v_col_category"), slices, len(snap["projects"]), lang, note)
+
+
+def type_donut(snap: dict, lang: str) -> Chart:
+    """Briefing 的 Type 欄（JDM／ODM／EMS）。"""
+    counts, blank, outside = _briefing_field_counts(snap, "biz_type")
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].casefold()))
+    slices = [(k, n, T.TYPE_COLORS.get(k, T.PALETTE[i % len(T.PALETTE)])) for i, (k, n) in enumerate(ranked)]
+    return _donut("type", t(lang, "v_c_type"), t(lang, "v_col_type"), slices + _tail_slices(blank, outside, lang), len(snap["projects"]), lang)
+
+
 def customer_bars(snap: dict, lang: str, top: int = 8) -> Chart:
     counts: dict[str, int] = {}
     for p in snap["projects"]:
