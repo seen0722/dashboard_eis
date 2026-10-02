@@ -21,8 +21,8 @@ def linked_exceptions(snap: dict, th: dict) -> str:
     for i, x in enumerate(snap["exceptions"]):
         codes = [c for c in dict.fromkeys(x.get("codes") or []) if c in names]
         if codes and items[i].endswith("</div>"):
-            links = " ".join(_project_link(month, c, names[c]) for c in codes)   # 空白＝斷行點
-            items[i] = items[i][:-len("</div>")] + f'<div class="open">Open: {links}</div></div>'
+            links = " ".join(f'<a class="chip plain" href="/ui/{e(month)}/projects/{e(c)}">{e(names[c])}</a>' for c in codes)   # 空白＝斷行點
+            items[i] = items[i][:-len("</div>")] + f'<div class="open">{links}</div></div>'
     return "</li>".join(items)
 
 

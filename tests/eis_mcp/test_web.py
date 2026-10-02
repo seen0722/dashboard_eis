@@ -538,3 +538,28 @@ def test_sidebar_month_picker_jumps_on_change_and_search_is_one_field():
 def test_each_page_has_one_heading_for_its_subject(ingested):
     t = html(ingested, f"/ui/202609/decisions?today={TODAY}")
     assert "<h1>Decisions this month" in t and "<h2>Decisions this month" not in t
+
+
+# ---- 專業化 pass 3（2026-10-03）：表格與清單 ----
+def test_project_rows_link_on_the_name_and_show_the_code_quietly(ingested):
+    t = html(ingested, "/ui/202609/projects")
+    assert f'<td class="code">{CODE}</td><td><a class="row-link" href="/ui/202609/projects/{CODE}">THORPE</a></td>' in t
+    assert f'<a href="/ui/202609/projects/{CODE}">{CODE}</a>' not in t
+
+
+def test_decision_project_links_are_chips(ingested):
+    t = html(ingested, f"/ui/202609/decisions?today={TODAY}")
+    opens = t[t.index('<div class="open">'):]
+    assert f'<a class="chip plain" href="/ui/202609/projects/{CODE}">THORPE</a>' in opens
+    head = t[t.index("At risk ("):t.index('<ol class="ex">')]
+    assert f'<a class="chip" href="/ui/202609/projects/{CODE}">THORPE</a>' in head
+
+
+def test_long_health_lists_collapse_after_six(ingested):
+    from src.eis_mcp.web.pages_health import _linked_health
+    snap = ingested.state.eis.store.load_snapshot("202609")
+    row = {"level": "track", "check": "briefing_stale", "label": "briefing_stale", "count": 10, "names": [f"P{i} last updated 2026-01-0{i % 9 + 1}" for i in range(10)], "source": "briefing"}
+    out = _linked_health(snap, [row])
+    assert out.count("P0 last updated") == 1 and '<details class="more"><summary>+4 more</summary>' in out
+    shown, hidden = out.split('<details class="more">')
+    assert "P5 last updated" in shown and "P6 last updated" in hidden

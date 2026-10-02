@@ -74,7 +74,7 @@ def at_risk_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | N
     if not codes:
         return ""
     names = {p["code"]: p["name"] for p in snap["projects"]}
-    items = ", ".join(f'<a href="{e(link(c))}">{e(names.get(c, c))}</a>' if link else f'<b>{e(names.get(c, c))}</b>' for c in codes)
+    items = " ".join(f'<a class="chip" href="{e(link(c))}">{e(names.get(c, c))}</a>' if link else f'<span class="chip">{e(names.get(c, c))}</span>' for c in codes)
     return (f'<p class="lead"><b class="sig">{e(t(lang, "v_risk_head", n=len(codes)))}</b> {items}'
             f'<br><span class="note">{e(t(lang, "v_risk_note", days=th["mp_slip_days"]))}</span></p>')
 

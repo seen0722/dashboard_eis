@@ -6,6 +6,16 @@ from .pages_decisions import _project_link
 from .pages_load import corrections_body
 
 
+KEEP = 6
+
+
+def _collapse(items: list[str], keep: int = KEEP) -> str:
+    """長名單只顯示前 keep 筆，其餘收進 <details>（例如「Briefing 超過 60 天未更新」有 42 筆）。"""
+    if len(items) <= keep:
+        return ", ".join(items)
+    return (", ".join(items[:keep]) + f' <details class="more"><summary>+{len(items) - keep} more</summary>{", ".join(items[keep:])}</details>')
+
+
 def _linked_health(snap: dict, rows: list[dict]) -> str:
     """health_html 的表格，名稱欄裡「恰好等於某個專案名稱」的項目換成連結；其他（如 KOS (BR…) also booked as …）保持純文字。"""
     month = snap["meta"]["report_month"]
@@ -19,7 +29,7 @@ def _linked_health(snap: dict, rows: list[dict]) -> str:
         return out
     for i, h in enumerate(rows):
         old = f'class="dim">{e(", ".join(h["names"]))}</td>'
-        new_names = ", ".join(_project_link(month, by_name[n][0], n) if len(by_name.get(n, [])) == 1 else e(n) for n in h["names"])
+        new_names = _collapse([_project_link(month, by_name[n][0], n) if len(by_name.get(n, [])) == 1 else e(n) for n in h["names"]])
         trs[body_start + i] = trs[body_start + i].replace(old, f'class="dim">{new_names}</td>', 1)
     return "</tr>".join(trs)
 
