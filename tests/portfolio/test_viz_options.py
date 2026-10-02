@@ -93,7 +93,7 @@ def test_forecast_capacity_series_and_budget_coverage():
     s = {x["name"]: x for x in ch.option["series"]}
     val = lambda d: d["value"] if isinstance(d, dict) else d  # noqa: E731
     assert s["Keyed-in BU headcount"]["data"] == [10] * 8 + [None] * 4
-    assert [val(d) for d in s["Headcount carried from Aug"]["data"]] == [None] * 7 + [10] * 5
+    assert [val(d) for d in s["Headcount, assumed same as Aug"]["data"]] == [None] * 7 + [10] * 5
     val = lambda d: d["value"] if isinstance(d, dict) else d  # noqa: E731
     withb, nob = s["With budget, 1 projects"], s["No budget, 1 projects"]
     assert withb["stack"] == nob["stack"] == "actual"
@@ -104,8 +104,9 @@ def test_forecast_capacity_series_and_budget_coverage():
     assert plan["data"][11]["label"]["formatter"] == "Plan 11"                     # 拿掉圖例後，短橫線要自己說明是什麼
     assert nob["data"][7]["label"]["formatter"] == "No budget 3"                    # 最新月直接標在長條旁，不靠圖例
     assert "legend" not in ch.option
-    carried = s["Headcount carried from Aug"]
-    assert "endLabel" not in carried and carried["data"][11]["label"]["formatter"] == "Headcount 10" and carried["data"][11]["symbol"] != "none"   # endLabel 遇到前段 null 會算出 NaN（瀏覽器實測）
+    carried = s["Headcount, assumed same as Aug"]
+    assert carried["data"][11]["label"]["position"] == "top" and carried["data"][11]["label"]["align"] == "right"   # 長標籤放線上方、往左長，不被右緣切掉
+    assert "endLabel" not in carried and carried["data"][11]["label"]["formatter"] == "Aug headcount 10, assumed unchanged" and carried["data"][11]["symbol"] != "none"   # endLabel 遇到前段 null 會算出 NaN（瀏覽器實測）
     assert ch.headline == "Aug: 13 of 10 in use, 3 over"
     assert ch.note == "Budget covers 1 / 2 projects, BU RD + PM only"
     assert ch.rows[7] == ("Aug", 10, 13.0, 10.0, 3.0, 11.0)
@@ -197,7 +198,7 @@ def test_forecast_tooltip_tells_series_apart():
     names = [x["name"] for x in ch.option["series"]]
     tip = ch.option["tooltip"]
     assert tip["formatter"] == {"$fn": "axisTip", "args": [["bar", "bar", "mark", "line", "dashed"], {"4": 3}, 1]}
-    assert names[4] == "Headcount carried from Aug" and names[3] == "Keyed-in BU headcount"     # 推算線在實線有值的月份不列
+    assert names[4] == "Headcount, assumed same as Aug" and names[3] == "Keyed-in BU headcount"     # 推算線在實線有值的月份不列
     plan = next(x for x in ch.option["series"] if x["name"] == "Budget plan, BU RD + PM")
     assert plan["itemStyle"]["color"] != next(x for x in ch.option["series"] if x["name"] == "Keyed-in BU headcount")["itemStyle"]["color"]
 

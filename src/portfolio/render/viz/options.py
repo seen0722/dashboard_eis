@@ -287,7 +287,7 @@ def forecast_capacity(snap: dict, lang: str) -> Chart:
 
     # 標籤掛在最後一點；endLabel 遇到前段 null 會在瀏覽器算出 NaN 座標
     carried: list = [v if i >= lm - 1 else None for i, v in enumerate(cap)]
-    carried[-1] = {"value": cap[-1], "symbol": "circle", "symbolSize": 5, "label": {"show": True, "position": "right", "formatter": f"{t(lang, 'v_fc_cap_label')} {cap[-1]:.0f}", "color": T.INK2}}
+    carried[-1] = {"value": cap[-1], "symbol": "circle", "symbolSize": 5, "label": {"show": True, "position": "top", "align": "right", "formatter": t(lang, "v_fc_cap_assumed", mon=MONTHS[lm - 1], n=f"{cap[-1]:.0f}"), "color": T.INK2}}
     series = [{"name": t(lang, "v_fc_with", n=len(wp)), "type": "bar", "stack": "actual", "barWidth": "45%",
                "data": bars(withb, t(lang, "v_fc_with_short"), T.ACCENT), "itemStyle": {"color": T.ACCENT}},
               {"name": t(lang, "v_fc_without", n=len(cl) - len(wp)), "type": "bar", "stack": "actual",
