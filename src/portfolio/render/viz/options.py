@@ -329,7 +329,7 @@ def fu_plan_actual(snap: dict, lang: str) -> Chart:
     option = {"grid": {"left": 8, "right": 96, "top": 24, "bottom": 8, "containLabel": True}, "tooltip": _tip(["bar", "mark"]),
               "xAxis": {"type": "category", "data": list(MONTHS), "axisTick": {"show": False}, "axisLabel": {"color": T.INK2}},
               "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": T.RULE}}, "axisLabel": {"color": T.INK3}}, "series": series}
-    headline = (t(lang, "v_fu_headline", mon=mon, act=f"{same[lm - 1]:.1f}", plan=f"{plan[lm - 1]:.1f}", pct=round(same[lm - 1] / plan[lm - 1] * 100))
+    headline = (t(lang, "v_fu_headline", mon=mon, act=f"{same[lm - 1]:.0f}", plan=f"{plan[lm - 1]:.0f}", pct=round(same[lm - 1] / plan[lm - 1] * 100))
                 if fp and plan[lm - 1] else "")
     rows = tuple((m, plan[i] if fp else None, same[i] if fp and i < lm else None, every[i] if i < lm else None) for i, m in enumerate(MONTHS))
     note = t(lang, "v_fu_note", covered=len(fp), total=len(cl), mon=MONTHS[lm - 1], all=f"{every[lm - 1]:.1f}")

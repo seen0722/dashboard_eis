@@ -41,7 +41,7 @@ def snap():
 def test_page_sections_and_strings():
     html = render_page(snap(), "en", "2026-09-12", TH)
     for s in ("BU10 Portfolio Review", "Decisions this month", "1 milestones passed", "Decision needed:", "Milestones, next 8 weeks",
-              "Timeline, next 6 months", "Forecast vs capacity", "Data health", "Project appendix", "Aug: 1 BU tasks, 1 FU tasks, 3.7 FTE",
+              "Timeline, next 6 months", "BU RD + PM: actual vs headcount", "FU RD: actual vs plan", "Data health", "Project appendix", "Aug: 1 BU tasks, 1 FU tasks, 3.7 FTE",
               "Headcount, assumed same as Aug"):
         assert s in html, s
     assert "TOMY" in html and "no dates yet" in html

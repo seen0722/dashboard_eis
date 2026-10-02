@@ -1,6 +1,7 @@
 """月份清單與總覽頁的 body。所有數字來自 snapshot / store.months()。"""
 from __future__ import annotations
 from html import escape as e
+from ...portfolio.render.strings import t
 from ...portfolio.render.viz.dash import card, kpi_cards, milestone_table, safe_chart_card
 from ...portfolio.render.viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, load_heatmap, stage_donut, type_donut
 from .. import queries
@@ -49,7 +50,7 @@ def overview_body(snap: dict, th: dict, today: str, weeks: int) -> str:
             f'<div class="grid-2">{safe_chart_card("Projects by category", lambda: category_donut(snap, "en"), "en")}'
             f'{safe_chart_card("Projects by type", lambda: type_donut(snap, "en"), "en")}</div>'
             f'{safe_chart_card(f"Timeline, next {months} months", lambda: gantt(snap, "en", today, months), "en")}'
-            f'<div class="grid-2">{safe_chart_card("Forecast vs capacity", lambda: forecast_capacity(snap, "en"), "en")}'
-            f'{safe_chart_card("FU RD: plan vs actual", lambda: fu_plan_actual(snap, "en"), "en")}</div>'
+            f'<div class="grid-2">{safe_chart_card(t("en", "v_c_forecast"), lambda: forecast_capacity(snap, "en"), "en")}'
+            f'{safe_chart_card(t("en", "v_c_fu"), lambda: fu_plan_actual(snap, "en"), "en")}</div>'
             f'{safe_chart_card("Resource load by function", lambda: load_heatmap(snap, "en", spare), "en")}'
             f'{_milestone_card(month, snap, today, weeks)}</section>')

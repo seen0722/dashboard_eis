@@ -187,9 +187,9 @@ def test_fu_plan_vs_actual_uses_one_denominator():
     val = lambda d: d["value"] if isinstance(d, dict) else d  # noqa: E731
     assert ch.id == "fu" and [val(d) for d in series["FU RD plan"]] == [3.0] * 12
     assert [val(d) for d in series["FU RD actual, same projects"]] == [2.0] * 8 + [None] * 4
-    assert ch.note == "FU plan covers 1 / 2 projects; both series use those projects. FU RD actual across all 2 projects in Aug: 2.0 FTE."
+    assert ch.note == "Plan covers 1 / 2 projects, FU RD only. All 2 projects: 2.0 FTE in Aug."
     assert ch.rows[7] == ("Aug", 3.0, 2.0, 2.0)
-    assert O.fu_plan_actual(snap(), "en").note.startswith("FU plan covers 0 / 2 projects")
+    assert O.fu_plan_actual(snap(), "en").note.startswith("Plan covers 0 / 2 projects, FU RD only")
 
 
 def test_forecast_tooltip_tells_series_apart():
@@ -219,5 +219,15 @@ def test_plan_vs_actual_charts_share_one_design_language():
     assert fs["FU RD actual, same projects"]["data"][7]["label"]["formatter"] == "Actual 2"
     assert fs["FU RD plan"]["data"][11]["label"]["formatter"] == "Plan 3"
     assert [val(d) for d in fs["FU RD plan"]["data"]] == [3.0] * 12
-    assert fu.headline == "Aug: FU actual 2.0 vs plan 3.0 (67%)"
+    assert fu.headline == "Aug: 2 of 3 planned, 67%"
     assert fu.option["tooltip"]["formatter"]["args"][0] == ["bar", "mark"]
+
+
+
+def test_paired_charts_use_one_title_and_headline_pattern():
+    """2026-10-02：並排的兩張卡片標題、結論、註記同一句型。"""
+    s = snap(); next(p for p in s["projects"] if p["code"] == "BR1")["pva"]["FU RD"]["plan"] = [3.0] * 12
+    bu, fu = O.forecast_capacity(s, "en"), O.fu_plan_actual(s, "en")
+    assert (bu.title, fu.title) == ("BU RD + PM: actual vs headcount", "FU RD: actual vs plan")
+    assert bu.headline.startswith("Aug: 13 of 10 ") and fu.headline.startswith("Aug: 2 of 3 ")
+    assert bu.note.endswith("projects, BU RD + PM only") and fu.note.startswith("Plan covers 1 / 2 projects, FU RD only")
