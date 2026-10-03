@@ -23,7 +23,7 @@ ENTRIES = (
     ("projects", "Projects", "專案", "Every project; filter by stage, type, category, group or customer.",
      "全部專案，可依階段、類型、類別、產品群或客戶篩選。"),
     ("loads", "Loads", "部門負載", "Department load by month: where spare capacity is left.", "各部門每月負載：哪裡還有餘裕。"),
-    ("health", "Data health", "資料健康度", "What the source files could not answer, and past-month numbers that changed.",
+    ("health", "Data health", "資料健康度", "Gaps and mismatches in the source files, and past-month numbers that changed.",
      "來源檔答不出來的事，以及被改過的過去月份數字。"),
     ("report.html", "Monthly report", "月報", "The single-page report, ready to forward.", "可直接轉寄的單頁月報。"),
 )
@@ -76,10 +76,10 @@ def _terms() -> str:
     terms = (
         # 這兩則取自月報 s_decisions_lead / s_health_lead 與總覽頁 lead，去掉指涉月報版面的部分（「above」「only here」）
         ("Decisions", "本月要決定的事", "Ranked by urgency. Each item carries its evidence and its source.", "依急迫排序，每條附證據與出處。"),
-        ("Data health", "資料健康度", "What the source files could not answer. Decide means the BU head has to act; track is handled by the report owner.",
+        ("Data health", "資料健康度", "Gaps and mismatches in the source files. Action needed means the BU head has to act; Monitor is handled by the report owner.",
          "來源檔案回答不了的事。「決定」要主管出面，「追蹤」由報表維護者處理。"),
         ("FTE", "FTE", t("en", "foot_1"), t("zh", "foot_1")),
-        ("Load / util %", "負載 / util %", t("en", "foot_2"), t("zh", "foot_2")),
+        ("Load %", "負載 %", t("en", "foot_2"), t("zh", "foot_2")),
         ("Corrections", "歷史修正", ENTRIES[3][3], ENTRIES[3][4]),
     )
     rows = "".join(f'<dt>{e(a)} <span class="zh-inline" lang="{ZH}">{e(b)}</span></dt><dd>{bi(c, d)}</dd>' for a, b, c, d in terms)

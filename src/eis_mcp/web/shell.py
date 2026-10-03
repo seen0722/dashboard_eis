@@ -71,7 +71,7 @@ def meta_line(meta: dict | None) -> str:
     rm, lm, sd = str(meta.get("report_month", "")), meta.get("latest_month"), str(meta.get("snap_date", ""))
     parts = [f"Report month {fmt_month(rm)}"]
     if isinstance(lm, int) and 1 <= lm <= 12:
-        parts.append(f"manpower keyed in through {MONTHS[lm - 1]}")
+        parts.append(f"manpower reported through {MONTHS[lm - 1]}")
     if len(sd) == 8:
         parts.append(f"Briefing {sd[:4]}-{sd[4:6]}-{sd[6:]}")
     return f'<p class="metaline">{e(" · ".join(parts))}</p>'
@@ -85,8 +85,7 @@ def render_shell(*, title: str, body: str, months: list[str], month: str | None 
             f'{_nav(months, month, suffix, active, decisions)}<main class="main">'
             f'<header><div><h1>{e(title)}{f"<span class=\"zh\" lang=\"zh-Hant\">{e(title_zh)}</span>" if title_zh else ""}</h1>{meta_line(meta)}</div></header>'
             f'{body}'
-            f'<footer><p>Values come straight from the monthly EIS snapshot; nothing is inferred or filled in.</p>'
-            f'<p>Same data as the MCP tools. Report month is the month the snapshot was built for (report_month in the tools); keyed in through is the last month with reported manpower (latest_month).</p></footer>'
+            f'<footer><p>Numbers come from the monthly EIS files, the same data the MCP tools return; nothing is estimated or filled in.</p></footer>'
             f'</main></div>{scripts("static")}'
             f'<script>document.addEventListener("change",function(e){{var s=e.target;if(s&&s.hasAttribute&&s.hasAttribute("data-autosubmit"))s.form.submit();}});'
             # 整列可點：點到列內非互動元素就前往該列的 row-link（不用 ::after 覆蓋層，Safari 不一定把 tr 當定位容器）

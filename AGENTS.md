@@ -601,6 +601,11 @@ Review 檔疑似**半手工整理**，跨月結構不一致。ingest **不可依
 - 跨月：每月 snapshot JSON 留在 data/snapshots/YYYYMM/，下個月自動比對過去月份數字是否被改。
 - 基準日（2026-10-03 需求方拍板）：「已過期」「幾天前／後」「未來 N 週」一律以 **Briefing 快照日**為準（月報、網頁、MCP 同一個），不用執行或瀏覽當天；事後重跑 ingest 結果不變。`--today`／`today` 參數只在需要另一個基準時指定。
 - 測試：`python -m pytest tests/portfolio`。
+- 用語（2026-10-03 需求方拍板，畫面上的英文一律照這張；`tests/eis_mcp/test_web_wording.py` 會擋）：
+  計畫人力＝**Plan**（不用 budget）；EIS 填報＝**reported**（reported headcount、reported through Aug，不用 keyed in）；
+  負載率＝**Load**（Load %，不用 util）；Data health 等級＝Action needed / Monitor / OK。
+  不用自創術語（second identity、charging、briefed）、不對使用者說 snapshot（改「this month’s data」「last month’s report」）、
+  不寫口號式說明（「One chart, three facts」之類）。專有名詞維持英文：EVT/DVT/PVT/MP、FTE、Briefing、Control List、At risk。
 
 ## MCP server（src/eis_mcp，2026-09-19 起）
 

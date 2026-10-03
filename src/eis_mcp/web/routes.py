@@ -34,11 +34,11 @@ def ok_months(state: ServerState) -> list[str]:
 
 def load_snap(state: ServerState, month: str) -> dict:
     if not MONTH_RE.match(month):
-        raise WebError(404, f"No snapshot for {month}", "<p>Months are written YYYYMM, e.g. 202609.</p>", "unknown_month")
+        raise WebError(404, f"No data for {month}", "<p>Months are written YYYYMM, e.g. 202609.</p>", "unknown_month")
     try:
         return state.store.load_snapshot(month)
     except UnknownMonth:
-        raise WebError(404, f"No snapshot for {month}", "<p>That month has not been ingested.</p>", "unknown_month") from None
+        raise WebError(404, f"No data for {month}", "<p>That month has not been ingested.</p>", "unknown_month") from None
     except SnapshotBroken:
         raise WebError(503, f"Snapshot for {month} is unreadable",
                        f"<p>Ask an uploader to run <code>ingest_month('{e(month)}')</code> again.</p>", "snapshot_broken") from None
