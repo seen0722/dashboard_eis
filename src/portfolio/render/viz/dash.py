@@ -93,7 +93,7 @@ def at_risk_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | N
         return ""
     trs = "".join(f'<tr><td>{f"<a class=\"plain\" href=\"{e(link(r["code"]))}\">{e(r["name"])}</a>" if link else e(r["name"])}</td>'
                   f'<td>{e(r["stage"] or "–")}</td><td>{"<br>".join(e(risk_reason(w, lang, r["stage"])) for w in r["why"])}</td></tr>' for r in rows)
-    return (f'<div class="card risk-t"><div class="card-h"><b class="sig">{e(t(lang, "v_risk_head", n=len(rows)).rstrip(":："))}</b>'
+    return (f'<div class="card risk-t"><div class="card-h"><b class="risk-h">{e(t(lang, "v_risk_head", n=len(rows)).rstrip(":："))}</b>'
             f'<span class="card-sub">{e(t(lang, "v_risk_note", days=th["mp_slip_days"]))}</span></div>'
             f'<table><thead><tr><th>{e(t(lang, "v_risk_col_project"))}</th><th>{e(t(lang, "v_risk_col_stage"))}</th><th>{e(t(lang, "v_risk_col_why"))}</th></tr></thead>'
             f'<tbody>{trs}</tbody></table></div>')

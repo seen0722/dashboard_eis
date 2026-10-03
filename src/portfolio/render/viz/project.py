@@ -83,7 +83,7 @@ def mp_drift(p: dict, lang: str) -> Chart | None:
     iso = lambda s: f"{s[:4]}-{s[4:6]}-{s[6:]}"  # noqa: E731
     orig, now = p["dates"].get("mp_orig"), pts[-1]["mp"]
     data = [{"value": [iso(h["snap"]), h["mp"]], "name": t(lang, "v_drift_tip", snap=iso(h["snap"]), mp=h["mp"], stage=h.get("stage") or "–")} for h in pts]
-    data[-1]["label"] = {"show": True, "formatter": f"MP {now}", "position": "left", "distance": 8, "color": T.INK, "fontWeight": 600}
+    data[-1]["label"] = {"show": True, "formatter": f"MP {now}", "position": "top", "align": "right", "distance": 8, "color": T.INK, "fontWeight": 600}
     series = {"type": "line", "step": "end", "data": data, "symbolSize": 6, "lineStyle": {"color": T.MS_COLORS["mp"], "width": 2},
               "itemStyle": {"color": T.MS_COLORS["mp"]}}
     if orig:

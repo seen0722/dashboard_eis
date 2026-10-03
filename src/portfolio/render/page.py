@@ -42,8 +42,8 @@ def _suspended_charging_body(x: dict, lang: str, lm: int) -> str:
     mon = MONTHS[lm - 1]
     blocks = []
     if twins:
-        lines = "".join(f'<div class="sig">{e(_susp_twin_line(tw, lang, mon))}</div>' for tw in twins)
-        blocks.append(f'<div class="body"><b class="sig">{e(t(lang, "ex_susp_twin_h"))}</b>{lines}</div>')
+        lines = "".join(f'<div>{e(_susp_twin_line(tw, lang, mon))}</div>' for tw in twins)
+        blocks.append(f'<div class="body"><b>{e(t(lang, "ex_susp_twin_h"))}</b>{lines}</div>')
     if charging:
         lines = "".join(f'<div>{e(f"{c["name"]} {c["fte"]:.1f} FTE" + (f" ({t(lang, "cat_terminated")})" if c.get("cat") == "Terminated" else ""))}</div>' for c in charging)
         blocks.append(f'<div class="body"><b>{e(t(lang, "ex_susp_charging_h", mon=mon))}</b>{lines}</div>')
@@ -89,7 +89,7 @@ def _health(snap: dict, lang: str) -> str:
     rows = "".join(f'<tr><td><span class="dot {h["level"][0]}"></span>{e(t(lang, "lv_" + h["level"]))}</td><td>{e(t(lang, "hc_" + h["check"]))}</td>'
                    f'<td class="num {"sig" if h["level"] == "decide" and h["count"] else ""}">{h["count"]}</td>'
                    f'<td style="white-space:normal;max-width:60ch" class="dim">{e(", ".join(h["names"]))}</td><td class="dim">{e(t(lang, "hs_" + h["source"]))}</td></tr>' for h in snap["health"])
-    return (f'<table><thead><tr><th>{e(t(lang, "col_level"))}</th><th>{e(t(lang, "col_check"))}</th><th class="num">{e(t(lang, "col_count"))}</th>'
+    return (f'<table class="health-t"><thead><tr><th>{e(t(lang, "col_level"))}</th><th>{e(t(lang, "col_check"))}</th><th class="num">{e(t(lang, "col_count"))}</th>'
             f'<th>{e(t(lang, "col_projects"))}</th><th>{e(t(lang, "col_source"))}</th></tr></thead><tbody>{rows}</tbody></table>')
 
 

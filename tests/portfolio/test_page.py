@@ -62,7 +62,7 @@ def test_page_sections_and_strings():
     assert "Terminated projects should carry no manpower" in html                 # ask
     assert "Briefing stage column; Resource Summary; Control List" in html         # source
     assert "% of the portfolio" not in html
-    assert re.search(r'<div class="sig">[^<]*TR_BU10_IPC_KOS[^<]*</div>', html)
+    assert re.search(r'<div>[^<]*TR_BU10_IPC_KOS[^<]*</div>', html)                  # 2026-10-03：佐證不用橘色，橘色留給 Decision needed
 
 
 def test_render_refuses_a_snapshot_with_no_manpower_month():

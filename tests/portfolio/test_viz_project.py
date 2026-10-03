@@ -85,4 +85,4 @@ def test_mp_drift_says_which_briefings_it_covers():
     ch = mp_drift(proj(history=hist), "en")
     assert ch.note == "Briefings on file: 2026-06-29 to 2026-09-29. Changes before that are not shown."
     last = ch.option["series"][0]["data"][-1]["label"]
-    assert last["position"] == "left"                                                    # 最右點的標籤往左放，不被切掉
+    assert last["position"] == "top" and last["align"] == "right"                       # 點的上方、往左延伸：不被右邊界切掉，也不壓在平線上

@@ -38,7 +38,12 @@ def health_section(snap: dict) -> str:
     """decide 級的三項（缺預算、里程碑過期、第二身分）與上方 Decisions 同一件事，收進 <details>；track/ok 級照常顯示。"""
     decide = [h for h in snap["health"] if h["level"] == "decide"]
     rest = [h for h in snap["health"] if h["level"] != "decide"]
-    main = f'<div class="wide">{_linked_health(snap, rest)}</div>' if rest else '<p class="empty">No tracking checks.</p>'
+    found = [h for h in rest if h["count"]]
+    empty = [h for h in rest if not h["count"]]                                        # 0 筆的檢查收合，問題不被稀釋
+    main = f'<div class="wide">{_linked_health(snap, found)}</div>' if found else '<p class="empty">Every tracking check came back empty.</p>'
+    if empty:
+        main += (f'<details class="group"><summary data-expand="expand" data-collapse="collapse"><span>{len(empty)} check{"" if len(empty) == 1 else "s"} found nothing</span></summary>'
+                 f'<div class="wide">{_linked_health(snap, empty)}</div></details>')
     dup = (f'<details class="dup"><summary data-expand="expand" data-collapse="collapse"><span>{len(decide)} decision-level check{"" if len(decide) == 1 else "s"} repeat items on the Decisions page</span></summary>'
            f'<div class="wide">{_linked_health(snap, decide)}</div></details>') if decide else ""
     return main + dup
