@@ -75,3 +75,18 @@ def test_safari_gets_a_png_touch_icon_as_well(ingested):
     r = get(ingested, "/ui/static/icon-180.png")
     assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content == PNG_180
     assert "data:image/png;base64" not in html(ingested, "/ui/202609/report.html")      # 月報只帶 SVG
+
+
+def test_product_cell_shows_the_category_icon_and_skips_unknown_ones(ingested):
+    import json
+    store = ingested.state.eis.store
+    f = store.snapshot_dir("202609") / "portfolio.json"
+    snap = json.loads(f.read_text(encoding="utf-8"))
+    base = snap["projects"][0]
+    snap["projects"] += [dict(base, code="BR0000000021", name="Tabby", category="Tablet"),
+                         dict(base, code="BR0000000022", name="Oddity", category="Smart Speaker")]
+    f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
+    t = html(ingested, "/ui/202609/projects")
+    row = lambda n: t[t.index(f'">{n}</a>'):][:t[t.index(f'">{n}</a>'):].index("</tr>")]   # noqa: E731
+    assert '<div class="prod"><svg class="cat-ic"' in row("Tabby")
+    assert "cat-ic" not in row("Oddity") and "Smart Speaker" in row("Oddity")             # 對不上：只有文字

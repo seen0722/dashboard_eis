@@ -4,6 +4,7 @@ from __future__ import annotations
 from html import escape as e
 from urllib.parse import urlencode
 from ...portfolio.entities import INACTIVE, MONTHS
+from ...portfolio.render.viz.category_icons import category_icon
 from ...portfolio.render.viz.dash import risk_reason
 from ...portfolio.render.viz.options import at_risk_rows, late_codes
 from ...portfolio.render.viz.project import next_milestone, plan_to_date, sparkline_svg
@@ -77,6 +78,8 @@ def _row(month: str, p: dict, lm: int, today: str, risk: dict, passed: dict) -> 
         stage = _two(e(p["stage"] or "–"), "" if same else e(p["stage_cat"] or ""))
         size = f' {p["panel_size"]}' if p.get("panel_size") and p["panel_size"].upper() != "NA" else ""
         product = _two(e(p.get("biz_type") or "–"), e((p.get("category") or "") + size))
+        icon = category_icon(p.get("category"))                       # 對不上的類別不畫，只留文字
+        product = f'<div class="prod">{icon}<div>{product}</div></div>' if icon else product
     else:
         stage, product = _two('<span class="dim">Not in Briefing</span>'), _two("–")
     return (f'<tr><td>{name}</td><td>{_two(e(p["customer"]) or "–", e(p["group"]))}</td><td>{product}</td>'
