@@ -18,7 +18,7 @@ def mask_hit(s: str) -> str:
     return s[:2] + "*" * (len(s) - 2)
 
 
-def run_ingest(state: ServerState, month: str, today: str, by: str) -> dict:
+def run_ingest(state: ServerState, month: str, today: str | None, by: str) -> dict:
     if not MONTH_RE.match(month):
         raise ValueError(f"bad_month: '{month}' must be YYYYMM")
     lock_path = state.store.locks_root / f"{month}.lock"
@@ -33,13 +33,13 @@ def run_ingest(state: ServerState, month: str, today: str, by: str) -> dict:
             fcntl.flock(fh, fcntl.LOCK_UN)
 
 
-def _ingest_locked(state: ServerState, month: str, today: str, by: str) -> dict:
+def _ingest_locked(state: ServerState, month: str, today: str | None, by: str) -> dict:
     store = state.store
     res = build_month(store.input_dir(month), month, today, store.snapshots_root, state.cfg, pii_check=find_pii)
     warnings = []
     if res.summary["control_lists"] == 0:
         warnings.append("no Control List was uploaded for this month: plan-vs-actual, tasks and dept loads are empty")
-    base = {"at": now_iso(), "by": by, "today": today, "summary": res.summary, "issues_count": len(res.issues)}
+    base = {"at": now_iso(), "by": by, "today": res.snap["meta"]["generated"], "summary": res.summary, "issues_count": len(res.issues)}
     if res.pii_hits:
         store.record_ingest(month, {**base, "status": "rejected_pii", "pii_hits": res.pii_hits[:5]})
         return {"status": "rejected_pii", "hits": [mask_hit(h) for h in res.pii_hits[:5]], "hits_count": len(res.pii_hits),

@@ -4,6 +4,7 @@
 回傳格式就是 tool 的回傳格式（少掉 meta），改這裡等於同時改 tool 與網頁。
 """
 from __future__ import annotations
+import datetime as dt
 from ..portfolio.config import Config, normalize_name
 from ..portfolio.entities import INACTIVE, MONTHS
 from ..portfolio.model.rules import days_between
@@ -92,6 +93,16 @@ def exceptions(snap: dict) -> dict:
 
 def health(snap: dict) -> dict:
     return {"health": snap["health"]}
+
+
+def snap_day(snap: dict) -> str:
+    """快照的 Briefing 日期（YYYY-MM-DD）：網頁、月報與 MCP 的「幾天前／後」共用這個基準（需求方 2026-10-03）。
+    用 server 當天會讓舊月份越看越偏、事後重跑結果不同。快照缺這個欄位才退回當天。"""
+    sd = str(snap.get("meta", {}).get("snap_date", ""))
+    try:
+        return dt.date(int(sd[:4]), int(sd[4:6]), int(sd[6:8])).isoformat()
+    except ValueError:
+        return dt.date.today().isoformat()
 
 
 def upcoming_milestones(snap: dict, today: str, weeks: int) -> list[dict]:

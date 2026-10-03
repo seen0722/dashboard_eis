@@ -34,3 +34,11 @@ def test_get_upcoming_milestones_tool(ingested):
     assert not err and [m["milestone"] for m in out["milestones"]] == ["pvt", "mp"]
     err, text = call_tool(ingested, "tok-view", "get_upcoming_milestones", {"today": "12/09/2026"})
     assert err and "bad_date" in text
+
+
+def test_upcoming_milestones_default_to_the_briefing_snapshot_date(ingested):
+    """2026-10-03：網頁、月報、MCP 同一個基準日（Briefing 快照日），不用 server 當天。"""
+    err, out = call_tool(ingested, "tok-view", "get_upcoming_milestones", {})
+    snap = ingested.state.eis.store.load_snapshot("202609")
+    sd = snap["meta"]["snap_date"]
+    assert not err and out["today"] == f"{sd[:4]}-{sd[4:6]}-{sd[6:]}"

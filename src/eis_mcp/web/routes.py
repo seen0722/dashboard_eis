@@ -15,6 +15,7 @@ from ...portfolio.render.viz.options import at_risk_rows
 from ..state import ServerState
 from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
 from .. import queries
+from ..queries import snap_day
 from . import pages_decisions, pages_health, pages_home, pages_load, pages_mcp, pages_overview, pages_project, pages_projects
 from .shell import SITE, SITE_ZH, render_error, render_shell
 
@@ -67,16 +68,6 @@ def float_param(request: Request, name: str, lo: float, hi: float) -> float | No
     if not lo <= v <= hi:
         raise WebError(400, f"Bad {name}", f"<p>{e(name)} must be between {lo:g} and {hi:g}.</p>", f"bad_{name}")
     return v
-
-
-def snap_day(snap: dict) -> str:
-    """快照的 Briefing 日期（YYYY-MM-DD）。頁面上的「幾天前/後」預設以它為準，與例外文字的天數同一基準；
-    用 server 當天會讓舊月份越看越偏，且同一頁出現兩個基準。缺值才退回當天。"""
-    sd = str(snap.get("meta", {}).get("snap_date", ""))
-    try:
-        return dt.date(int(sd[:4]), int(sd[4:6]), int(sd[6:8])).isoformat()
-    except ValueError:
-        return dt.date.today().isoformat()
 
 
 def date_param(request: Request, default: str, name: str = "today") -> str:

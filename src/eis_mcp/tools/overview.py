@@ -1,6 +1,5 @@
 """組合總覽：報告第一屏的 exceptions、health 表、以及里程碑視窗。查詢邏輯在 queries.py。"""
 from __future__ import annotations
-import datetime as dt
 from mcp.server.mcpserver import Context, MCPServer
 from .. import queries
 from ..queries import MILESTONES, upcoming_milestones  # noqa: F401  舊 import 路徑保留（tests 用）
@@ -32,9 +31,9 @@ def register(mcp: MCPServer, state: ServerState) -> None:
     def get_upcoming_milestones(ctx: Context, weeks: int = 8, month: str | None = None, today: str | None = None) -> dict:
         """EVT/DVT/PVT/MP dates within +/- weeks*7 days of today for active (in briefing, not terminated or suspended) projects.
         days_left < 0 means already passed. Returns {"meta", "today", "weeks", "milestones": [{code, name, stage_cat,
-        milestone, date, days_left}]} sorted by days_left. today "YYYY-MM-DD" defaults to the server date."""
+        milestone, date, days_left}]} sorted by days_left. today "YYYY-MM-DD" defaults to the Briefing snapshot date of that month."""
         def go(p):
             _, snap = resolve_month(state, month)
-            t = check_date(today) if today else dt.date.today().isoformat()
+            t = check_date(today) if today else queries.snap_day(snap)
             return with_meta(snap, **queries.upcoming(snap, t, weeks))
         return guarded(state, ctx, "get_upcoming_milestones", {"weeks": weeks, "month": month, "today": today}, go)

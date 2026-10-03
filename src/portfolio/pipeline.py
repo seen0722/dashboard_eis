@@ -49,7 +49,7 @@ def find_one(d: Path, pattern: str) -> Path | None:
     return hits[-1] if hits else None
 
 
-def build_month(input_dir: str | Path, report_month: str, today: str, snapshots_dir: str | Path, cfg: Config,
+def build_month(input_dir: str | Path, report_month: str, today: str | None, snapshots_dir: str | Path, cfg: Config,
                 lang: str = "en", pii_check: Callable[[str], list[str]] = find_pii) -> BuildResult:
     d = Path(input_dir); th = cfg.thresholds
     found = {k: find_one(d, g) for k, g in INPUT_GLOBS.items()}
@@ -72,6 +72,9 @@ def build_month(input_dir: str | Path, report_month: str, today: str, snapshots_
     loads, i6 = build_dept_loads(cls); issues += i6
     issues += second_identity_issues(projects, lm, cfg)
     snap_iso = f"{snap_date[:4]}-{snap_date[4:6]}-{snap_date[6:]}"
+    # 基準日預設＝Briefing 快照日（需求方 2026-10-03）：延後與天數描述的是資料當天，不是執行當天；
+    # 事後重跑 ingest 才會得到同樣的結果。today 只在重建過去月份需要另一個基準時指定。
+    today = today or snap_iso
     for r in briefing:
         if r.snap == snap_date and r.updated and days_between(snap_iso, r.updated) > th["briefing_stale_days"]:
             issues.append(Issue("track", "briefing_stale", f"{r.name} last updated {r.updated}", "Briefing", r.code))

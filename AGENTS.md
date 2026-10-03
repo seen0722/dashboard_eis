@@ -599,6 +599,7 @@ Review 檔疑似**半手工整理**，跨月結構不一致。ingest **不可依
 - stage_cat 自 2026-10 起分 `Terminated`（結案）與 `Suspended`（暫停）：Briefing 2026-09 改版後 PM 統一寫 Terminate / Suspend，兩者處置不同（撤人 vs 保留）。所有「非活躍」判斷用 `entities.INACTIVE`，不要寫死 `== "Suspended"`。
 - PII：不讀「人力」「實名制」分頁；任務文字遮罩；輸出前 find_pii 擋下工號與姓名，命中則不寫檔（exit 2）。
 - 跨月：每月 snapshot JSON 留在 data/snapshots/YYYYMM/，下個月自動比對過去月份數字是否被改。
+- 基準日（2026-10-03 需求方拍板）：「已過期」「幾天前／後」「未來 N 週」一律以 **Briefing 快照日**為準（月報、網頁、MCP 同一個），不用執行或瀏覽當天；事後重跑 ingest 結果不變。`--today`／`today` 參數只在需要另一個基準時指定。
 - 測試：`python -m pytest tests/portfolio`。
 
 ## MCP server（src/eis_mcp，2026-09-19 起）
