@@ -184,7 +184,8 @@ def _gantt_rows(snap: dict, today: str, months: int, overdue: dict | None = None
     t0 = dt.date.fromisoformat(today[:7] + "-01")
     t1 = _add_months(t0, months)
     in_win = lambda s: bool(s) and t0 <= dt.date.fromisoformat(s) < t1  # noqa: E731
-    rows = [p for p in snap["projects"] if p["in_briefing"] and p["stage_cat"] not in INACTIVE
+    # 已量產（MP、Sustain / EOP）不列：沒有下一個里程碑可追，MP 日期落在時間窗內只會畫出已達成的事件（需求方 2026-10-03，Brandy）
+    rows = [p for p in snap["projects"] if p["in_briefing"] and p["stage_cat"] not in INACTIVE and p["stage_cat"] not in SHIPPED
             and (p["code"] in overdue or any(in_win(p["dates"].get(k)) for k in MS) or (p["stage_cat"] == "RFQ / RFI" and not p["dates"].get("mp")))]
     rows.sort(key=lambda p: (p["code"] not in overdue, -overdue[p["code"]][2] if p["code"] in overdue else 0,
                              p["dates"].get("mp") or p["dates"].get("pvt") or p["dates"].get("dvt") or p["dates"].get("evt") or "9", p["name"].casefold()))
