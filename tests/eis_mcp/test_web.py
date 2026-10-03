@@ -573,3 +573,14 @@ def test_overview_web_follows_the_same_order(ingested):
     order = [t.index(x) for x in ('<div class="kpis">', 'id="c-stage"', 'id="c-gantt"', "<h3>Milestones, next 8 weeks", 'id="c-forecast"', 'id="c-fu"')]
     assert order == sorted(order) and 'class="status"' not in t and 'id="c-heat-function"' not in t
     assert 'href="/ui/202609/decisions"><span class="k-label">At risk</span>' in t
+
+
+def test_whole_row_click_does_not_rely_on_a_positioned_table_row():
+    """2026-10-03 使用者回報 Safari：點任一列都進最後一案、側欄搜尋框點不到。
+    根因：a.row-link::after{inset:0} 以 tr{position:relative} 為範圍，部分 Safari 不把 tr 當定位容器，
+    覆蓋層撐成整頁、最後一列蓋在最上面。改為不用覆蓋層，整列點擊由頁尾腳本轉到該列的 row-link。"""
+    from src.portfolio.render.css import CSS
+    assert "row-link::after" not in CSS and "tbody tr{position:relative}" not in CSS
+    t = render_shell(title="x", body="", months=["202609"], month="202609")
+    tail = t[t.index("</nav>"):]
+    assert 'closest("tr")' in tail and 'querySelector("a.row-link")' in tail

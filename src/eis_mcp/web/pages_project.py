@@ -24,7 +24,7 @@ def projects_body(month: str, res: dict, filters: dict, groups: list[str], custo
             f'<label>Customer {_select("customer", customers, filters.get("customer", ""))}</label>'
             f'<label>Text <input type="text" name="q" value="{e(filters.get("q", ""))}" placeholder="name, customer or product"></label>'
             f'<button>Filter</button> <a href="/ui/{month}/projects">clear</a></form>')
-    # 名稱是連結，整列可點（CSS row-link）；code 淡色顯示，不再是一整欄藍色底線
+    # 名稱是連結，整列可點（shell 頁尾腳本把列點擊轉到 row-link）；code 淡色顯示，不再是一整欄藍色底線
     rows = "".join(f'<tr><td class="code">{e(p["code"])}</td><td><a class="row-link" href="/ui/{month}/projects/{e(p["code"])}">{e(p["name"])}</a></td><td>{e(p["stage"])}</td>'
                    f'<td>{e(p["stage_cat"])}</td><td>{e(p.get("biz_type", ""))}</td><td>{e(p.get("category", ""))}{(" " + e(p["panel_size"])) if p.get("panel_size") and p["panel_size"].upper() != "NA" else ""}</td>'
                    f'<td>{e(p["customer"])}</td><td>{e(p["group"])}</td><td class="num">{p["latest_fte"]:.1f}</td></tr>'
