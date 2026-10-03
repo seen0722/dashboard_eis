@@ -291,3 +291,32 @@ def test_gantt_table_names_current_mp_and_shows_original_mp():
 def test_plan_label_uses_the_darker_violet():
     plan = next(x for x in O.forecast_capacity(snap(), "en").option["series"] if x["name"] == "Plan, BU RD + PM")
     assert plan["renderItem"]["args"][2] == "#7C3AED" and plan["renderItem"]["args"][4] == "#6D28D9"
+
+
+def _thorpe_out_of_window():
+    """THORPE 的日期全在時間窗之前（MP 07-31 已過、階段仍 PVT）：舊規則會把它排除在 Timeline 外。"""
+    s = snap()
+    th = next(p for p in s["projects"] if p["code"] == "BR1")
+    th["dates"].update({"dvt": "2025-03-06", "pvt": "2026-03-21", "mp": "2026-07-31"})
+    next(x for x in s["exceptions"] if x["title"] == "milestones_passed")["codes"].append("BR1")   # 與 Decisions 第 1 條同一份名單
+    return s
+
+
+def test_timeline_keeps_overdue_projects_even_when_every_date_is_before_the_window():
+    """2026-10-03 需求方：At Risk 第一名的 THORPE 不在 Timeline 上——逾期越久越會從圖上消失。"""
+    from src.portfolio.render.viz import options as O
+    ch = O.gantt(_thorpe_out_of_window(), "en", "2026-09-12", 6)
+    names = ch.option["yAxis"]["data"][::-1]                                              # y 軸由下往上，反轉成由上往下
+    assert names[0] == "THORPE"                                                            # 逾期的排最上面
+
+
+def test_overdue_milestone_before_the_window_is_pinned_to_the_left_edge():
+    from src.portfolio.render.viz import options as O
+    from src.portfolio.render.viz import tokens as T
+    ch = O.gantt(_thorpe_out_of_window(), "en", "2026-09-12", 6)
+    marks = ch.option["series"][-1]["data"]
+    pin = [m for m in marks if "overdue" in str(m["label"].get("formatter", ""))]
+    assert len(pin) == 1
+    assert pin[0]["value"][0] == O._ms("2026-09-01")                                       # 時間窗起點
+    assert pin[0]["label"]["formatter"] == "◀ MP 07/31, 43 days overdue"
+    assert pin[0]["label"]["color"] == T.BAD
