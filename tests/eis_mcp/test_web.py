@@ -759,3 +759,12 @@ def test_manpower_group_shows_the_total_and_the_plan_it_is_divided_by(ingested):
     row = row[:row.index("</tr>")]
     assert '<td class="num">96.0</td>' in row                                            # fixture：12.0 × 8 個月
     assert "<small>plan " in row
+
+
+def test_fte_card_states_its_source_instead_of_a_jan_comparison(ingested):
+    """2026-10-03 需求方：「from 36.1 in Jan」只比兩個月，看似一路上升（Delta3-7 實際 5 月高峰後連降）；
+    逐月走勢由下方 Plan vs actual 圖呈現，卡片只交代數字是什麼。"""
+    t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
+    card = t[t.index('<span class="k-label">FTE, Aug</span>'):]
+    card = card[:card.index("</div>")]
+    assert "in Jan" not in card and '<span class="k-sub">Resource Summary, all roles</span>' in card
