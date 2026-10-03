@@ -501,14 +501,15 @@ def test_shell_is_a_sidebar_that_loads_charts():
     nav = t[t.index("<nav"):t.index("</nav>")]
     assert [x for x in ("/decisions", "/projects", "/loads", "/health", "/report.html") if f'href="/ui/202609{x}"' in nav] == \
            ["/decisions", "/projects", "/loads", "/health", "/report.html"]
-    assert '>Decisions<span class="badge">3</span></a>' in nav
+    assert '>Decisions<span class="badge" title="3 decisions this month">3</span></a>' in nav
 
 
 def test_decisions_page_and_badge_count(ingested):
     snap = ingested.state.eis.store.load_snapshot("202609")
     t = html(ingested, f"/ui/202609/decisions?today={TODAY}")
     assert "Decisions this month" in t and '<ol class="ex">' in t
-    assert f'>Decisions<span class="badge">{len(snap["exceptions"])}</span>' in t
+    n = len(snap["exceptions"])
+    assert f'>Decisions<span class="badge" title="{n} decision{"" if n == 1 else "s"} this month">{n}</span>' in t
     ex = t[t.index('<ol class="ex">'):t.index("</ol>")]
     assert f'href="/ui/202609/projects/{CODE}"' in ex
 
@@ -724,3 +725,19 @@ def test_plan_column_names_the_unit_and_the_months(ingested):
     assert 'title="Actual FTE as a share of planned FTE, summed over Jan to Aug, all roles"' in head
     row = t[t.index('href="/ui/202609/projects/BR0000015346">THORPE'):]
     assert 'title="Jan to Aug: planned FTE ' in row[:row.index("</tr>")]
+
+
+
+def test_missing_source_note_does_not_restyle_the_due_soon_pill():
+    """2026-10-03：單案頁警示框用了 .warn，與 .pill.warn（Due soon）撞名，標籤被套上 padding、外框與上邊距。"""
+    import re
+    from src.portfolio.render.css import CSS
+    assert not re.search(r"(^|[}\s])\.warn\{", CSS)                                   # 不可有裸的 .warn 規則
+    assert ".miss-note{" in CSS
+
+
+def test_decisions_badge_is_a_count_not_an_unread_marker():
+    from src.portfolio.render.css import CSS
+    rule = CSS[CSS.index(".side .badge{"):]
+    rule = rule[:rule.index("}")]
+    assert "var(--signal)" not in rule                                                   # 不用橘色未讀樣式

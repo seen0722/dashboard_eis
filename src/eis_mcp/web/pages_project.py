@@ -43,7 +43,7 @@ def _warnings(p: dict) -> str:
     miss = [m for ok, m in ((p["in_briefing"], "not in the Briefing, so no stage or dates"),
                             (p["in_control_list"], "not in any Control List, so no plan vs actual or tasks"),
                             (p["has_plan"] or not p["in_control_list"], "in a Control List but without a plan")) if not ok]
-    return f'<p class="warn">This project is {e("; ".join(miss))}.</p>' if miss else ""
+    return f'<p class="miss-note">This project is {e("; ".join(miss))}.</p>' if miss else ""
 
 
 def _milestones(p: dict, today: str, risk: dict | None) -> str:

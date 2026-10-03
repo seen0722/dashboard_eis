@@ -53,7 +53,8 @@ def _nav(months: list[str], month: str | None, suffix: str, active: str, decisio
         return side_nav(brand, "", "Menu")
     items = []
     for key, label, path in NAV:
-        badge = f'<span class="badge">{decisions}</span>' if key == "decisions" and decisions else ""
+        badge = (f'<span class="badge" title="{decisions} decision{"" if decisions == 1 else "s"} this month">{decisions}</span>'   # 本月事項數，不是未讀
+                 if key == "decisions" and decisions else "")
         items.append(f'<a href="/ui/{e(month)}/{path}"{" class=\"on\"" if active == key else ""}>{label}{badge}</a>')
     opts = "".join(f'<option value="{e(m)}"{" selected" if m == month else ""}>{fmt_month(m)}</option>' for m in months)
     # 月份選了就跳轉（頁尾腳本，不用 inline onchange）；沒有 JS 時才出現 Go。搜尋按 Enter 送出，按鈕只給螢幕閱讀器。
