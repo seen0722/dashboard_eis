@@ -9,6 +9,8 @@ out/
 # 驗證用暫存（截圖含專案代號與人力數字，且可重新產生）
 .playwright-mcp/
 *.png
+# 例外：程式執行時要讀的圖檔必須進版控（2026-10-03 VM 部署事故；tests/test_repo_ships_runtime_files.py 會擋）
+!src/portfolio/render/icon-180.png
 
 # macOS
 .DS_Store
