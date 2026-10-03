@@ -29,7 +29,7 @@ def _top_cards(p: dict, lm: int, today: str, risk: dict | None) -> str:
     else:
         nx = {"value": "–", "sub": "none ahead in the briefing" if p["in_briefing"] else "not in briefing"}
     kind = ", ".join(x for x in (p.get("biz_type", ""), p.get("category", "")) if x)
-    fte_sub = f'from {p["fte"][0]:.1f} in Jan' if lm > 1 else "Resource Summary"
+    fte_sub = "Resource Summary, all roles"                   # 走勢看下方 Plan vs actual 圖；只比 Jan 會誤導（需求方 2026-10-03）
     items = [{"key": "stage", "label": "Stage", "value": p["stage"] or "–", "tone": "bad" if why else "",
               "sub": ("At risk: " + "; ".join(why)) if why else (p["stage_cat"] or "not in briefing")},
              {"key": "customer", "label": "Customer", "value": p["customer"] or "–", "sub": kind},
