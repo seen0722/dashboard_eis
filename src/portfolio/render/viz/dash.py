@@ -148,7 +148,8 @@ def bar_list_card(ch: Chart, lang: str, sub: str = "") -> str:
 
 
 
-def milestone_card(rows: list[dict], lang: str, weeks: int, link: Callable[[str], str] | None = None) -> str:
+def milestone_card(rows: list[dict], lang: str, weeks: int, link: Callable[[str], str] | None = None, asof: str = "") -> str:
+    """asof：基準日（Briefing 快照日，YYYY-MM-DD），寫進副標，讓「Due soon／Passed」說得出是相對哪一天。"""
     """Timeline 旁的精簡里程碑卡：範圍寫在標題下，不放表單；表格只有 Date／Project／Milestone／Status。"""
     table = milestone_table(rows, lang, link=link, compact=True) if rows else f'<p class="note">{e(t(lang, "none"))}</p>'
-    return card(t(lang, "v_c_milestones", weeks=weeks), table + f'<p class="note">{e(t(lang, "v_ms_note"))}</p>', t(lang, "v_ms_sub", weeks=weeks))
+    return card(t(lang, "v_c_milestones", weeks=weeks), table + f'<p class="note">{e(t(lang, "v_ms_note"))}</p>', t(lang, "v_ms_sub", weeks=weeks, d=asof[5:].replace("-", "/")))

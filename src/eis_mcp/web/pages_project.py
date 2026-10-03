@@ -25,7 +25,7 @@ def _top_cards(p: dict, lm: int, today: str, risk: dict | None) -> str:
     if late:
         nx = {"value": f'{late["ms"]} {late["date"]}', "sub": f'overdue {late["days"]} days', "tone": "bad"}
     elif nxt:
-        nx = {"value": f'{nxt["key"].upper()} {nxt["date"]}', "sub": f'in {nxt["days"]} days'}
+        nx = {"value": f'{nxt["key"].upper()} {nxt["date"]}', "sub": "on Briefing day" if nxt["days"] == 0 else f'in {nxt["days"]} days'}
     else:
         nx = {"value": "–", "sub": "none ahead in the briefing" if p["in_briefing"] else "not in briefing"}
     kind = ", ".join(x for x in (p.get("biz_type", ""), p.get("category", "")) if x)
@@ -53,7 +53,7 @@ def _milestones(p: dict, today: str, risk: dict | None) -> str:
         d = p["dates"].get(k)
         if d:
             n = (dt.date.fromisoformat(d) - dt.date.fromisoformat(today)).days
-            when = f"overdue {-n} days" if k in late else (f"in {n} days" if n >= 0 else f"{-n} days ago")
+            when = f"overdue {-n} days" if k in late else ("on Briefing day" if n == 0 else f"in {n} days" if n > 0 else f"{-n} days ago")
         else:
             when = "not filled" if p["in_briefing"] else "not in briefing"
         cls = ' class="sig"' if k in late else ""

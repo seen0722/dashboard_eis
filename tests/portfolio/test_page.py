@@ -219,4 +219,4 @@ def test_overview_timeline_with_milestones_then_bu_fu():
     assert 'class="status"' not in ov and 'id="c-heat-function"' not in ov
     assert '<a class="kpi bad" href="#decisions"><span class="k-label">At risk</span><b class="k-value">1</b>' in ov
     ms = ov[ov.index("<h3>Milestones"):ov.index('<div class="grid-2 eq">')]
-    assert "Past 7 days to next 8 weeks" in ms and "<form" not in ms and "<th>Status</th>" in ms and "Days left" not in ms
+    assert "Past 7 days to 8 weeks after the" in ms and "<form" not in ms and "<th>Status</th>" in ms and "Days left" not in ms

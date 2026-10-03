@@ -663,7 +663,7 @@ def test_project_list_sections_share_column_widths_and_avoid_repeats():
          "fte": [1.0] * 12, "pva": {}, "dates": {"evt": None, "dvt": None, "pvt": None, "mp": "2026-09-29"}}
     row = _row("202609", p, 8, "2026-09-29", {}, {})
     assert "<small>MP</small>" not in row                                                # 階段與分類同名不重複
-    assert "today" in _next_cell(p, "2026-09-29", {}) and "in 0 days" not in _next_cell(p, "2026-09-29", {})
+    assert "on Briefing day" in _next_cell(p, "2026-09-29", {}) and "in 0 days" not in _next_cell(p, "2026-09-29", {})
 
 
 def test_project_list_tables_use_one_column_layout(ingested):

@@ -52,3 +52,28 @@ def test_health_level_and_source_cells_do_not_wrap_and_in_card_folds_match():
 def test_health_table_carries_its_class(ingested):
     t = html(ingested, "/ui/202609/health")
     assert '<table class="health-t">' in t
+
+
+# ---- 2026-10-03：基準日是 Briefing 快照日，畫面要明說，不寫「Today」 ----
+def test_timeline_marker_names_the_briefing_date_not_today():
+    from tests.portfolio.test_page import snap
+    from src.portfolio.render.viz.options import gantt
+    ch = gantt(snap(), "en", "2026-09-29", 6)
+    ml = ch.option["series"][-1]["markLine"]
+    assert ml["label"]["formatter"] == "Briefing 09/29"
+
+
+def test_milestone_card_says_which_briefing_it_counts_from():
+    from src.portfolio.render.viz.dash import milestone_card
+    h = milestone_card([], "en", 8, asof="2026-09-29")
+    assert "Past 7 days to 8 weeks after the 09/29 Briefing" in h
+
+
+def test_same_day_reads_as_briefing_day_in_list_and_project_page():
+    from src.eis_mcp.web.pages_projects import _next_cell
+    from src.eis_mcp.web.pages_project import _milestones, _top_cards
+    p = {"code": "B1", "name": "X", "in_briefing": True, "stage": "PVT", "stage_cat": "Execution", "customer": "C", "biz_type": "", "category": "",
+         "fte": [1.0] * 12, "dates": {"kickoff": None, "evt": None, "dvt": None, "pvt": None, "mp": "2026-09-29", "mp_orig": None}}
+    assert "on Briefing day" in _next_cell(p, "2026-09-29", {}) and "today" not in _next_cell(p, "2026-09-29", {})
+    assert "on Briefing day" in _top_cards(p, 8, "2026-09-29", None) and "in 0 days" not in _top_cards(p, 8, "2026-09-29", None)
+    assert "on Briefing day" in _milestones(p, "2026-09-29", None)
