@@ -63,27 +63,90 @@ def _plan_cell(p: dict, lm: int) -> str:
     return f'<td class="num" title="Jan–{MONTHS[lm - 1]} plan {plan:.1f}, actual {act:.1f}">{round(act / plan * 100)}%</td>'
 
 
+def _two(top: str, sub: str = "") -> str:
+    """每格固定兩行：上行主資訊、下行次要資訊（空的也佔位，列高一致）。兩個參數都已跳脫。"""
+    return f'{top}<small>{sub or "&nbsp;"}</small>'
+
+
 def _row(month: str, p: dict, lm: int, today: str, risk: dict, passed: dict) -> str:
-    risk_cell = (f'<span class="chip" title="{e("; ".join(risk[p["code"]]))}">At risk</span>' if p["code"] in risk else "")
+    code = f'<span class="code" title="{e(p["code"])}">{e(p["code"])}</span>'
+    flag = f'<span class="chip" title="{e("; ".join(risk[p["code"]]))}">At risk</span> ' if p["code"] in risk else ""
+    name = _two(f'<a class="row-link" href="/ui/{month}/projects/{e(p["code"])}">{e(p["name"])}</a>', flag + code)
     if p["in_briefing"]:
         same = (p["stage"] or "").casefold() == (p["stage_cat"] or "").casefold()
-        stage = f'{e(p["stage"] or "–")}' + ("" if same or not p["stage_cat"] else f'<small>{e(p["stage_cat"])}</small>')
-        kind = ", ".join(x for x in (p.get("biz_type", ""), p.get("category", "") + (f' {p["panel_size"]}' if p.get("panel_size") and p["panel_size"].upper() != "NA" else "")) if x.strip())
+        stage = _two(e(p["stage"] or "–"), "" if same else e(p["stage_cat"] or ""))
+        size = f' {p["panel_size"]}' if p.get("panel_size") and p["panel_size"].upper() != "NA" else ""
+        product = _two(e(p.get("biz_type") or "–"), e((p.get("category") or "") + size))
     else:
-        stage, kind = '<span class="dim">Not in Briefing</span>', ""
-    return (f'<tr><td><a class="row-link" href="/ui/{month}/projects/{e(p["code"])}">{e(p["name"])}</a></td><td>{risk_cell}</td>'
-            f'<td>{stage}</td><td class="nx">{_next_cell(p, today, passed)}</td><td>{e(p["customer"]) or "–"}</td><td>{e(kind) or "–"}</td><td>{e(p["group"]) or "–"}</td>'
-            f'<td>{sparkline_svg(p["fte"], lm)}</td><td class="num">{p["fte"][lm - 1]:.1f}</td>{_plan_cell(p, lm)}<td class="code" title="{e(p["code"])}">{e(p["code"])}</td></tr>')
+        stage, product = _two('<span class="dim">Not in Briefing</span>'), _two("–")
+    return (f'<tr><td>{name}</td><td>{_two(e(p["customer"]) or "–", e(p["group"]))}</td><td>{product}</td>'
+            f'<td class="g">{stage}</td><td class="nx">{_next_cell(p, today, passed)}</td>'
+            f'<td class="g">{sparkline_svg(p["fte"], lm)}</td><td class="num">{p["fte"][lm - 1]:.1f}</td>{_plan_cell(p, lm)}</tr>')
 
 
-COLS = "".join(f'<col style="width:{w}%">' for w in (12, 7, 8, 12, 8, 13, 7, 9, 6, 7, 11))
-HEAD = (f'<colgroup>{COLS}</colgroup>' '<thead><tr><th>Project</th><th>Risk</th><th>Stage</th><th>Next milestone</th><th>Customer</th><th>Type, category</th><th>Group</th>'
-        '<th title="Each line is scaled to the project peak; compare shapes, not heights">FTE, Jan to {mon}</th><th class="num">FTE {mon}</th><th class="num" title="Actual over plan, Jan to the latest month, all roles">Plan to date</th><th>Code</th></tr></thead>')
+# 欄位：(key, 表頭, 可排序鍵, 預設方向, class)。g = 每組第一欄（左側分隔線）
+COLUMNS = (("name", "Name", True, "asc", ""), ("customer", "Customer", True, "asc", ""), ("product", "Product", False, "", ""),
+           ("stage", "Stage", True, "asc", "g"), ("next", "Next milestone", True, "asc", ""),
+           ("trend", "FTE, Jan to {mon}", False, "", "g"), ("fte", "FTE {mon}", True, "desc", "num"), ("plan", "Plan to date", True, "asc", "num"))
+SORTS = {c[0]: c[3] for c in COLUMNS if c[2]}
+DEFAULT_SORT = "fte"
+COLS = "".join(f'<col style="width:{w}%">' for w in (17, 14, 14, 10, 14, 12, 9, 10))
+TIPS = {"trend": "Each line is scaled to the project peak; compare shapes, not heights",
+        "plan": "Actual over plan, Jan to the latest month, all roles", "next": "Overdue first, then the nearest date"}
+
+
+def _head(month: str, mon: str, filters: dict, sort: str, dir_: str) -> str:
+    keep = {k: filters.get(k, "") for k in ("stage_cat", "biz_type", "category", "group", "customer", "q")}
+    ths = []
+    for key, label, sortable, default, cls in COLUMNS:
+        text = e(label.format(mon=mon))
+        attrs = f' class="{cls}"' if cls else ""
+        if key in TIPS:
+            attrs += f' title="{e(TIPS[key])}"'
+        if sortable:
+            on = key == sort
+            nxt = ("desc" if dir_ == "asc" else "asc") if on else default
+            q = {**keep, "sort": key, **({"dir": nxt} if nxt != default else {})}
+            arrow = (" ▴" if dir_ == "asc" else " ▾") if on else ""
+            attrs += f' aria-sort="{"ascending" if dir_ == "asc" else "descending"}"' if on else ""
+            text = f'<a class="sort" href="{e(_href(month, **q))}">{text}{arrow}</a>'
+        ths.append(f"<th{attrs}>{text}</th>")
+    grp = '<tr class="grp"><th colspan="3">Project</th><th colspan="2" class="g">Schedule</th><th colspan="3" class="g">Manpower</th></tr>'
+    return f'<colgroup>{COLS}</colgroup><thead>{grp}<tr>{"".join(ths)}</tr></thead>'
+
+
+STAGE_RANK = {c: i for i, c in enumerate(("RFQ / RFI", "POC", "Execution", "MP", "Sustain / EOP", "Terminated", "Suspended"))}
+
+
+def _sort_key(key: str, p: dict, lm: int, today: str, passed: dict):
+    """回傳 None 表示這列沒有這個值：不論方向一律排最後（未知不是最小也不是最大）。"""
+    if key == "name":
+        return p["name"].casefold()
+    if key == "customer":
+        return (p["customer"] or "").casefold() or None
+    if key == "stage":
+        return (STAGE_RANK.get(p["stage_cat"], 99), (p["stage"] or "").casefold()) if p["in_briefing"] else None
+    if key == "next":
+        if p["code"] in passed:
+            return (0, -passed[p["code"]]["days"], "")
+        n = next_milestone(p, today) if p["in_briefing"] else None
+        return (1, 0, n["date"]) if n else None
+    if key == "plan":
+        pt = plan_to_date(p, lm)
+        return pt[1] / pt[0] if pt else None
+    return p["fte"][lm - 1]
+
+
+def _sorted(ps: list[dict], key: str, dir_: str, lm: int, today: str, passed: dict) -> list[dict]:
+    base = sorted(ps, key=lambda p: p["name"].casefold())                               # 同值時依名稱，結果穩定
+    have = [p for p in base if _sort_key(key, p, lm, today, passed) is not None]
+    miss = [p for p in base if _sort_key(key, p, lm, today, passed) is None]
+    return sorted(have, key=lambda p: _sort_key(key, p, lm, today, passed), reverse=dir_ == "desc") + miss
 
 
 def projects_body(month: str, snap: dict, codes: list[str], filters: dict, th: dict, today: str,
                   groups: list[str], customers: list[str], categories: list[str]) -> str:
-    """codes：符合篩選的專案（queries.search 的結果）。各段依最新月 FTE 由大到小，同 FTE 依名稱（不分大小寫）。"""
+    """codes：符合篩選的專案（queries.search 的結果）。filters 的 sort/dir 決定各段內的順序；不認得的值回到預設（本月 FTE 由大到小）。"""
     lm = snap["meta"]["latest_month"]
     rows = {r["code"]: r for r in at_risk_rows(snap, th["mp_slip_days"])}
     risk = {c: [risk_reason(w, "en", r["stage"]) for w in r["why"]] for c, r in rows.items()}
@@ -92,10 +155,12 @@ def projects_body(month: str, snap: dict, codes: list[str], filters: dict, th: d
     keep = set(codes)
     ps = [p for p in snap["projects"] if p["code"] in keep]
     filtered = any(filters.get(k) for k in ("stage_cat", "biz_type", "category", "group", "customer", "q"))
-    head = HEAD.format(mon=MONTHS[lm - 1])
+    sort = filters.get("sort") if filters.get("sort") in SORTS else DEFAULT_SORT
+    dir_ = filters.get("dir") if filters.get("dir") in ("asc", "desc") else SORTS[sort]
+    head = _head(month, MONTHS[lm - 1], filters, sort, dir_)
     parts = []
     for label, test, folded in GROUPS:
-        g = sorted((p for p in ps if test(p)), key=lambda p: (-p["fte"][lm - 1], p["name"].casefold()))
+        g = _sorted([p for p in ps if test(p)], sort, dir_, lm, today, passed)
         if not g:
             continue
         table = f'<div class="wide"><table class="plist">{head}<tbody>{"".join(_row(month, p, lm, today, risk, passed) for p in g)}</tbody></table></div>'

@@ -547,9 +547,9 @@ def test_each_page_has_one_heading_for_its_subject(ingested):
 # ---- 專業化 pass 3（2026-10-03）：表格與清單 ----
 def test_project_rows_link_on_the_name_and_show_the_code_quietly(ingested):
     t = html(ingested, "/ui/202609/projects")
-    assert f'<td><a class="row-link" href="/ui/202609/projects/{CODE}">THORPE</a></td>' in t
+    assert f'<td><a class="row-link" href="/ui/202609/projects/{CODE}">THORPE</a><small>' in t
     row = t[t.index(f'href="/ui/202609/projects/{CODE}">THORPE'):]
-    assert row.index(f'<td class="code" title="{CODE}">{CODE}</td>') < row.index("</tr>")                # code 在同一列，排最後
+    assert row.index(f'<span class="code" title="{CODE}">{CODE}</span>') < row.index("</td>")          # code 收在名稱下方，不另佔一欄
     assert f'<a href="/ui/202609/projects/{CODE}">{CODE}</a>' not in t
 
 
@@ -667,4 +667,50 @@ def test_project_list_sections_share_column_widths_and_avoid_repeats():
 
 def test_project_list_tables_use_one_column_layout(ingested):
     t = html(ingested, f"/ui/202609/projects?today={TODAY}")
-    assert '<table class="plist"><colgroup>' in t and "<th>Risk</th>" in t
+    assert '<table class="plist"><colgroup>' in t and "<th>Risk</th>" not in t and "<th>Code</th>" not in t
+
+
+
+def _plist_names(t: str) -> list[str]:
+    import re
+    return re.findall(r'class="row-link" href="[^"]+">([^<]+)</a>', t)
+
+
+def _three(app):
+    store = app.state.eis.store
+    f = store.snapshot_dir("202609") / "portfolio.json"
+    snap = json.loads(f.read_text(encoding="utf-8"))
+    b = snap["projects"][0]
+    lo = dict(b, code="BR0000000011", name="alpha", customer="Zed", fte=[1.0] * 12, dates={**b["dates"], "mp": "2026-12-01"})
+    hi = dict(b, code="BR0000000012", name="Beta", customer="Acme", fte=[30.0] * 12, dates={**b["dates"], "mp": "2026-10-01"})
+    snap["projects"] += [lo, hi]
+    f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
+
+
+def test_project_list_sorts_by_the_clicked_header(ingested):
+    _three(ingested)
+    t = html(ingested, f"/ui/202609/projects?today={TODAY}")
+    assert _plist_names(t) == ["Beta", "THORPE", "alpha"]                                 # 預設：本月 FTE 由大到小
+    assert _plist_names(html(ingested, f"/ui/202609/projects?today={TODAY}&sort=name")) == ["alpha", "Beta", "THORPE"]   # 不分大小寫
+    assert _plist_names(html(ingested, f"/ui/202609/projects?today={TODAY}&sort=name&dir=desc")) == ["THORPE", "Beta", "alpha"]
+    assert _plist_names(html(ingested, f"/ui/202609/projects?today={TODAY}&sort=customer")) == ["Beta", "THORPE", "alpha"]
+    assert _plist_names(html(ingested, f"/ui/202609/projects?today={TODAY}&sort=next")) == ["THORPE", "Beta", "alpha"]   # 逾期最前，再依日期
+
+
+def test_sort_headers_toggle_and_keep_filters(ingested):
+    t = html(ingested, f"/ui/202609/projects?today={TODAY}&customer=Dior&sort=name")
+    head = t[t.index('<table class="plist">'):t.index("</thead>")]
+    assert 'aria-sort="ascending"' in head
+    assert 'href="/ui/202609/projects?customer=Dior&amp;sort=name&amp;dir=desc"' in head     # 再點同一欄＝反向，篩選保留
+    assert 'href="/ui/202609/projects?customer=Dior&amp;sort=fte"' in head
+
+
+def test_project_list_columns_are_grouped(ingested):
+    t = html(ingested, f"/ui/202609/projects?today={TODAY}")
+    head = t[t.index('<table class="plist">'):t.index("</thead>")]
+    assert '<tr class="grp"><th colspan="3">Project</th><th colspan="2" class="g">Schedule</th><th colspan="3" class="g">Manpower</th></tr>' in head
+
+
+def test_bad_sort_value_falls_back_to_default(ingested):
+    t = html(ingested, f"/ui/202609/projects?today={TODAY}&sort=%3Cx%3E&dir=up")
+    assert "<x>" not in t and "THORPE" in t

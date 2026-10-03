@@ -209,7 +209,7 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
     async def projects(request: Request) -> Response:
         month = request.path_params["month"]
         qp = request.query_params
-        filters = {k: (qp.get(k) or "").strip() for k in ("stage_cat", "group", "customer", "biz_type", "category", "q")}
+        filters = {k: (qp.get(k) or "").strip() for k in ("stage_cat", "group", "customer", "biz_type", "category", "q", "sort", "dir")}
 
         def build(ok):
             snap = load_snap(state, month)
