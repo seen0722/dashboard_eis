@@ -11,6 +11,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 from ...portfolio.render.pii import find_pii
 from ...portfolio.render.viz.embed import echarts_source
+from ...portfolio.render.icon import PNG_180
 from ...portfolio.render.viz.options import at_risk_rows
 from ..state import ServerState
 from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
@@ -290,6 +291,11 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             return render_shell(title="Department loads", body=pages_load.loads_body(month, snap, res, min_util, float(state.cfg.thresholds.get("spare_capacity_pct", 85))), months=ok, month=month,
                                 suffix=suffix, meta=snap["meta"], decisions=nav_count(snap), active="loads")
         return await respond(state, request, build)
+
+    @mcp.custom_route("/ui/static/icon-180.png", methods=["GET"])
+    async def icon_png(request: Request) -> Response:
+        # 網站圖示的 PNG 版（Safari 起始頁、舊版 Safari 分頁）；與 echarts 同樣不寫 audit
+        return Response(PNG_180, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
     @mcp.custom_route("/ui/static/echarts.min.js", methods=["GET"])
     async def echarts_js(request: Request) -> Response:

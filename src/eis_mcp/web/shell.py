@@ -2,7 +2,7 @@
 月份切換是 GET 表單送到 /ui/go（routes.go 驗證後 redirect），鍵盤選月份不會每按一次方向鍵就跳頁。"""
 from __future__ import annotations
 from html import escape as e
-from .icon import FAVICON
+from .icon import WEB_FAVICON
 from ...portfolio.entities import MONTHS
 from ...portfolio.render.css import CSS
 from ...portfolio.render.viz.dash import side_nav
@@ -82,7 +82,7 @@ def render_shell(*, title: str, body: str, months: list[str], month: str | None 
                  meta: dict | None = None, active: str = "", title_zh: str = "", decisions: int | None = None) -> str:
     full = f"EIS · {title}" + (f" · {fmt_month(month)}" if month else "")
     return (f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<title>{e(full)}</title>{FAVICON}<style>{CSS}{WEB_CSS}</style></head><body><div class="app">'
+            f'<title>{e(full)}</title>{WEB_FAVICON}<style>{CSS}{WEB_CSS}</style></head><body><div class="app">'
             f'{_nav(months, month, suffix, active, decisions)}<main class="main">'
             f'<header><div><h1>{e(title)}{f"<span class=\"zh\" lang=\"zh-Hant\">{e(title_zh)}</span>" if title_zh else ""}</h1>{meta_line(meta)}</div></header>'
             f'{body}'

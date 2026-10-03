@@ -62,3 +62,16 @@ def test_every_page_and_the_report_carry_the_site_icon(ingested):
     assert "%232563EB" in FAVICON                                                          # 主色（# 已 URL 編碼）
     for path in ("/ui/", "/ui/202609/", "/ui/202609/projects", "/ui/202609/report.html"):
         assert FAVICON in html(ingested, path), path
+
+
+def test_safari_gets_a_png_touch_icon_as_well(ingested):
+    """2026-10-03 需求方截圖：Safari 起始頁顯示 IP 字母圓圈——它用 apple-touch-icon（PNG），不吃 SVG。
+    PNG 走靜態檔、不內嵌：base64 隨機字串可能被 PII 檢查誤判（測試曾撞到 "Bob"）。"""
+    from tests.eis_mcp.test_web import get
+    from src.portfolio.render.icon import PNG_180, WEB_FAVICON
+    assert PNG_180[:8] == b"\x89PNG\r\n\x1a\n"
+    assert '<link rel="apple-touch-icon" href="/ui/static/icon-180.png">' in WEB_FAVICON
+    assert WEB_FAVICON in html(ingested, "/ui/") and "data:image/png;base64" not in html(ingested, "/ui/")
+    r = get(ingested, "/ui/static/icon-180.png")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content == PNG_180
+    assert "data:image/png;base64" not in html(ingested, "/ui/202609/report.html")      # 月報只帶 SVG
