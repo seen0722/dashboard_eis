@@ -80,7 +80,7 @@ Resource Summary 中最後一個 Total EIS 人力非零的月份（input-08 為 
 |---|---|---|
 | decide | Budget plan 未填 | Control List |
 | decide | 里程碑已過但 Stage 未推進 | Briefing |
-| track | 在 Briefing（非停案）但沒有 Control List | 對照 |
+| track | 在 Briefing（非結案或暫停）但沒有 Control List | 對照 |
 | track | 有 Control List 但不在 Briefing | 對照 |
 | track | MP 較 Original 延後 > 60 天（附原訂 → 目前與天數；2026-10-01 由例外移來） | Briefing |
 | track | Customer 為 NA / TBD / 空白 | Briefing |

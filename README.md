@@ -206,6 +206,8 @@ location /ui/ { proxy_pass http://127.0.0.1:8765; proxy_set_header Host $host; }
 location = /ui { return 301 /ui/; }
 ```
 
+**版面（2026-10-02 起）**：左側導覽 Overview／Decisions／Projects／Loads／Data health／Report。Overview 是 KPI 卡＋Stage／Customer 分布、六個月 Gantt、Function 負載熱度表、Forecast vs Capacity、未來里程碑；Decisions 是本月例外清單；Data health 併入原 Corrections（舊網址 301 轉址）。圖表用 vendor 進 repo 的 ECharts 5.6.0（`vendor/echarts/`），月報內嵌、網頁走 `/ui/static/echarts.min.js`；每張圖下方的「Data table」是同一份數字。版面實測：`python scripts/check_layout.py --help`。
+
 ## 8. 已知限制
 
 - 每人每月填報上限 1.0 FTE，超載不會出現在數字裡；報告頁尾有註明。

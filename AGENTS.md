@@ -611,3 +611,4 @@ Review 檔疑似**半手工整理**，跨月結構不一致。ingest **不可依
 - 資料語意的坑：快照 `loads[].util` 是**整數百分比或 None**（`round(allocated/keyed_in*100)`，無人填報則 None），不是 0–1 比例；`get_dept_loads(min_util=85)` 是百分比。
 - 兩級 token（`tokens.yaml`，uploader / viewer），token 必須是非空字串（空字串會讓空的 Bearer header 通過認證）。所有 `month` 參數先過 `^\d{6}$` 再拼路徑。
 - 測試：`python -m pytest tests`（含 tests/eis_mcp，用 ASGI transport 打真的 MCP client，不需啟動 server）。
+- 版面（2026-10-02）：v2 儀表板（`src/portfolio/render/viz/`）。**圖上的數字只在 Python 算**（`options.py` 產生 ECharts option 與同一份資料表），JS 只畫；缺資料用獨立類別或灰格，不補 0。At Risk = 既有 `milestones_passed` ∪ `mp_slipped`（只算尚未量產的；已在 MP / Sustain 的延後只留在健康度，2026-10-03 拍板），不是新規則。`vendor/echarts/` 必須跟著部署（`deploy/install.sh` 已放行），缺檔 server 拒絕啟動。

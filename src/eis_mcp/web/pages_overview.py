@@ -1,8 +1,9 @@
 """月份清單與總覽頁的 body。所有數字來自 snapshot / store.months()。"""
 from __future__ import annotations
 from html import escape as e
-from ...portfolio.render.page import exceptions_html, health_html, stage_strip_html
-from .. import queries
+from ...portfolio.render.strings import t
+from ...portfolio.render.viz.dash import bar_list_card, donut_card, kpi_cards, milestone_card, safe_chart_card
+from ...portfolio.render.viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, milestone_rows, stage_donut
 from .shell import fmt_month
 
 
@@ -26,70 +27,16 @@ def months_body(months: list[dict], heading: bool = True) -> str:
             f'<th class="num">Files</th><th class="num">Size</th><th>Categories</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>')
 
 
-def _milestones(month: str, res: dict) -> str:
-    rows = "".join(f'<tr><td>{e(r["date"])}</td><td class="num {"sig" if r["days_left"] < 0 else ""}">{r["days_left"]}</td>'
-                   f'<td><a href="/ui/{month}/projects/{e(r["code"])}">{e(r["name"])}</a></td><td>{e(r["stage_cat"])}</td><td>{r["milestone"].upper()}</td></tr>'
-                   for r in res["milestones"])
-    if not rows:
-        return f'<p class="empty">No EVT/DVT/PVT/MP within ±{res["weeks"]} weeks of {e(res["today"])}.</p>'
-    return (f'<div class="wide"><table><thead><tr><th>Date</th><th class="num">Days left</th><th>Project</th><th>Stage</th><th>Milestone</th></tr></thead>'
-            f'<tbody>{rows}</tbody></table></div><p class="dim">Negative days left = already passed. Active projects only (in briefing, not terminated or suspended).</p>')
-
-
-def _project_link(month: str, code: str, label: str) -> str:
-    return f'<a href="/ui/{e(month)}/projects/{e(code)}">{e(label)}</a>'
-
-
-def linked_exceptions(snap: dict, th: dict) -> str:
-    """月報的例外清單（共用 render/page.py，不改它），每條後面補一行連到單案頁的連結，來源是例外自帶的 codes。
-    一個 <li> 對一條 snap["exceptions"]；結構對不上就原樣回傳（頁面照常出，只是少了連結），不猜。"""
-    out = exceptions_html(snap, "en", th)
-    month = snap["meta"]["report_month"]
-    names = {p["code"]: p["name"] for p in snap["projects"]}
-    items = out.split("</li>")
-    if len(items) != len(snap["exceptions"]) + 1:
-        return out
-    for i, x in enumerate(snap["exceptions"]):
-        codes = [c for c in dict.fromkeys(x.get("codes") or []) if c in names]
-        if codes and items[i].endswith("</div>"):
-            links = " ".join(_project_link(month, c, names[c]) for c in codes)   # 空白＝斷行點
-            items[i] = items[i][:-len("</div>")] + f'<div class="open">Open: {links}</div></div>'
-    return "</li>".join(items)
-
-
-def _linked_health(snap: dict, rows: list[dict]) -> str:
-    """health_html 的表格，名稱欄裡「恰好等於某個專案名稱」的項目換成連結；其他（如 KOS (BR…) also booked as …）保持純文字。"""
-    month = snap["meta"]["report_month"]
-    by_name: dict[str, list[str]] = {}
-    for p in snap["projects"]:
-        by_name.setdefault(p["name"], []).append(p["code"])
-    out = health_html({"health": rows}, "en")
-    trs = out.split("</tr>")
-    body_start = 1                                    # trs[0] 是表頭列
-    if len(trs) != len(rows) + body_start + 1:
-        return out
-    for i, h in enumerate(rows):
-        old = f'class="dim">{e(", ".join(h["names"]))}</td>'
-        new_names = ", ".join(_project_link(month, by_name[n][0], n) if len(by_name.get(n, [])) == 1 else e(n) for n in h["names"])
-        trs[body_start + i] = trs[body_start + i].replace(old, f'class="dim">{new_names}</td>', 1)
-    return "</tr>".join(trs)
-
-
-def health_section(snap: dict) -> str:
-    """decide 級的三項（缺預算、里程碑過期、第二身分）與上方 Decisions 同一件事，收進 <details>；track/ok 級照常顯示。"""
-    decide = [h for h in snap["health"] if h["level"] == "decide"]
-    rest = [h for h in snap["health"] if h["level"] != "decide"]
-    main = f'<div class="wide">{_linked_health(snap, rest)}</div>' if rest else '<p class="empty">No tracking checks.</p>'
-    dup = (f'<details class="dup"><summary data-expand="expand" data-collapse="collapse"><span>{len(decide)} decision-level check{"" if len(decide) == 1 else "s"} repeat the Decisions above</span></summary>'
-           f'<div class="wide">{_linked_health(snap, decide)}</div></details>') if decide else ""
-    return main + dup
-
-
 def overview_body(snap: dict, th: dict, today: str, weeks: int) -> str:
-    month = snap["meta"]["report_month"]; lm = snap["meta"]["latest_month"]
-    up = queries.upcoming(snap, today, weeks)
-    form = (f'<form method="get" class="filters"><label>Weeks <input type="number" name="weeks" value="{weeks}" min="1" max="52"></label>'
-            f'<label>Today <input type="text" name="today" value="{e(today)}" size="10"></label><button>Apply</button></form>')
-    return (f'<section><h2>Decisions this month</h2><p class="lead">Exceptions the rules found, ranked; each names the decision asked for.</p>{linked_exceptions(snap, th)}</section>'
-            f'<section>{stage_strip_html(snap, "en", lm)}<h2>Milestones within {weeks} weeks</h2>{form}{_milestones(month, up)}</section>'
-            f'<section><h2>Data health</h2><p class="lead">What the source files could not answer.</p>{health_section(snap)}</section>')
+    """與月報同一順序：6 張 KPI → Stage｜Customer｜Category → Timeline(2/3)｜Milestones(1/3) → BU｜FU。?weeks= 與 ?today= 仍有效（不放表單）。"""
+    month = snap["meta"]["report_month"]
+    months = int(th.get("timeline_months", 6))
+    link = lambda c: f"/ui/{month}/projects/{c}"  # noqa: E731
+    return (f'<section>{kpi_cards(kpis(snap, "en", th), {"risk": f"/ui/{month}/decisions"})}'
+            f'<div class="grid-3">{donut_card(stage_donut(snap, "en"), "en", t("en", "v_src_stage"))}'
+            f'{bar_list_card(customer_bars(snap, "en"), "en", t("en", "v_src_customer"))}'
+            f'{donut_card(category_donut(snap, "en"), "en", t("en", "v_src_category"))}</div>'
+            f'<div class="tl-row eq">{safe_chart_card(f"Timeline, next {months} months", lambda: gantt(snap, "en", today, months), "en")}'
+            f'{milestone_card(milestone_rows(snap, today, weeks), "en", weeks, link=link)}</div>'
+            f'<div class="grid-2 eq">{safe_chart_card(t("en", "v_c_forecast"), lambda: forecast_capacity(snap, "en"), "en")}'
+            f'{safe_chart_card(t("en", "v_c_fu"), lambda: fu_plan_actual(snap, "en"), "en")}</div></section>')

@@ -26,6 +26,7 @@ rsync -a --delete \
   --include='src/' --include='src/**' \
   --include='config/' --include='config/**' \
   --include='scripts/' --include='scripts/**' \
+  --include='vendor/' --include='vendor/**' \
   --include='requirements.txt' --include='README.md' \
   --include='docs/' --include='docs/eis-mcp-client-setup.md' \
   --exclude='*' \

@@ -7,6 +7,7 @@ import uvicorn
 from .app import build_app
 from .auth import load_tokens
 from .store import Store
+from ..portfolio.render.viz.embed import ECHARTS_JS
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -16,6 +17,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--allowed-host", action="append", default=None,
                     help="Host header values to accept (enables DNS-rebinding protection); repeatable, e.g. eis-host:8765")
     a = ap.parse_args(argv)
+    if not ECHARTS_JS.is_file():
+        print(f"refusing to start: {ECHARTS_JS} is missing (vendor/echarts ships with the repo; re-copy the checkout or re-run deploy/install.sh)",
+              file=sys.stderr)
+        return 1
     store = Store(Path(a.data)); store.init_layout()
     if not store.tokens_file.exists():
         print(f"{store.tokens_file} not found. Create it with entries like:\n"

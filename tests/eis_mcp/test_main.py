@@ -20,3 +20,15 @@ def test_main_runs_uvicorn_with_args(tmp_path, monkeypatch):
     monkeypatch.setattr("src.eis_mcp.__main__.uvicorn.run", lambda app, **kw: calls.update(kw, app=app))
     assert main(["--data", str(d), "--host", "10.0.0.5", "--port", "9000", "--allowed-host", "eis.example:9000"]) == 0
     assert calls["host"] == "10.0.0.5" and calls["port"] == 9000 and calls["app"].state.eis.store.root == d
+
+
+def test_main_refuses_without_echarts_bundle(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr("src.eis_mcp.__main__.ECHARTS_JS", tmp_path / "missing.js")
+    assert main(["--data", str(tmp_path / "d")]) == 1
+    assert "missing.js" in capsys.readouterr().err
+
+
+def test_install_copies_vendor():
+    from pathlib import Path
+    sh = Path("deploy/install.sh").read_text(encoding="utf-8")
+    assert "--include='vendor/' --include='vendor/**'" in sh

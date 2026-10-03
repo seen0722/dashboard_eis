@@ -8,6 +8,7 @@ from html import escape as e
 from ...portfolio.render.page import stage_strip_html
 from ...portfolio.render.strings import t
 from .pages_overview import months_body
+from ...portfolio.render.viz.dash import exception_titles  # noqa: F401  （月報、Overview 共用；首頁沿用原名）
 from .shell import meta_line
 
 ZH = "zh-Hant"
@@ -17,13 +18,13 @@ READ_ONLY = ("Read-only. Same data as the monthly report and the MCP tools; noth
 
 # (path, 英文名, 中文名, 英文說明, 中文說明)
 ENTRIES = (
-    ("", "Decisions", "本月要決定的事", "What needs a decision this month, with evidence, milestones and data health.",
-     "本月要決定的事，附證據、里程碑與資料健康度。"),
+    ("", "Overview", "總覽", "KPIs, charts and the six-month timeline.", "KPI、圖表與六個月時程。"),
+    ("decisions", "Decisions", "本月要決定的事", "What needs a decision this month, with evidence.", "本月要決定的事，附證據。"),
     ("projects", "Projects", "專案", "Every project; filter by stage, type, category, group or customer.",
      "全部專案，可依階段、類型、類別、產品群或客戶篩選。"),
     ("loads", "Loads", "部門負載", "Department load by month: where spare capacity is left.", "各部門每月負載：哪裡還有餘裕。"),
-    ("corrections", "Corrections", "歷史修正", "Past-month numbers that changed since the previous snapshot.",
-     "與上一份快照相比，被改過的過去月份數字。"),
+    ("health", "Data health", "資料健康度", "What the source files could not answer, and past-month numbers that changed.",
+     "來源檔答不出來的事，以及被改過的過去月份數字。"),
     ("report.html", "Monthly report", "月報", "The single-page report, ready to forward.", "可直接轉寄的單頁月報。"),
 )
 
@@ -32,20 +33,6 @@ def bi(en: str, zh: str, cls: str = "") -> str:
     """一段中英並列文字：英文在上、中文在下（標 lang，螢幕閱讀器才會用中文發音）。輸入是純文字，這裡負責跳脫。"""
     c = f' class="{cls}"' if cls else ""
     return f'<p{c}><span>{e(en)}</span><span class="zh" lang="{ZH}">{e(zh)}</span></p>'
-
-
-def exception_titles(snap: dict, th: dict, lang: str) -> list[str]:
-    """與 render/page.py::_exceptions 相同的標題組法（同一組 kw、同一個 legacy 退路），只取標題。
-    tests 以「每個標題都出現在 exceptions_html 輸出裡」守住兩邊不漂移。"""
-    out = []
-    for x in snap["exceptions"]:
-        k = x["title"]
-        kw = {"n": x["count"], "days": th["mp_slip_days"], "pct": th["spare_capacity_pct"], "full": x.get("ask_data", "")}
-        kw.update(x.get("extra", {}))
-        if k == "suspended_charging" and "suspended" not in kw:
-            k = "suspended_charging_legacy"
-        out.append(t(lang, f"ex_{k}_title", **kw))
-    return out
 
 
 SUMMARY_ATTRS = 'data-expand="expand · 展開" data-collapse="collapse · 收合"'   # 與月報 task 表的 summary 同一形狀：左標題、右動作字樣

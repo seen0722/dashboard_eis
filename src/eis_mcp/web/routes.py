@@ -10,10 +10,12 @@ from mcp.server.mcpserver import MCPServer
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 from ...portfolio.render.pii import find_pii
+from ...portfolio.render.viz.embed import echarts_source
+from ...portfolio.render.viz.options import at_risk_rows
 from ..state import ServerState
 from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
 from .. import queries
-from . import pages_home, pages_load, pages_mcp, pages_overview, pages_project
+from . import pages_decisions, pages_health, pages_home, pages_load, pages_mcp, pages_overview, pages_project, pages_projects
 from .shell import SITE, SITE_ZH, render_error, render_shell
 
 log = logging.getLogger("eis_mcp.web")
@@ -125,6 +127,11 @@ async def respond(state: ServerState, request: Request, build: Callable[[list[st
     return HTMLResponse(out)
 
 
+def nav_count(snap: dict) -> int:
+    """側欄 Decisions 的件數 badge：與月報例外清單同一份。"""
+    return len(snap.get("exceptions") or [])
+
+
 def safe_page(page: str) -> str:
     """/ui/go 的 page 參數只能是 /ui/{month}/ 之下的相對路徑（可帶 query）：擋 scheme、host、開頭斜線、..、反斜線、控制字元，
     避免變成 open redirect 或跳出 /ui/。"""
@@ -202,7 +209,7 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
     async def projects(request: Request) -> Response:
         month = request.path_params["month"]
         qp = request.query_params
-        filters = {k: (qp.get(k) or "").strip() for k in ("stage_cat", "group", "customer", "biz_type", "category", "q")}
+        filters = {k: (qp.get(k) or "").strip() for k in ("stage_cat", "group", "customer", "biz_type", "category", "q", "sort", "dir")}
 
         def build(ok):
             snap = load_snap(state, month)
@@ -213,10 +220,11 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
                                  filters["biz_type"] or None, filters["category"] or None)
             if filters["q"] and res["count"] == 1 and not any(filters[k] for k in ("stage_cat", "group", "customer", "biz_type", "category")):
                 return RedirectResponse(f"/ui/{month}/projects/{res['projects'][0]['code']}", status_code=307)
-            body = pages_project.projects_body(month, res, filters, queries.distinct(snap, "group"), queries.distinct(snap, "customer"),
-                                               queries.distinct(snap, "category"))
+            body = pages_projects.projects_body(month, snap, [x["code"] for x in res["projects"]], filters, state.cfg.thresholds,
+                                                date_param(request, snap_day(snap)), queries.distinct(snap, "group"),
+                                                queries.distinct(snap, "customer"), queries.distinct(snap, "category"))
             suffix = "projects" + (("?" + str(qp)) if str(qp) else "")
-            return render_shell(title="Projects", body=body, months=ok, month=month, suffix=suffix, meta=snap["meta"], active="projects")
+            return render_shell(title="Projects", body=body, months=ok, month=month, suffix=suffix, meta=snap["meta"], decisions=nav_count(snap), active="projects")
         return await respond(state, request, build)
 
     @mcp.custom_route("/ui/{month}/projects/{code}/diff", methods=["GET"])
@@ -236,7 +244,7 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             except queries.NotFound as ex:
                 raise WebError(404, "Project not found", f'<p>{e(str(ex), quote=False)}.</p><p><a href="/ui/{month}/projects">Back to the project list</a></p>', "not_found") from None
             return render_shell(title=f"Diff {res['code']}", body=pages_project.diff_body(month, res), months=ok, month=month,
-                                suffix=f"projects/{res['code']}", meta=snap["meta"], active="projects")   # 換月份回單案頁，避免同月互比
+                                suffix=f"projects/{res['code']}", meta=snap["meta"], decisions=nav_count(snap), active="projects")   # 換月份回單案頁，避免同月互比
         return await respond(state, request, build)
 
     @mcp.custom_route("/ui/{month}/projects/{code}", methods=["GET"])
@@ -251,12 +259,13 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
                 raise WebError(404, "Project not found", f'<p>{e(str(ex), quote=False)}.</p><p><a href="/ui/{month}/projects">Back to the project list</a></p>', "not_found") from None
             if "candidates" in res:
                 return render_shell(title="Projects", body=pages_project.candidates_body(month, res["candidates"], code), months=ok, month=month,
-                                    suffix="projects", meta=snap["meta"], active="projects")
+                                    suffix="projects", meta=snap["meta"], decisions=nav_count(snap), active="projects")
             p = res["project"]; today = date_param(request, snap_day(snap))
             earlier = [m for m in ok if m < month]           # ok 是 newest first；前一個 ok 月份 = 小於本月的第一個
             prev = earlier[0] if earlier else None
-            body = pages_project.project_body(month, p, today, snap["meta"]["latest_month"], prev)
-            return render_shell(title=p["name"], body=body, months=ok, month=month, suffix=f"projects/{p['code']}", meta=snap["meta"], active="projects")
+            risk = next((r for r in at_risk_rows(snap, state.cfg.thresholds["mp_slip_days"]) if r["code"] == p["code"]), None)
+            body = pages_project.project_body(month, p, today, snap["meta"]["latest_month"], prev, risk)
+            return render_shell(title=p["name"], body=body, months=ok, month=month, suffix=f"projects/{p['code']}", meta=snap["meta"], decisions=nav_count(snap), active="projects")
         return await respond(state, request, build)
 
     @mcp.custom_route("/ui/{month}/", methods=["GET"])
@@ -273,7 +282,7 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             weeks = int_param(request, "weeks", int(state.cfg.thresholds.get("upcoming_weeks", 8)), 1, 52)
             today = date_param(request, snap_day(snap))
             body = pages_overview.overview_body(snap, state.cfg.thresholds, today, weeks)
-            return render_shell(title="Overview", body=body, months=ok, month=month, suffix="", meta=snap["meta"], active="overview")
+            return render_shell(title="Overview", body=body, months=ok, month=month, suffix="", meta=snap["meta"], decisions=nav_count(snap), active="overview")
         return await respond(state, request, build)
 
     @mcp.custom_route("/ui/{month}/loads", methods=["GET"])
@@ -286,7 +295,33 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             res = queries.dept_loads(snap, min_util)
             suffix = "loads" + (f"?min_util={min_util:g}" if min_util is not None else "")
             return render_shell(title="Department loads", body=pages_load.loads_body(month, snap, res, min_util, float(state.cfg.thresholds.get("spare_capacity_pct", 85))), months=ok, month=month,
-                                suffix=suffix, meta=snap["meta"], active="loads")
+                                suffix=suffix, meta=snap["meta"], decisions=nav_count(snap), active="loads")
+        return await respond(state, request, build)
+
+    @mcp.custom_route("/ui/static/echarts.min.js", methods=["GET"])
+    async def echarts_js(request: Request) -> Response:
+        # vendor 靜態檔、不含資料：不過 PII 檢查也不寫 audit（每頁都會載一次，只是噪音）
+        return Response(echarts_source(), media_type="application/javascript; charset=utf-8",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+    @mcp.custom_route("/ui/{month}/decisions", methods=["GET"])
+    async def decisions(request: Request) -> Response:
+        month = request.path_params["month"]
+
+        def build(ok):
+            snap = load_snap(state, month)
+            return render_shell(title="Decisions this month", body=pages_decisions.decisions_body(snap, state.cfg.thresholds), months=ok, month=month,
+                                suffix="decisions", meta=snap["meta"], decisions=nav_count(snap), active="decisions")
+        return await respond(state, request, build)
+
+    @mcp.custom_route("/ui/{month}/health", methods=["GET"])
+    async def health(request: Request) -> Response:
+        month = request.path_params["month"]
+
+        def build(ok):
+            snap = load_snap(state, month)
+            return render_shell(title="Data health", body=pages_health.health_body(month, snap, queries.corrections(snap)), months=ok,
+                                month=month, suffix="health", meta=snap["meta"], decisions=nav_count(snap), active="health")
         return await respond(state, request, build)
 
     @mcp.custom_route("/ui/{month}/corrections", methods=["GET"])
@@ -294,7 +329,6 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
         month = request.path_params["month"]
 
         def build(ok):
-            snap = load_snap(state, month)
-            return render_shell(title="Corrections", body=pages_load.corrections_body(month, queries.corrections(snap)), months=ok, month=month,
-                                suffix="corrections", meta=snap["meta"], active="corrections")
+            load_snap(state, month)                       # 月份不存在照樣 404
+            return RedirectResponse(f"/ui/{month}/health", status_code=301)   # 2026-10-02 併入 Data health
         return await respond(state, request, build)

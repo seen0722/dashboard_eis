@@ -2,7 +2,8 @@
 from __future__ import annotations
 from html import escape as e
 from ...portfolio.entities import MONTHS
-from ...portfolio.render.charts import capacity_svg
+from ...portfolio.render.viz.dash import chart_card
+from ...portfolio.render.viz.options import forecast_capacity, load_heatmap
 
 
 def _cells(values: list, fmt: str) -> str:
@@ -13,7 +14,7 @@ def loads_body(month: str, snap: dict, res: dict, min_util: float | None, spare_
     """橘色標的是「低於 spare_pct 的閒置產能」，與月報「可調度部門」例外同一語意；>=100 的部門佔絕大多數，標了等於沒標。"""
     lm = res["latest_month"]
     form = (f'<form method="get" class="filters"><label>Min latest util (%) <input type="number" name="min_util" value="{"" if min_util is None else f"{min_util:g}"}" min="0" max="1000" step="1"></label>'
-            f'<button>Filter</button> <a href="/ui/{month}/loads">clear</a></form>')
+            f'<button>Apply</button> <a href="/ui/{month}/loads">Clear</a></form>')
     head = "".join(f'<th class="num">{m}</th>' for m in MONTHS)
     rows = []
     for r in res["loads"]:
@@ -23,10 +24,14 @@ def loads_body(month: str, snap: dict, res: dict, min_util: float | None, spare_
     table = (f'<div class="wide"><table><thead><tr><th>Dept</th><th>Name</th><th>Function</th><th class="num">Latest util %</th>{head}</tr></thead>'
              f'<tbody>{"".join(rows)}</tbody></table></div>') if rows else '<p class="empty">No department matches.</p>'
     return (f'<section><h2>Capacity</h2><p class="lead">Keyed-in people per month across departments; months after {MONTHS[lm - 1]} carry the last value forward.</p>'
-            f'{capacity_svg(snap["projects"], snap["capacity"], lm, "en")}</section>'
-            f'<section><h2>{res["count"]} department{"" if res["count"] == 1 else "s"}</h2>'
+            f'{chart_card(forecast_capacity(snap, "en"), "en")}</section>'
+            f'<section><h2>Load by department</h2><p class="lead">Every department, every month. Orange marks spare capacity; blue deepens as load reaches 100%.</p>'
+            f'{chart_card(load_heatmap(snap, "en", spare_pct, by="dept"), "en")}</section>'
+            # 部門表與熱度表同一份數字：收合在熱度表下方，只在需要篩選或逐列查時展開
+            f'<details class="group"{" open" if min_util is not None else ""}><summary data-expand="expand" data-collapse="collapse">'
+            f'<span>All {res["count"]} department{"" if res["count"] == 1 else "s"} as a table</span></summary>'
             f'<p class="lead">util % = allocated FTE / people who keyed in (not headcount). Sorted by latest util ({MONTHS[lm - 1]}); departments with nobody keyed in come last and are dropped when a minimum is set. <span class="sig">Orange</span> = below {spare_pct:g}%, the spare capacity the report points at.</p>'
-            f'{form}{table}</section>')
+            f'{form}{table}</details></section>')
 
 
 def corrections_body(month: str, res: dict) -> str:
