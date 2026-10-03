@@ -60,8 +60,9 @@ def test_every_page_and_the_report_carry_the_site_icon(ingested):
     from src.eis_mcp.web.icon import FAVICON
     assert FAVICON.startswith('<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,')
     assert "%232563EB" in FAVICON                                                          # 主色（# 已 URL 編碼）
-    for path in ("/ui/", "/ui/202609/", "/ui/202609/projects", "/ui/202609/report.html"):
+    for path in ("/ui/", "/ui/202609/", "/ui/202609/projects"):
         assert FAVICON in html(ingested, path), path
+    assert FAVICON in ingested.state.eis.store.report_html("202609")                       # ingest 產生的月報檔
 
 
 def test_safari_gets_a_png_touch_icon_as_well(ingested):
@@ -74,7 +75,7 @@ def test_safari_gets_a_png_touch_icon_as_well(ingested):
     assert WEB_FAVICON in html(ingested, "/ui/") and "data:image/png;base64" not in html(ingested, "/ui/")
     r = get(ingested, "/ui/static/icon-180.png")
     assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content == PNG_180
-    assert "data:image/png;base64" not in html(ingested, "/ui/202609/report.html")      # 月報只帶 SVG
+    assert "data:image/png;base64" not in ingested.state.eis.store.report_html("202609")  # 月報只帶 SVG
 
 
 def test_product_cell_shows_the_category_icon_and_skips_unknown_ones(ingested):

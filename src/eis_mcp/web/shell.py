@@ -37,7 +37,7 @@ dl.terms{margin:8px 0 0;max-width:90ch}dl.terms dt{font-weight:600;margin-top:12
 """
 
 NAV = (("overview", "Overview", ""), ("decisions", "Decisions", "decisions"), ("projects", "Projects", "projects"),
-       ("loads", "Loads", "loads"), ("health", "Data health", "health"), ("report", "Report", "report.html"))
+       ("loads", "Loads", "loads"), ("health", "Data health", "health"))   # 月報不在網頁提供（需求方 2026-10-03）
 
 
 def fmt_month(month: str) -> str:

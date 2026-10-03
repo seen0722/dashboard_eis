@@ -188,16 +188,10 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
 
     @mcp.custom_route("/ui/{month}/report.html", methods=["GET"])
     async def report(request: Request) -> Response:
+        # 網頁不再提供月報（需求方 2026-10-03：月報像網站、打開後回不到網頁）。月報仍由 ingest 產生，
+        # 從 CLI out/ 或 MCP 資源 eis://{月}/report.html 取得；舊書籤轉到該月總覽，不給 404。
         month = request.path_params["month"]
-
-        def build(ok):
-            load_snap(state, month)          # 404/503 規則與其他頁一致
-            try:
-                return state.store.report_html(month)
-            except UnknownMonth:
-                raise WebError(404, f"No report for {month}",
-                               "<p>The snapshot exists but its report_en.html is missing; ask an uploader to run ingest_month again.</p>", "no_report") from None
-        return await respond(state, request, build)
+        return await respond(state, request, lambda ok: RedirectResponse(f"/ui/{month}/", status_code=301))
 
     @mcp.custom_route("/ui/{month}/projects", methods=["GET"])
     async def projects(request: Request) -> Response:
