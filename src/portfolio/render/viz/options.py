@@ -177,6 +177,12 @@ def _overdue(snap: dict, today: str) -> dict[str, tuple[str, str, int]]:
     return {p.code: (ms, d, n) for p, ms, d, n in milestones_passed([SimpleNamespace(**q) for q in snap["projects"]], today) if p.code in late}
 
 
+def _reached_mp(p: dict, t0: dt.date, today: str) -> bool:
+    """階段已是 MP，且 Briefing 的 MP Date 落在報告月份起點到 Briefing 日之間＝本月進入 MP。"""
+    mp = p["dates"].get("mp")
+    return p["stage_cat"] == "MP" and bool(mp) and t0.isoformat() <= mp <= today
+
+
 def _gantt_rows(snap: dict, today: str, months: int, overdue: dict | None = None) -> tuple[dt.date, dt.date, list[dict]]:
     """在 Briefing、非結案／暫停，且視窗內有里程碑，或是還沒有 MP 日期的 RFQ / RFI；
     另外逾期的專案（overdue）一律納入並排最上面——否則逾期越久越會從圖上消失（需求方 2026-10-03，THORPE）。"""
@@ -184,8 +190,9 @@ def _gantt_rows(snap: dict, today: str, months: int, overdue: dict | None = None
     t0 = dt.date.fromisoformat(today[:7] + "-01")
     t1 = _add_months(t0, months)
     in_win = lambda s: bool(s) and t0 <= dt.date.fromisoformat(s) < t1  # noqa: E731
-    # 已量產（MP、Sustain / EOP）不列：沒有下一個里程碑可追，MP 日期落在時間窗內只會畫出已達成的事件（需求方 2026-10-03，Brandy）
-    rows = [p for p in snap["projects"] if p["in_briefing"] and p["stage_cat"] not in INACTIVE and p["stage_cat"] not in SHIPPED
+    # 已量產（MP、Sustain / EOP）通常不列：沒有下一個里程碑可追。例外是「本月進入 MP」——每月 review 要看到它（需求方 2026-10-03，Brandy）
+    rows = [p for p in snap["projects"] if p["in_briefing"] and p["stage_cat"] not in INACTIVE
+            and (p["stage_cat"] not in SHIPPED or _reached_mp(p, t0, today))
             and (p["code"] in overdue or any(in_win(p["dates"].get(k)) for k in MS) or (p["stage_cat"] == "RFQ / RFI" and not p["dates"].get("mp")))]
     rows.sort(key=lambda p: (p["code"] not in overdue, -overdue[p["code"]][2] if p["code"] in overdue else 0,
                              p["dates"].get("mp") or p["dates"].get("pvt") or p["dates"].get("dvt") or p["dates"].get("evt") or "9", p["name"].casefold()))
@@ -210,12 +217,14 @@ def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: 
             if not d or not t0 <= dt.date.fromisoformat(d) < t1:
                 continue
             overdue = p["code"] in late and d < today            # 逾期用紅色粗體標籤表示；圖示顏色只代表里程碑種類
+            reached = k == "mp" and _reached_mp(p, t0, today)        # 本月進入 MP：綠色標籤
             c = T.MS_COLORS[k]
             close = any(0 < (dt.date.fromisoformat(x) - dt.date.fromisoformat(d)).days <= LABEL_GAP_DAYS for x in shown)   # 下一個標記太近：標籤放上方
             marks.append({"value": [_ms(d), y], "symbol": SYMBOL[k], "symbolSize": MS_SIZE[k], "itemStyle": {"color": c, "borderColor": c},
                           "tooltip": {"formatter": f"{escape(p['name'])}: {k.upper()} {d}"},   # 預設 tooltip 會顯示時區換算後的時間與內部 y 索引
-                          "label": {"show": True, "position": "top" if close else "right", "formatter": f"{k.upper()} {d[5:7]}/{d[8:10]}",
-                                    "color": T.BAD if overdue else T.INK, "fontWeight": 700 if overdue else 400, "fontSize": 11}})
+                          "label": {"show": True, "position": "top" if close else "right",
+                                    "formatter": t(lang, "v_gantt_reached", ms=k.upper(), d=f"{d[5:7]}/{d[8:10]}") if reached else f"{k.upper()} {d[5:7]}/{d[8:10]}",
+                                    "color": T.BAD if overdue else T.OK if reached else T.INK, "fontWeight": 700 if overdue or reached else 400, "fontSize": 11}})
         od = pinned.get(p["code"])
         if od and dt.date.fromisoformat(od[1]) < t0:                # 逾期的里程碑在圖的左邊界之外：釘在左邊界，標出日期與天數
             ms, d, n_days = od

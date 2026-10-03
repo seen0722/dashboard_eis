@@ -322,12 +322,17 @@ def test_overdue_milestone_before_the_window_is_pinned_to_the_left_edge():
     assert pin[0]["label"]["color"] == T.BAD
 
 
-def test_timeline_leaves_out_projects_already_in_mp_or_sustain():
-    """2026-10-03 需求方：Brandy 已在 MP，MP 09/01 落在時間窗內就被畫上 Timeline——已達成的里程碑是雜訊。"""
+def test_timeline_shows_projects_that_reached_mp_this_month_and_drops_older_ones():
+    """2026-10-03 需求方：每月 review 要看到「本月進入 MP」的專案（Brandy MP 09/01）；更早就量產的不列（舊事件）。"""
     from src.portfolio.render.viz import options as O
+    from src.portfolio.render.viz import tokens as T
     s = snap()
     b = next(p for p in s["projects"] if p["code"] == "BR1")
     b.update({"name": "Brandy", "stage": "MP", "stage_cat": "MP"})
-    b["dates"].update({"mp": "2026-09-01"})
-    names = O.gantt(s, "en", "2026-09-12", 6).option["yAxis"]["data"]
-    assert "Brandy" not in names
+    b["dates"].update({"pvt": "2026-03-09", "mp": "2026-09-01"})
+    ch = O.gantt(s, "en", "2026-09-12", 6)
+    assert "Brandy" in ch.option["yAxis"]["data"]
+    mark = next(m for m in ch.option["series"][-1]["data"] if "reached" in str(m["label"].get("formatter", "")))
+    assert mark["label"]["formatter"] == "MP 09/01 reached" and mark["label"]["color"] == T.OK
+    b["dates"].update({"mp": "2026-07-28"})                                              # 7 月就量產：不是本月的事
+    assert "Brandy" not in O.gantt(s, "en", "2026-09-12", 6).option["yAxis"]["data"]
