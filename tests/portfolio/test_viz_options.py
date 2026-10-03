@@ -64,8 +64,8 @@ def _marks(ch):
 
 def test_gantt_rows_markers_and_customer_variants():
     ch = O.gantt(snap(), "en", TODAY, 6)
-    assert ch.option["yAxis"]["data"] == ["TOMY", "AX200", "THORPE", "N1X"]      # 依里程碑先後；第一列在最上面
-    assert [r[0] for r in ch.rows] == ["N1X", "THORPE", "AX200", "TOMY"]         # Q11（暫停）、KOS（結案）、不在 Briefing 的都不列
+    assert ch.option["yAxis"]["data"] == ["TOMY", "THORPE", "N1X"]               # 依里程碑先後；第一列在最上面
+    assert [r[0] for r in ch.rows] == ["N1X", "THORPE", "TOMY"]                  # Q11（暫停）、KOS（結案）、AX200（已在 MP）、不在 Briefing 的都不列
     marks = _marks(ch)
     n1x = next(m for m in marks if m["label"]["formatter"] == "PVT 09/02")
     assert n1x["itemStyle"]["color"] == "#F59E0B" and n1x["label"]["color"] == "#DC2626"     # 圖示是 PVT 色；逾期改用紅色標籤
@@ -73,7 +73,7 @@ def test_gantt_rows_markers_and_customer_variants():
     assert thorpe["label"]["color"] == "#1F2937"                                   # 已過但不在 milestones_passed → 不標紅
     assert any(m["label"]["formatter"] == "RFQ, no dates yet" for m in marks)
     assert all(x["renderItem"] == {"$fn": "ganttBar"} for x in ch.option["series"] if x["type"] == "custom")
-    assert set(ch.variants) == {"Axelera", "Dell", "Trimble"}
+    assert set(ch.variants) == {"Dell", "Trimble"}
     assert ch.variants["Trimble"]["yAxis"]["data"] == ["TOMY", "THORPE"]
     assert ch.note.startswith("Red labels mark a milestone")
 
@@ -257,7 +257,7 @@ def test_gantt_label_moves_above_when_next_marker_is_close():
     """2/3 寬的 Timeline 實測：PVT 09/08 的標籤被 3 週後的 MP 09/29 圓點蓋住；30 天內有下一個標記時標籤改放上方。"""
     s = snap(); next(p for p in s["projects"] if p["code"] == "BR1")["dates"]["mp"] = "2026-09-29"
     marks = _marks(O.gantt(s, "en", TODAY, 6))
-    pvt = next(m for m in marks if m["label"]["formatter"] == "PVT 09/08" and m["value"][1] == 2)
+    pvt = next(m for m in marks if m["label"]["formatter"] == "PVT 09/08" and m["value"][1] == 1)
     mp = next(m for m in marks if m["label"]["formatter"] == "MP 09/29")
     assert pvt["label"]["position"] == "top" and mp["label"]["position"] == "right"
 
@@ -275,8 +275,8 @@ def test_gantt_uses_the_mock_symbols_colours_and_legend():
     assert set(bars) == {"to EVT", "to DVT", "to PVT", "to MP"}
     assert bars["to PVT"]["itemStyle"]["color"] == "#F59E0B" and bars["to MP"]["itemStyle"]["color"] == "#DC2626"
     ms = lambda iso: O._ms(iso)  # noqa: E731
-    assert [2, ms("2024-04-02"), ms("2026-09-08")] in bars["to PVT"]["data"]       # THORPE：kickoff → PVT 用 PVT 色
-    assert [2, ms("2026-09-08"), ms("2026-10-20")] in bars["to MP"]["data"]        # PVT → MP 用 MP 色
+    assert [1, ms("2024-04-02"), ms("2026-09-08")] in bars["to PVT"]["data"]       # THORPE：kickoff → PVT 用 PVT 色
+    assert [1, ms("2026-09-08"), ms("2026-10-20")] in bars["to MP"]["data"]        # PVT → MP 用 MP 色
     today = _scatter(ch)["markLine"]["lineStyle"]
     assert today == {"color": "#DC2626", "type": "dashed"}
 
@@ -320,3 +320,35 @@ def test_overdue_milestone_before_the_window_is_pinned_to_the_left_edge():
     assert pin[0]["value"][0] == O._ms("2026-09-01")                                       # 時間窗起點
     assert pin[0]["label"]["formatter"] == "◀ MP 07/31, 43 days overdue"
     assert pin[0]["label"]["color"] == T.BAD
+
+
+def test_timeline_shows_projects_that_reached_mp_this_month_and_drops_older_ones():
+    """2026-10-03 需求方：每月 review 要看到「本月進入 MP」的專案（Brandy MP 09/01）；更早就量產的不列（舊事件）。"""
+    from src.portfolio.render.viz import options as O
+    from src.portfolio.render.viz import tokens as T
+    s = snap()
+    b = next(p for p in s["projects"] if p["code"] == "BR1")
+    b.update({"name": "Brandy", "stage": "MP", "stage_cat": "MP"})
+    b["dates"].update({"pvt": "2026-03-09", "mp": "2026-09-01"})
+    ch = O.gantt(s, "en", "2026-09-12", 6)
+    assert "Brandy" in ch.option["yAxis"]["data"]
+    mark = next(m for m in ch.option["series"][-1]["data"] if "reached" in str(m["label"].get("formatter", "")))
+    assert mark["label"]["formatter"] == "MP 09/01 reached" and mark["label"]["color"] == T.OK
+    b["dates"].update({"mp": "2026-07-28"})                                              # 7 月就量產：不是本月的事
+    assert "Brandy" not in O.gantt(s, "en", "2026-09-12", 6).option["yAxis"]["data"]
+
+
+def test_blank_mp_with_an_original_date_is_drawn_hollow_and_says_so():
+    """2026-10-03 需求方選 A：N1X 的 MP Date 空白、Original MP 10/23 有填——畫在原訂日期，灰色空心，寫明目前未填；
+    不把原訂日期當成目前 MP（AGENTS.md 第一守則）。"""
+    from src.portfolio.render.viz import options as O
+    from src.portfolio.render.viz import tokens as T
+    s = snap()
+    n1x = next(p for p in s["projects"] if p["code"] == "BR6")
+    n1x["dates"].update({"mp": None, "mp_orig": "2026-10-23"})
+    ch = O.gantt(s, "en", "2026-09-12", 6)
+    m = next(x for x in ch.option["series"][-1]["data"] if "Original MP" in str(x["label"].get("formatter", "")))
+    assert m["label"]["formatter"] == "Original MP 10/23, current not filled"
+    assert m["value"][0] == O._ms("2026-10-23") and m["label"]["color"] == T.INK3
+    assert m["itemStyle"]["color"] == "transparent" and m["itemStyle"]["borderColor"] == T.INK3
+    assert not any(x.get("label", {}).get("formatter") == "MP 10/23" for x in ch.option["series"][-1]["data"])   # 不畫成目前的 MP
