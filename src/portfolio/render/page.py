@@ -4,6 +4,7 @@ import datetime as dt
 from html import escape as e
 from ..entities import INACTIVE, MONTHS
 from .css import CSS
+from .icon import FAVICON
 from .strings import t
 from .viz.dash import at_risk_html, bar_list_card, card, donut_card, kpi_cards, milestone_card, safe_chart_card, side_nav
 from .viz.embed import chart_html, scripts
@@ -148,7 +149,7 @@ def render_page(snap: dict, lang: str, today: str, th: dict, echarts: str = "inl
                                                                           ("health", "v_nav_health"), ("appendix", "v_nav_appendix")))
     side = side_nav(f'<a class="brand" href="#overview">{e(t(lang, "h1"))}</a>', links, t(lang, "v_menu"), label=t(lang, "h1"))
     return f"""<!DOCTYPE html><html lang="{t(lang, "html_lang")}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(t(lang, "doc_title", ym=ym))}</title><style>{CSS}</style></head><body><div class="app">{side}<main class="main">
+<title>{e(t(lang, "doc_title", ym=ym))}</title>{FAVICON}<style>{CSS}</style></head><body><div class="app">{side}<main class="main">
 <header><div><h1>{e(t(lang, "h1"))}</h1><p>{e(t(lang, "intro"))}</p></div>{_title_block(m, lang, len(cl), lm)}</header>
 <section id="overview">{_overview(snap, lang, today, th, late)}</section>
 <section id="decisions"><h2>{e(t(lang, "s_decisions"))}</h2><p class="lead">{e(t(lang, "s_decisions_lead"))}</p>{at_risk_html(snap, lang, th)}<div class="card">{_exceptions(snap, lang, th)}</div></section>

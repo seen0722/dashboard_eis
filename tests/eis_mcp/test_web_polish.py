@@ -53,3 +53,40 @@ def test_small_controls_have_usable_hit_areas(ingested, path, sel, min_h):
             "details.more>summary": "details.more summary{display:inline;padding:10px 4px;margin:-10px -4px;",
             "a.chip": "a.chip{display:inline-flex;align-items:center;min-height:30px}"}[sel]
     assert rule in c
+
+
+def test_every_page_and_the_report_carry_the_site_icon(ingested):
+    """2026-10-03 需求方：瀏覽器分頁沒有圖示。內嵌 SVG（data URI），不另放靜態檔，轉寄出去的月報也帶得到。"""
+    from src.eis_mcp.web.icon import FAVICON
+    assert FAVICON.startswith('<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,')
+    assert "%232563EB" in FAVICON                                                          # 主色（# 已 URL 編碼）
+    for path in ("/ui/", "/ui/202609/", "/ui/202609/projects", "/ui/202609/report.html"):
+        assert FAVICON in html(ingested, path), path
+
+
+def test_safari_gets_a_png_touch_icon_as_well(ingested):
+    """2026-10-03 需求方截圖：Safari 起始頁顯示 IP 字母圓圈——它用 apple-touch-icon（PNG），不吃 SVG。
+    PNG 走靜態檔、不內嵌：base64 隨機字串可能被 PII 檢查誤判（測試曾撞到 "Bob"）。"""
+    from tests.eis_mcp.test_web import get
+    from src.portfolio.render.icon import PNG_180, WEB_FAVICON
+    assert PNG_180[:8] == b"\x89PNG\r\n\x1a\n"
+    assert '<link rel="apple-touch-icon" href="/ui/static/icon-180.png">' in WEB_FAVICON
+    assert WEB_FAVICON in html(ingested, "/ui/") and "data:image/png;base64" not in html(ingested, "/ui/")
+    r = get(ingested, "/ui/static/icon-180.png")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content == PNG_180
+    assert "data:image/png;base64" not in html(ingested, "/ui/202609/report.html")      # 月報只帶 SVG
+
+
+def test_product_cell_shows_the_category_icon_and_skips_unknown_ones(ingested):
+    import json
+    store = ingested.state.eis.store
+    f = store.snapshot_dir("202609") / "portfolio.json"
+    snap = json.loads(f.read_text(encoding="utf-8"))
+    base = snap["projects"][0]
+    snap["projects"] += [dict(base, code="BR0000000021", name="Tabby", category="Tablet"),
+                         dict(base, code="BR0000000022", name="Oddity", category="Smart Speaker")]
+    f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
+    t = html(ingested, "/ui/202609/projects")
+    row = lambda n: t[t.index(f'">{n}</a>'):][:t[t.index(f'">{n}</a>'):].index("</tr>")]   # noqa: E731
+    assert '<div class="prod"><svg class="cat-ic"' in row("Tabby")
+    assert "cat-ic" not in row("Oddity") and "Smart Speaker" in row("Oddity")             # 對不上：只有文字
