@@ -11,6 +11,18 @@ FAVICON = f'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{quot
 
 # Safari 起始頁／我的最愛方塊與舊版 Safari 分頁不吃 SVG：另附 180×180 PNG（同一個 SVG 渲染、滿版正方形，Apple 自己裁圓角）。
 # PNG 走 /ui/static 靜態檔，不內嵌 base64：隨機字串可能碰巧像工號或姓名，讓月報的 PII 檢查擋下整個月（2026-10-03 測試就撞到 "Bob"）。
-PNG_180 = Path(__file__).with_name("icon-180.png").read_bytes()
+# 2026-10-03 VM 部署事故：這個檔被 .gitignore 的 *.png 擋掉，git pull 拿不到，import 時讀檔失敗讓 server 起不來。
+# 現在 .gitignore 已放行；讀不到時只少 PNG 圖示（路由 404、不輸出 <link>），網站照常。
+
+
+def load_png(path: Path) -> bytes | None:
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
+PNG_180 = load_png(Path(__file__).with_name("icon-180.png"))
 PNG_PATH = "/ui/static/icon-180.png"
-WEB_FAVICON = FAVICON + f'<link rel="icon" type="image/png" sizes="180x180" href="{PNG_PATH}"><link rel="apple-touch-icon" href="{PNG_PATH}">'
+WEB_FAVICON = FAVICON + (f'<link rel="icon" type="image/png" sizes="180x180" href="{PNG_PATH}"><link rel="apple-touch-icon" href="{PNG_PATH}">'
+                         if PNG_180 else "")

@@ -295,6 +295,8 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
     @mcp.custom_route("/ui/static/icon-180.png", methods=["GET"])
     async def icon_png(request: Request) -> Response:
         # 網站圖示的 PNG 版（Safari 起始頁、舊版 Safari 分頁）；與 echarts 同樣不寫 audit
+        if not PNG_180:                                       # 檔案缺漏時只少這個圖示，不影響其他頁面
+            return Response(status_code=404)
         return Response(PNG_180, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
     @mcp.custom_route("/ui/static/echarts.min.js", methods=["GET"])
