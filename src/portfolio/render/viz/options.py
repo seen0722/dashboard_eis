@@ -170,18 +170,29 @@ def _ms(iso: str) -> int:
     return int(dt.datetime.fromisoformat(iso[:10]).replace(tzinfo=dt.timezone.utc).timestamp() * 1000)
 
 
-def _gantt_rows(snap: dict, today: str, months: int) -> tuple[dt.date, dt.date, list[dict]]:
-    """與舊 timeline_svg 同一個選列條件：在 Briefing、非結案／暫停，且視窗內有里程碑，或是還沒有 MP 日期的 RFQ / RFI。"""
+def _overdue(snap: dict, today: str) -> dict[str, tuple[str, str, int]]:
+    """里程碑已過、階段沒推進的專案 → (里程碑, 日期, 逾期天數)。名單取 Decisions 的 milestones_passed（late_codes），
+    里程碑與天數用同一個 rules 函式算，與 At Risk 表一致。"""
+    late = late_codes(snap)
+    return {p.code: (ms, d, n) for p, ms, d, n in milestones_passed([SimpleNamespace(**q) for q in snap["projects"]], today) if p.code in late}
+
+
+def _gantt_rows(snap: dict, today: str, months: int, overdue: dict | None = None) -> tuple[dt.date, dt.date, list[dict]]:
+    """在 Briefing、非結案／暫停，且視窗內有里程碑，或是還沒有 MP 日期的 RFQ / RFI；
+    另外逾期的專案（overdue）一律納入並排最上面——否則逾期越久越會從圖上消失（需求方 2026-10-03，THORPE）。"""
+    overdue = overdue or {}
     t0 = dt.date.fromisoformat(today[:7] + "-01")
     t1 = _add_months(t0, months)
     in_win = lambda s: bool(s) and t0 <= dt.date.fromisoformat(s) < t1  # noqa: E731
     rows = [p for p in snap["projects"] if p["in_briefing"] and p["stage_cat"] not in INACTIVE
-            and (any(in_win(p["dates"].get(k)) for k in MS) or (p["stage_cat"] == "RFQ / RFI" and not p["dates"].get("mp")))]
-    rows.sort(key=lambda p: (p["dates"].get("mp") or p["dates"].get("pvt") or p["dates"].get("dvt") or p["dates"].get("evt") or "9", p["name"].casefold()))
+            and (p["code"] in overdue or any(in_win(p["dates"].get(k)) for k in MS) or (p["stage_cat"] == "RFQ / RFI" and not p["dates"].get("mp")))]
+    rows.sort(key=lambda p: (p["code"] not in overdue, -overdue[p["code"]][2] if p["code"] in overdue else 0,
+                             p["dates"].get("mp") or p["dates"].get("pvt") or p["dates"].get("dvt") or p["dates"].get("evt") or "9", p["name"].casefold()))
     return t0, t1, rows
 
 
-def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: set[str], lang: str) -> dict:
+def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: set[str], lang: str, pinned: dict | None = None) -> dict:
+    pinned = pinned or {}                                           # 逾期專案 → (里程碑, 日期, 天數)；迴圈內的 overdue 是另一個布林
     n = len(rows)
     bars: dict[str, list] = {k: [] for k in MS}
     marks = []
@@ -204,6 +215,14 @@ def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: 
                           "tooltip": {"formatter": f"{escape(p['name'])}: {k.upper()} {d}"},   # 預設 tooltip 會顯示時區換算後的時間與內部 y 索引
                           "label": {"show": True, "position": "top" if close else "right", "formatter": f"{k.upper()} {d[5:7]}/{d[8:10]}",
                                     "color": T.BAD if overdue else T.INK, "fontWeight": 700 if overdue else 400, "fontSize": 11}})
+        od = pinned.get(p["code"])
+        if od and dt.date.fromisoformat(od[1]) < t0:                # 逾期的里程碑在圖的左邊界之外：釘在左邊界，標出日期與天數
+            ms, d, n_days = od
+            label = t(lang, "v_gantt_overdue", ms=ms.upper(), d=f"{d[5:7]}/{d[8:10]}", n=n_days)
+            marks.append({"value": [_ms(t0.isoformat()), y], "symbol": SYMBOL[ms], "symbolSize": MS_SIZE[ms],
+                          "itemStyle": {"color": T.MS_COLORS[ms], "borderColor": T.MS_COLORS[ms]},
+                          "tooltip": {"formatter": f"{escape(p['name'])}: {ms.upper()} {d}, {label}"},
+                          "label": {"show": True, "position": "right", "formatter": label, "color": T.BAD, "fontWeight": 700, "fontSize": 11}})
         if not ds:
             marks.append({"value": [_ms(today), y], "symbol": "emptyCircle", "symbolSize": 8, "itemStyle": {"color": T.INK3},   # symbol none 會連標籤一起藏掉
                           "tooltip": {"formatter": f"{escape(p['name'])}: {escape(t(lang, 'no_dates', stage=p['stage']))}"},
@@ -221,13 +240,14 @@ def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: 
 
 
 def gantt(snap: dict, lang: str, today: str, months: int) -> Chart:
-    t0, t1, rows = _gantt_rows(snap, today, months)
     late = late_codes(snap)
+    overdue = _overdue(snap, today)
+    t0, t1, rows = _gantt_rows(snap, today, months, overdue)
     customers = sorted({p["customer"] for p in rows if p["customer"]}, key=str.casefold)
-    variants = {c: _gantt_option([p for p in rows if p["customer"] == c], t0, t1, today, late, lang) for c in customers}
+    variants = {c: _gantt_option([p for p in rows if p["customer"] == c], t0, t1, today, late, lang, overdue) for c in customers}
     # MP 欄是 Briefing 的「MP Date」（目前預計），旁邊附「Original MP Date」；客戶已在篩選器，不另列（需求方 2026-10-03）
     table = tuple((p["name"], p["stage"], *(p["dates"].get(k) or "" for k in MS), p["dates"].get("mp_orig") or "") for p in rows)
-    return Chart("gantt", t(lang, "v_c_gantt", months=months), _gantt_option(rows, t0, t1, today, late, lang),
+    return Chart("gantt", t(lang, "v_c_gantt", months=months), _gantt_option(rows, t0, t1, today, late, lang, overdue),
                  (t(lang, "col_project"), t(lang, "col_stage"), "EVT", "DVT", "PVT", t(lang, "v_col_mp_current"), t(lang, "v_col_mp_orig")), table,
                  height=max(160, 30 * len(rows) + 50), variants=variants, note=t(lang, "v_gantt_note"), min_width=720,
                  legend=tuple((g, k.upper(), T.MS_COLORS[k]) for g, k in zip(("◇", "◆", "▲", "★"), MS)))
