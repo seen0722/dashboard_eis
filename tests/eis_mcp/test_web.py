@@ -159,7 +159,7 @@ def test_loads_page_has_department_heatmap(ingested):
 
 def test_project_page_top_cards(ingested):
     t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
-    top = t[t.index('<div class="kpis four">'):t.index("</div></section>")]
+    top = t[t.index('<div class="kpis four">'):]
     assert '<span class="k-label">Stage</span>' in top and '<span class="k-label">FTE, Aug</span><b class="k-value">12.0</b>' in top
 
 
@@ -199,10 +199,10 @@ def test_project_text_is_escaped(ingested):
 def test_projects_table_filters_and_single_hit_redirect(ingested):
     add_twin(ingested)
     t = html(ingested, "/ui/202609/projects")
-    assert t.count(f'href="/ui/202609/projects/BR0000') == 2 and "THORPE2" in t and "2 projects" in t
-    assert 'value="POC" selected' not in t and 'value="POC"' in t and 'value="Beta"' in t     # 下拉有 distinct 值
+    assert t.count('class="row-link" href="/ui/202609/projects/BR0000') == 2 and "THORPE2" in t and "2 projects" in t
+    assert 'href="/ui/202609/projects?stage_cat=POC"' in t and 'value="Beta"' in t     # Stage 是計數標籤，其餘篩選是下拉
     t = html(ingested, "/ui/202609/projects?stage_cat=POC")
-    assert "THORPE2" in t and 'projects/BR0000015346"' not in t and 'value="POC" selected' in t
+    assert "THORPE2" in t and 'projects/BR0000015346"' not in t and 'aria-current="true" href="/ui/202609/projects?stage_cat=POC"' in t
     t = html(ingested, "/ui/202609/projects?customer=Beta&stage_cat=")
     assert "1 project" in t and "THORPE2" in t
     r = get(ingested, "/ui/202609/projects?q=THORPE2")
@@ -343,8 +343,9 @@ def test_month_picker_works_without_js(ingested):
 
 def test_latest_task_month_is_open(ingested):
     t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
-    assert t.count("<details open>") == 1
-    assert "<details>" not in t or t.index("<details open>") < t.index("<details>")      # 打開的是最上面（最新月）那一個
+    tasks = t[t.index('<h2>Tasks'):]
+    assert tasks.count('<details class="month" open>') == 1
+    assert '<details class="month">' not in tasks or tasks.index('<details class="month" open>') < tasks.index('<details class="month">')
 
 
 def test_tables_scroll_on_narrow_screens(ingested):
@@ -367,7 +368,7 @@ def test_open_links_can_wrap(ingested):
 def test_project_page_dates_and_footnote_are_readable(ingested):
     t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
     assert "latest_month =" not in t and "Manpower keyed in through" in t
-    hist = t[t.index("<h2>Briefing history"):]
+    hist = t[t.index('id="c-mp-drift"'):]
     assert "<td>2026-" in hist and "<td>2026090" not in hist
 
 
@@ -546,7 +547,9 @@ def test_each_page_has_one_heading_for_its_subject(ingested):
 # ---- 專業化 pass 3（2026-10-03）：表格與清單 ----
 def test_project_rows_link_on_the_name_and_show_the_code_quietly(ingested):
     t = html(ingested, "/ui/202609/projects")
-    assert f'<td class="code">{CODE}</td><td><a class="row-link" href="/ui/202609/projects/{CODE}">THORPE</a></td>' in t
+    assert f'<td><a class="row-link" href="/ui/202609/projects/{CODE}">THORPE</a></td>' in t
+    row = t[t.index(f'href="/ui/202609/projects/{CODE}">THORPE'):]
+    assert row.index(f'<td class="code" title="{CODE}">{CODE}</td>') < row.index("</tr>")                # code 在同一列，排最後
     assert f'<a href="/ui/202609/projects/{CODE}">{CODE}</a>' not in t
 
 
@@ -584,3 +587,84 @@ def test_whole_row_click_does_not_rely_on_a_positioned_table_row():
     t = render_shell(title="x", body="", months=["202609"], month="202609")
     tail = t[t.index("</nav>"):]
     assert 'closest("tr")' in tail and 'querySelector("a.row-link")' in tail
+
+
+
+# ---- 2026-10-03 review：專案列表與單案頁 ----
+def test_project_list_groups_by_status_and_folds_the_inactive(ingested):
+    store = ingested.state.eis.store
+    f = store.snapshot_dir("202609") / "portfolio.json"
+    snap = json.loads(f.read_text(encoding="utf-8"))
+    base = snap["projects"][0]
+    extra = [dict(base, code="BR0000000001", name="aDone", stage="Terminate", stage_cat="Terminated", fte=[0.0] * 12),
+             dict(base, code="BR0000000002", name="Zmp", stage="MP", stage_cat="MP"),
+             dict(base, code="POOL", name="BU10_RFQ_POOL", stage="", stage_cat="", in_briefing=False, customer="", biz_type="", category="", pva={})]
+    snap["projects"] += extra
+    f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
+    t = html(ingested, f"/ui/202609/projects?today={TODAY}")
+    heads = [h for h in ("Active", "In production", "Closed or on hold", "Not in Briefing") if f">{h} (" in t]
+    assert heads == ["Active", "In production", "Closed or on hold", "Not in Briefing"]
+    assert t.index("THORPE") < t.index("Zmp") < t.index("aDone") < t.index("BU10_RFQ_POOL")
+    assert "<h3>Active (" in t and "<h3>In production (" in t                               # 進行中與量產直接展開
+    assert '<details class="group"><summary data-expand="expand" data-collapse="collapse"><span>Closed or on hold (' in t                 # 結案／暫停與不在 Briefing 收合
+    assert '<details class="group"><summary data-expand="expand" data-collapse="collapse"><span>Not in Briefing (' in t
+    pool = t[t.index("BU10_RFQ_POOL"):]
+    assert "Not in Briefing" in pool[:pool.index("</tr>")]                                 # 空白格寫明原因，不留白
+    assert "<th>Stage cat.</th>" not in t and 'type="text" name="q"' not in t[t.index('<form method="get" class="filters"'):]
+
+
+def test_project_list_shows_risk_next_milestone_trend_and_plan(ingested):
+    t = html(ingested, f"/ui/202609/projects?today={TODAY}")
+    row = t[t.index('href="/ui/202609/projects/BR0000015346">THORPE'):]
+    row = row[:row.index("</tr>")]
+    assert 'class="chip"' in row and "At risk" in row                                    # THORPE MP 已過
+    assert "MP 2026-07-31" in row and "overdue" in row
+    assert '<svg class="spark"' in row
+    assert "%" in row
+
+
+def test_project_list_keeps_the_search_text_when_filtering(ingested):
+    add_twin(ingested)
+    t = html(ingested, "/ui/202609/projects?q=THORP")
+    form = t[t.index('<form method="get" class="filters"'):]
+    assert '<input type="hidden" name="q" value="THORP">' in form
+    assert "Matches for" in t and "THORP" in t
+
+
+def test_project_page_leads_with_status_and_why_it_is_at_risk(ingested):
+    t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
+    top = t[t.index('<div class="kpis four">'):]
+    first = top[:top.index("</div>", top.index("k-sub"))]
+    assert "At risk" in first and "MP 2026-07-31 passed" in t[t.index('<div class="kpis four">'):t.index('<div class="kpis four">') + 2000]
+    from src.eis_mcp.web.pages_project import project_body
+    snap = ingested.state.eis.store.load_snapshot("202609")
+    b = project_body("202609", snap["projects"][0], TODAY, 8, "202608")
+    assert "Compare with 2026-08" in b[:b.index('<div class="kpis four">')]                  # 比較連結在頁首
+    assert "<span>In briefing</span>" not in t and "<span>Has plan</span>" not in t       # key-value 清單拿掉，只在缺資料時警示
+
+
+def test_project_page_sections_in_reading_order(ingested):
+    t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
+    order = [t.index(x) for x in ('id="c-mp-drift"', "<h2>Plan vs actual", "<h2>Tasks", "<h2>FTE and NTD by month")]
+    assert order == sorted(order)
+
+
+def test_project_page_tasks_are_summarised_by_function(ingested):
+    t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
+    tasks = t[t.index("<h2>Tasks"):t.index("<h2>FTE and NTD by month")]
+    assert '<table class="tg">' in tasks and "Show all" in tasks
+
+
+def test_project_list_sections_share_column_widths_and_avoid_repeats():
+    from src.eis_mcp.web.pages_projects import _next_cell, _row
+    t_ = html  # noqa: F841
+    p = {"code": "B1", "name": "X", "in_briefing": True, "stage": "MP", "stage_cat": "MP", "customer": "C", "group": "G", "biz_type": "", "category": "",
+         "fte": [1.0] * 12, "pva": {}, "dates": {"evt": None, "dvt": None, "pvt": None, "mp": "2026-09-29"}}
+    row = _row("202609", p, 8, "2026-09-29", {}, {})
+    assert "<small>MP</small>" not in row                                                # 階段與分類同名不重複
+    assert "today" in _next_cell(p, "2026-09-29", {}) and "in 0 days" not in _next_cell(p, "2026-09-29", {})
+
+
+def test_project_list_tables_use_one_column_layout(ingested):
+    t = html(ingested, f"/ui/202609/projects?today={TODAY}")
+    assert '<table class="plist"><colgroup>' in t and "<th>Risk</th>" in t

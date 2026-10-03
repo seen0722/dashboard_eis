@@ -80,7 +80,7 @@ def milestone_table(rows: list[dict], lang: str, link: Callable[[str], str] | No
     return f'<div class="wide"><table><thead><tr>{head}</tr></thead><tbody>{"".join(body)}</tbody></table></div>'
 
 
-def _risk_reason(w: dict, lang: str, stage: str) -> str:
+def risk_reason(w: dict, lang: str, stage: str) -> str:
     if w["rule"] == "passed":
         return t(lang, "v_risk_passed", ms=w["ms"], date=w["date"], days=w["days"], stage=stage) if "date" in w else t(lang, "v_risk_passed_bare")
     return t(lang, "v_risk_slipped", orig=w["orig"], mp=w["mp"], days=w["days"])
@@ -92,7 +92,7 @@ def at_risk_html(snap: dict, lang: str, th: dict, link: Callable[[str], str] | N
     if not rows:
         return ""
     trs = "".join(f'<tr><td>{f"<a class=\"plain\" href=\"{e(link(r["code"]))}\">{e(r["name"])}</a>" if link else e(r["name"])}</td>'
-                  f'<td>{e(r["stage"] or "–")}</td><td>{"<br>".join(e(_risk_reason(w, lang, r["stage"])) for w in r["why"])}</td></tr>' for r in rows)
+                  f'<td>{e(r["stage"] or "–")}</td><td>{"<br>".join(e(risk_reason(w, lang, r["stage"])) for w in r["why"])}</td></tr>' for r in rows)
     return (f'<div class="card risk-t"><div class="card-h"><b class="sig">{e(t(lang, "v_risk_head", n=len(rows)).rstrip(":："))}</b>'
             f'<span class="card-sub">{e(t(lang, "v_risk_note", days=th["mp_slip_days"]))}</span></div>'
             f'<table><thead><tr><th>{e(t(lang, "v_risk_col_project"))}</th><th>{e(t(lang, "v_risk_col_stage"))}</th><th>{e(t(lang, "v_risk_col_why"))}</th></tr></thead>'

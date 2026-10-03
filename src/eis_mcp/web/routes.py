@@ -11,10 +11,11 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 from ...portfolio.render.pii import find_pii
 from ...portfolio.render.viz.embed import echarts_source
+from ...portfolio.render.viz.options import at_risk_rows
 from ..state import ServerState
 from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
 from .. import queries
-from . import pages_decisions, pages_health, pages_home, pages_load, pages_mcp, pages_overview, pages_project
+from . import pages_decisions, pages_health, pages_home, pages_load, pages_mcp, pages_overview, pages_project, pages_projects
 from .shell import SITE, SITE_ZH, render_error, render_shell
 
 log = logging.getLogger("eis_mcp.web")
@@ -219,8 +220,9 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
                                  filters["biz_type"] or None, filters["category"] or None)
             if filters["q"] and res["count"] == 1 and not any(filters[k] for k in ("stage_cat", "group", "customer", "biz_type", "category")):
                 return RedirectResponse(f"/ui/{month}/projects/{res['projects'][0]['code']}", status_code=307)
-            body = pages_project.projects_body(month, res, filters, queries.distinct(snap, "group"), queries.distinct(snap, "customer"),
-                                               queries.distinct(snap, "category"))
+            body = pages_projects.projects_body(month, snap, [x["code"] for x in res["projects"]], filters, state.cfg.thresholds,
+                                                date_param(request, snap_day(snap)), queries.distinct(snap, "group"),
+                                                queries.distinct(snap, "customer"), queries.distinct(snap, "category"))
             suffix = "projects" + (("?" + str(qp)) if str(qp) else "")
             return render_shell(title="Projects", body=body, months=ok, month=month, suffix=suffix, meta=snap["meta"], decisions=nav_count(snap), active="projects")
         return await respond(state, request, build)
@@ -261,7 +263,8 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             p = res["project"]; today = date_param(request, snap_day(snap))
             earlier = [m for m in ok if m < month]           # ok 是 newest first；前一個 ok 月份 = 小於本月的第一個
             prev = earlier[0] if earlier else None
-            body = pages_project.project_body(month, p, today, snap["meta"]["latest_month"], prev)
+            risk = next((r for r in at_risk_rows(snap, state.cfg.thresholds["mp_slip_days"]) if r["code"] == p["code"]), None)
+            body = pages_project.project_body(month, p, today, snap["meta"]["latest_month"], prev, risk)
             return render_shell(title=p["name"], body=body, months=ok, month=month, suffix=f"projects/{p['code']}", meta=snap["meta"], decisions=nav_count(snap), active="projects")
         return await respond(state, request, build)
 

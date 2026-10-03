@@ -7,6 +7,7 @@ from .css import CSS
 from .strings import t
 from .viz.dash import at_risk_html, bar_list_card, card, donut_card, kpi_cards, milestone_card, safe_chart_card, side_nav
 from .viz.embed import chart_html, scripts
+from .viz.project import pva_line
 from .viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, milestone_rows, pva, stage_donut
 
 STAGE_KEYS = [("RFQ / RFI", "stage_rfq"), ("POC", "stage_poc"), ("Execution", "stage_exec"), ("MP", "stage_mp"), ("Sustain / EOP", "stage_sustain"), ("Terminated", "stage_terminated"), ("Suspended", "stage_suspended")]
@@ -104,8 +105,7 @@ def _appendix_one(p: dict, lang: str, today: str, latest_month: int, i: int) -> 
         cards = []
         for role in ("BU RD", "FU RD", "PM"):
             v = p["pva"].get(role) or {"plan": [0] * 12, "actual": [0] * 12}
-            plan, act = sum(v["plan"]), sum(v["actual"][:latest_month])
-            cards.append(f'<div><h4>{role}</h4><div class="s">{e(t(lang, "pva_line", plan=f"{plan:.1f}", missing="" if plan else t(lang, "pva_missing"), mon=MONTHS[latest_month - 1], actual=f"{act:.1f}"))}</div>{chart_html(pva(p, role, latest_month, lang, i), lang)}</div>')
+            cards.append(f'<div><h4>{role}</h4><div class="s">{e(pva_line(v, latest_month, lang))}</div>{chart_html(pva(p, role, latest_month, lang, i), lang)}</div>')
         by_m: dict[int, list] = {}
         for task in p["tasks"]:
             by_m.setdefault(task["month"], []).append(task)
