@@ -157,7 +157,9 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             broken = next((m["month"] for m in months if m["status"] == "broken" and (latest is None or m["month"] > latest)), None)
             snap = state.store.load_snapshot(latest) if latest else None
             body = pages_home.home_body(months, snap, state.cfg.thresholds, broken)
-            return render_shell(title=SITE, title_zh=SITE_ZH, body=body, months=ok, active="home")
+            # 側欄帶最新月份的導覽、頁首帶資料日期；首頁本身只放搜尋、狀態卡與連結
+            return render_shell(title=SITE, title_zh=SITE_ZH, body=body, months=ok, active="home", month=latest if snap else None,
+                                meta=snap["meta"] if snap else None, decisions=nav_count(snap) if snap else None)
         return await respond(state, request, build)
 
     async def tool_list() -> list[tuple[str, str]]:

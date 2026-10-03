@@ -373,30 +373,35 @@ def test_project_page_dates_and_footnote_are_readable(ingested):
 
 
 # ---- 首頁（2026-10-01：中英並列 landing page）----
-def test_home_explains_purpose_in_both_languages(ingested):
+def test_home_is_a_launchpad_without_long_explanations(ingested):
+    """2026-10-03 需求方：首頁只要簡單的 landing page，不要過多文字。"""
     t = html(ingested, "/ui/")
-    assert "BU10 Portfolio Review" in t and "BU10 專案組合檢討" in t
-    assert "Monthly review of BU10 projects" in t and "BU10 專案月度檢視" in t
-    assert "Read-only" in t and "唯讀" in t
-    assert 'lang="zh-Hant"' in t
+    body = t[t.index("</nav>"):]
+    assert "BU10 Portfolio Review" in t and "BU10 專案組合檢討" in t and "Report month 2026-09" in body
+    for gone in ("Where to start", "Terms", "Read-only", "Use it from an AI agent", "Monthly review of BU10 projects"):
+        assert gone not in body, gone
+    assert 'action="/ui/202609/projects"' in body                                         # 搜尋是首頁的主要動作
 
 
-def test_home_summarises_latest_month_and_links_entry_points(ingested):
-    from src.eis_mcp.web.pages_home import exception_titles
-    from src.portfolio.render.page import exceptions_html
+def test_home_status_tiles_link_to_their_pages(ingested):
+    from src.portfolio.render.viz.options import at_risk_codes
     snap = ingested.state.eis.store.load_snapshot("202609")
-    th = ingested.state.eis.cfg.thresholds
+    risk = len(at_risk_codes(snap, ingested.state.eis.cfg.thresholds["mp_slip_days"]))
     t = html(ingested, "/ui/")
-    assert "Report month 2026-09" in t and "Latest" in t
-    titles = exception_titles(snap, th, "en")
-    assert titles and all(x in exceptions_html(snap, "en", th) for x in titles)      # 與月報同一份標題，不另編
-    from html import escape
-    assert all(escape(x) in t for x in titles)
-    for href in ('href="/ui/202609/"', 'href="/ui/202609/decisions"', 'href="/ui/202609/projects"', 'href="/ui/202609/loads"',
-                 'href="/ui/202609/health"', 'href="/ui/202609/report.html"'):
-        assert href in t, href
-    assert 'action="/ui/202609/projects"' in t[t.index("</nav>"):]                    # 頁面本體有搜尋框，不只 nav
-    assert "<details" in t and "Data history" in t and "Terms" in t
+    tiles = t[t.index('<div class="kpis home-tiles">'):]
+    tiles = tiles[:tiles.index("</div></section>") if "</div></section>" in tiles else len(tiles)]
+    assert f'href="/ui/202609/decisions"><span class="k-label">At risk</span><b class="k-value">{risk}</b>' in tiles
+    assert f'<span class="k-label">Decisions</span><b class="k-value">{len(snap["exceptions"])}</b>' in tiles
+    assert f'href="/ui/202609/projects"><span class="k-label">Projects</span><b class="k-value">{len(snap["projects"])}</b>' in tiles
+    assert 'href="/ui/202609/loads"><span class="k-label">FTE, Aug</span>' in tiles
+
+
+def test_home_sidebar_carries_the_latest_month_navigation(ingested):
+    t = html(ingested, "/ui/")
+    nav = t[t.index("<nav"):t.index("</nav>")]
+    assert 'href="/ui/202609/decisions"' in nav and 'href="/ui/202609/projects"' in nav and 'href="/ui/" class="brand on"' in nav
+    body = t[t.index("</nav>"):]
+    assert 'href="/ui/202609/report.html"' in body and 'href="/ui/mcp"' in body and "Data history" in body
 
 
 def test_home_when_latest_snapshot_is_broken_still_explains(ingested):
@@ -462,7 +467,7 @@ def test_mcp_guide_missing_is_loud(ingested, monkeypatch):
 
 def test_home_links_to_mcp_page(ingested):
     t = html(ingested, "/ui/")
-    assert 'href="/ui/mcp"' in t and "AI agent" in t
+    assert 'href="/ui/mcp"' in t and "MCP setup" in t
 
 
 def test_install_script_ships_the_setup_guide():

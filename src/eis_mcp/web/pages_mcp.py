@@ -7,7 +7,14 @@ from __future__ import annotations
 import re
 from html import escape as e
 from pathlib import Path
-from .pages_home import ZH, bi
+
+ZH = "zh-Hant"
+
+
+def bi(en: str, zh: str, cls: str = "") -> str:
+    """一段中英並列文字：英文在上、中文在下（標 lang，螢幕閱讀器才會用中文發音）。輸入是純文字，這裡負責跳脫。"""
+    c = f' class="{cls}"' if cls else ""
+    return f'<p{c}><span>{e(en)}</span><span class="zh" lang="{ZH}">{e(zh)}</span></p>'
 
 GUIDE = Path(__file__).resolve().parents[3] / "docs" / "eis-mcp-client-setup.md"   # deploy/install.sh 會一併複製這個檔
 HOST_RE = re.compile(r"^[A-Za-z0-9.\-]+(:\d{1,5})?$")
