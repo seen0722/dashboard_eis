@@ -709,7 +709,7 @@ def test_sort_headers_toggle_and_keep_filters(ingested):
 def test_project_list_columns_are_grouped(ingested):
     t = html(ingested, f"/ui/202609/projects?today={TODAY}")
     head = t[t.index('<table class="plist">'):t.index("</thead>")]
-    assert '<tr class="grp"><th colspan="3">Project</th><th colspan="2" class="g">Schedule</th><th colspan="3" class="g">Manpower</th></tr>' in head
+    assert '<tr class="grp"><th colspan="3">Project</th><th colspan="2" class="g">Schedule</th><th colspan="4" class="g">Manpower</th></tr>' in head
 
 
 def test_bad_sort_value_falls_back_to_default(ingested):
@@ -721,7 +721,7 @@ def test_plan_column_names_the_unit_and_the_months(ingested):
     """2026-10-03 需求方：「Plan to date」沒說比的是 FTE、也沒說期間。"""
     t = html(ingested, f"/ui/202609/projects?today={TODAY}")
     head = t[t.index('<table class="plist">'):t.index("</thead>")]
-    assert "% of planned FTE, Jan to Aug" in head and "Plan to date" not in t
+    assert "% of planned FTE,<br>Jan to Aug" in head and "Plan to date" not in t
     assert 'title="Actual FTE as a share of planned FTE, summed over Jan to Aug, all roles"' in head
     row = t[t.index('href="/ui/202609/projects/BR0000015346">THORPE'):]
     assert 'title="Jan to Aug: planned FTE ' in row[:row.index("</tr>")]
@@ -741,3 +741,16 @@ def test_decisions_badge_is_a_count_not_an_unread_marker():
     rule = CSS[CSS.index(".side .badge{"):]
     rule = rule[:rule.index("}")]
     assert "var(--signal)" not in rule                                                   # 不用橘色未讀樣式
+
+
+def test_manpower_group_shows_the_total_and_the_plan_it_is_divided_by(ingested):
+    """2026-10-03 需求方：加 Jan to Aug 總數，% 放在它後面；% 欄第二行給 plan 總數，讓算式攤開。"""
+    t = html(ingested, f"/ui/202609/projects?today={TODAY}")
+    head = t[t.index('<table class="plist">'):t.index("</thead>")]
+    order = [head.index(x) for x in ("Trend, Jan to Aug", "FTE Aug", "FTE, Jan to Aug", "% of planned FTE,<br>Jan to Aug")]
+    assert order == sorted(order) and '<th colspan="4" class="g">Manpower</th>' in head
+    assert 'href="/ui/202609/projects?sort=total"' in head
+    row = t[t.index('href="/ui/202609/projects/BR0000015346">THORPE'):]
+    row = row[:row.index("</tr>")]
+    assert '<td class="num">96.0</td>' in row                                            # fixture：12.0 × 8 個月
+    assert "<small>plan " in row

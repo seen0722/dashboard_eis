@@ -60,7 +60,7 @@ def _plan_cell(p: dict, lm: int) -> str:
     if pt is None:
         return '<td class="num dim" title="No plan in the Control List">–</td>'
     plan, act = pt
-    return f'<td class="num" title="Jan to {MONTHS[lm - 1]}: planned FTE {plan:.1f}, actual FTE {act:.1f}">{round(act / plan * 100)}%</td>'
+    return f'<td class="num" title="Jan to {MONTHS[lm - 1]}: planned FTE {plan:.1f}, actual FTE {act:.1f} (Control List)">{_two(f"{round(act / plan * 100)}%", f"plan {plan:.1f}")}</td>'
 
 
 def _two(top: str, sub: str = "") -> str:
@@ -81,18 +81,20 @@ def _row(month: str, p: dict, lm: int, today: str, risk: dict, passed: dict) -> 
         stage, product = _two('<span class="dim">Not in Briefing</span>'), _two("–")
     return (f'<tr><td>{name}</td><td>{_two(e(p["customer"]) or "–", e(p["group"]))}</td><td>{product}</td>'
             f'<td class="g">{stage}</td><td class="nx">{_next_cell(p, today, passed)}</td>'
-            f'<td class="g">{sparkline_svg(p["fte"], lm)}</td><td class="num">{p["fte"][lm - 1]:.1f}</td>{_plan_cell(p, lm)}</tr>')
+            f'<td class="g">{sparkline_svg(p["fte"], lm)}</td><td class="num">{p["fte"][lm - 1]:.1f}</td><td class="num">{sum(p["fte"][:lm]):.1f}</td>{_plan_cell(p, lm)}</tr>')
 
 
 # 欄位：(key, 表頭, 可排序鍵, 預設方向, class)。g = 每組第一欄（左側分隔線）
 COLUMNS = (("name", "Name", True, "asc", ""), ("customer", "Customer", True, "asc", ""), ("product", "Product", False, "", ""),
            ("stage", "Stage", True, "asc", "g"), ("next", "Next milestone", True, "asc", ""),
-           ("trend", "FTE, Jan to {mon}", False, "", "g"), ("fte", "FTE {mon}", True, "desc", "num"), ("plan", "% of planned FTE, Jan to {mon}", True, "asc", "num"))
+           ("trend", "Trend, Jan to {mon}", False, "", "g"), ("fte", "FTE {mon}", True, "desc", "num"),
+           ("total", "FTE, Jan to {mon}", True, "desc", "num"), ("plan", "% of planned FTE, Jan to {mon}", True, "asc", "num"))
 SORTS = {c[0]: c[3] for c in COLUMNS if c[2]}
 DEFAULT_SORT = "fte"
-COLS = "".join(f'<col style="width:{w}%">' for w in (17, 14, 14, 10, 14, 12, 9, 10))
+COLS = "".join(f'<col style="width:{w}%">' for w in (13, 10, 11, 8, 13, 11, 8, 11, 15))
 TIPS = {"trend": "Each line is scaled to the project peak; compare shapes, not heights",
-        "plan": "Actual FTE as a share of planned FTE, summed over Jan to {mon}, all roles", "next": "Overdue first, then the nearest date"}
+        "plan": "Actual FTE as a share of planned FTE, summed over Jan to {mon}, all roles",
+        "total": "FTE summed over Jan to {mon} (Resource Summary)", "next": "Overdue first, then the nearest date"}
 
 
 def _head(month: str, mon: str, filters: dict, sort: str, dir_: str) -> str:
@@ -100,6 +102,8 @@ def _head(month: str, mon: str, filters: dict, sort: str, dir_: str) -> str:
     ths = []
     for key, label, sortable, default, cls in COLUMNS:
         text = e(label.format(mon=mon))
+        if key == "plan":                                       # 在逗號後斷行，不讓月份單獨掉到第二行
+            text = text.replace(", Jan", ",<br>Jan")
         attrs = f' class="{cls}"' if cls else ""
         if key in TIPS:
             attrs += f' title="{e(TIPS[key].format(mon=mon))}"'
@@ -111,7 +115,7 @@ def _head(month: str, mon: str, filters: dict, sort: str, dir_: str) -> str:
             attrs += f' aria-sort="{"ascending" if dir_ == "asc" else "descending"}"' if on else ""
             text = f'<a class="sort" href="{e(_href(month, **q))}">{text}{arrow}</a>'
         ths.append(f"<th{attrs}>{text}</th>")
-    grp = '<tr class="grp"><th colspan="3">Project</th><th colspan="2" class="g">Schedule</th><th colspan="3" class="g">Manpower</th></tr>'
+    grp = '<tr class="grp"><th colspan="3">Project</th><th colspan="2" class="g">Schedule</th><th colspan="4" class="g">Manpower</th></tr>'
     return f'<colgroup>{COLS}</colgroup><thead>{grp}<tr>{"".join(ths)}</tr></thead>'
 
 
@@ -134,6 +138,8 @@ def _sort_key(key: str, p: dict, lm: int, today: str, passed: dict):
     if key == "plan":
         pt = plan_to_date(p, lm)
         return pt[1] / pt[0] if pt else None
+    if key == "total":
+        return sum(p["fte"][:lm])
     return p["fte"][lm - 1]
 
 
