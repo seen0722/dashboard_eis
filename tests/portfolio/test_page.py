@@ -143,7 +143,10 @@ def test_in_briefing_no_cl_label_matches_inactive_rule():
 
 def test_report_is_v2_layout_with_inline_echarts():
     html = render_page(snap(), "en", "2026-09-12", TH)
-    assert '<nav class="side" aria-label="BU10 Portfolio Review">' in html and 'href="#decisions"' in html
+    # 2026-10-03 需求方：月報像網站（深色側欄被當成網頁選單）→ 改回文件：無側欄、單欄置中、頁首下一行頁內目錄
+    assert '<nav class="side"' not in html and '<main class="main doc">' in html
+    toc = html[html.index('<nav class="doc-toc"'):html.index("</nav>", html.index('<nav class="doc-toc"'))]
+    assert all(f'href="#{a}"' in toc for a in ("overview", "decisions", "health", "appendix"))
     assert html.index('id="overview"') < html.index('id="decisions"') < html.index('id="health"') < html.index('id="appendix"')
     assert "<script src=" not in html and "Apache Software Foundation" in html     # 內嵌，零外部腳本
     for cid in ("stage", "category", "gantt", "forecast", "fu", "pva-0-burd"):

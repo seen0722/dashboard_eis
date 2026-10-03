@@ -195,7 +195,7 @@ journalctl -u eis-mcp -f
 | `/ui/<YYYYMM>/projects/<code>/diff?to=<YYYYMM>` | 跨月差異 | `diff_project` |
 | `/ui/<YYYYMM>/loads?min_util=` | 部門負載與產能圖 | `get_dept_loads` / `get_capacity` |
 | `/ui/<YYYYMM>/corrections` | 歷史數字被改 | `get_corrections` |
-| `/ui/<YYYYMM>/report.html` | 完整月報 | resource |
+| `/ui/<YYYYMM>/report.html` | 轉到該月 Overview（2026-10-03 起網頁不提供月報；月報從 CLI `out/` 或 resource 取得） | resource |
 
 每頁出口都過一次 PII 檢查（命中則整頁不出、回 503），並在 `audit.sqlite` 記一列 `kind=web`（無 name/role）。
 
@@ -206,7 +206,7 @@ location /ui/ { proxy_pass http://127.0.0.1:8765; proxy_set_header Host $host; }
 location = /ui { return 301 /ui/; }
 ```
 
-**版面（2026-10-02 起）**：左側導覽 Overview／Decisions／Projects／Loads／Data health／Report。Overview 是 KPI 卡＋Stage／Customer 分布、六個月 Gantt、Function 負載熱度表、Forecast vs Capacity、未來里程碑；Decisions 是本月例外清單；Data health 併入原 Corrections（舊網址 301 轉址）。圖表用 vendor 進 repo 的 ECharts 5.6.0（`vendor/echarts/`），月報內嵌、網頁走 `/ui/static/echarts.min.js`；每張圖下方的「Data table」是同一份數字。版面實測：`python scripts/check_layout.py --help`。
+**版面（2026-10-02 起）**：左側導覽 Overview／Decisions／Projects／Loads／Data health（2026-10-03 移除 Report：月報改回單欄文件樣式，供轉寄）。Overview 是 KPI 卡＋Stage／Customer 分布、六個月 Gantt、Function 負載熱度表、Forecast vs Capacity、未來里程碑；Decisions 是本月例外清單；Data health 併入原 Corrections（舊網址 301 轉址）。圖表用 vendor 進 repo 的 ECharts 5.6.0（`vendor/echarts/`），月報內嵌、網頁走 `/ui/static/echarts.min.js`；每張圖下方的「Data table」是同一份數字。版面實測：`python scripts/check_layout.py --help`。
 
 ## 8. 已知限制
 

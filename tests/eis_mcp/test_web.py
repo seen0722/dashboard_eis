@@ -62,17 +62,23 @@ def test_months_page_listed(ingested):
     assert r.status_code == 307 and r.headers["location"] == "/ui/202609/"
 
 
-def test_report_html_is_served_verbatim(ingested):
-    t = html(ingested, "/ui/202609/report.html")
-    assert t == ingested.state.eis.store.report_html("202609")
-    assert "Decisions this month" in t
+def test_web_has_no_report_page_and_old_links_land_on_the_overview(ingested):
+    """2026-10-03 需求方選 C：網頁不再提供月報（月報仍由 ingest 產生，CLI out/ 與 MCP eis://{月}/report.html 可取得）；
+    舊書籤轉到該月總覽，不給 404。"""
+    r = get(ingested, "/ui/202609/report.html")
+    assert r.status_code == 301 and r.headers["location"] == "/ui/202609/"
+    t = html(ingested, f"/ui/202609/?today={TODAY}")
+    assert "report.html" not in t and ">Report<" not in t
+    assert "report.html" not in html(ingested, "/ui/")
+    stored = ingested.state.eis.store.report_html("202609")                                # ingest 仍產生月報
+    assert stored.startswith("<!DOCTYPE html>") and "Decisions this month" in stored
 
 
 # ---- 錯誤頁 ----
 def test_unknown_and_bad_month_are_404_with_month_links(ingested):
-    t = html(ingested, "/ui/202501/report.html", 404)
+    t = html(ingested, "/ui/202501/loads", 404)
     assert "No data for 202501" in t and 'href="/ui/202609/"' in t
-    t = html(ingested, "/ui/2026-09/report.html", 404)
+    t = html(ingested, "/ui/2026-09/loads", 404)
     assert "No data for 2026-09" in t
     assert last_audit(ingested)["kind"] == "web" and last_audit(ingested)["status"] == "error"
 
@@ -87,7 +93,7 @@ def test_broken_snapshot_is_503(ingested):
 # ---- PII 與 audit ----
 def test_pii_hit_withholds_page_and_audits(ingested, monkeypatch):
     monkeypatch.setattr("src.eis_mcp.web.routes.find_pii", lambda text, *a, **kw: ["LA0000001"])
-    t = html(ingested, "/ui/202609/report.html", 503)
+    t = html(ingested, "/ui/202609/loads", 503)
     assert "withheld" in t and "LA0000001" not in t
     row = last_audit(ingested)
     assert row["kind"] == "web" and row["status"] == "rejected_pii" and row["name"] is None
@@ -401,7 +407,7 @@ def test_home_sidebar_carries_the_latest_month_navigation(ingested):
     nav = t[t.index("<nav"):t.index("</nav>")]
     assert 'href="/ui/202609/decisions"' in nav and 'href="/ui/202609/projects"' in nav and 'href="/ui/" class="brand on"' in nav
     body = t[t.index("</nav>"):]
-    assert 'href="/ui/202609/report.html"' in body and 'href="/ui/mcp"' in body and "Data history" in body
+    assert 'href="/ui/mcp"' in body and "Data history" in body and "report.html" not in body
 
 
 def test_home_when_latest_snapshot_is_broken_still_explains(ingested):
@@ -505,7 +511,7 @@ def test_shell_is_a_sidebar_that_loads_charts():
     assert '<script src="/ui/static/echarts.min.js"></script>' in t and "window.eisCharts" in t
     nav = t[t.index("<nav"):t.index("</nav>")]
     assert [x for x in ("/decisions", "/projects", "/loads", "/health", "/report.html") if f'href="/ui/202609{x}"' in nav] == \
-           ["/decisions", "/projects", "/loads", "/health", "/report.html"]
+           ["/decisions", "/projects", "/loads", "/health"]
     assert '>Decisions<span class="badge" title="3 decisions this month">3</span></a>' in nav
 
 

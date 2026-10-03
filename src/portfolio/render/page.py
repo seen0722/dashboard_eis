@@ -6,7 +6,7 @@ from ..entities import INACTIVE, MONTHS
 from .css import CSS
 from .icon import FAVICON
 from .strings import t
-from .viz.dash import at_risk_html, bar_list_card, card, donut_card, kpi_cards, milestone_card, safe_chart_card, side_nav
+from .viz.dash import at_risk_html, bar_list_card, card, donut_card, kpi_cards, milestone_card, safe_chart_card
 from .viz.embed import chart_html, scripts
 from .viz.project import pva_line
 from .viz.options import category_donut, customer_bars, forecast_capacity, fu_plan_actual, gantt, kpis, late_codes, milestone_rows, pva, stage_donut
@@ -147,16 +147,17 @@ def render_page(snap: dict, lang: str, today: str, th: dict, echarts: str = "inl
     ym = f"{m['report_month'][:4]}-{m['report_month'][4:]}"
     links = "".join(f'<a href="#{a}">{e(t(lang, k))}</a>' for a, k in (("overview", "v_nav_overview"), ("decisions", "v_nav_decisions"),
                                                                           ("health", "v_nav_health"), ("appendix", "v_nav_appendix")))
-    side = side_nav(f'<a class="brand" href="#overview">{e(t(lang, "h1"))}</a>', links, t(lang, "v_menu"), label=t(lang, "h1"))
+    # 月報是給人轉寄、從頭讀到尾的文件：不用網站式的深色側欄（需求方 2026-10-03），頁首下方一行頁內目錄
+    toc = f'<nav class="doc-toc" aria-label="{e(t(lang, "v_menu"))}">{links}</nav>'
     return f"""<!DOCTYPE html><html lang="{t(lang, "html_lang")}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(t(lang, "doc_title", ym=ym))}</title>{FAVICON}<style>{CSS}</style></head><body><div class="app">{side}<main class="main">
-<header><div><h1>{e(t(lang, "h1"))}</h1><p>{e(t(lang, "intro"))}</p></div>{_title_block(m, lang, len(cl), lm)}</header>
+<title>{e(t(lang, "doc_title", ym=ym))}</title>{FAVICON}<style>{CSS}</style></head><body><main class="main doc">
+<header><div><h1>{e(t(lang, "h1"))}</h1><p>{e(t(lang, "intro"))}</p></div>{_title_block(m, lang, len(cl), lm)}</header>{toc}
 <section id="overview">{_overview(snap, lang, today, th, late)}</section>
 <section id="decisions"><h2>{e(t(lang, "s_decisions"))}</h2><p class="lead">{e(t(lang, "s_decisions_lead"))}</p>{at_risk_html(snap, lang, th)}<div class="card">{_exceptions(snap, lang, th)}</div></section>
 <section id="health"><h2>{e(t(lang, "s_health"))}</h2><p class="lead">{e(t(lang, "s_health_lead"))}</p><div class="card"><div class="wide">{_health(snap, lang)}</div></div></section>
 <section id="appendix"><h2>{e(t(lang, "s_appendix"))}</h2><p class="lead">{e(t(lang, "s_appendix_lead"))}</p><select id="pick">{options}</select><div id="projects">{appendix}</div></section>
 <footer><p>{e(t(lang, "foot_1"))}</p><p>{e(t(lang, "foot_2"))}</p><p>{e(t(lang, "foot_3"))}</p></footer>
-</main></div>{scripts(echarts)}
+</main>{scripts(echarts)}
 <script>(function(){{var s=document.getElementById('pick'),ps=document.querySelectorAll('#projects .proj');function show(i){{ps.forEach(function(p){{p.style.display=p.dataset.idx===String(i)?'':'none';}});if(window.eisCharts)window.eisCharts.init(document.getElementById('projects'));}}s.addEventListener('change',function(){{show(s.value);}});show(s.value);}})();</script>
 </body></html>"""
 

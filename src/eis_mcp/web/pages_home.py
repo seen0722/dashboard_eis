@@ -43,7 +43,7 @@ def home_body(months: list[dict], snap: dict | None, th: dict, broken_month: str
     if snap is not None:
         month = snap["meta"]["report_month"]
         parts.append(f'<section class="home">{_search(month)}{_tiles(snap, th)}'
-                     f'<p class="home-links"><a href="/ui/{e(month)}/report.html">Monthly report</a><a href="/ui/mcp">MCP setup for Claude or OpenCode</a></p></section>')
+                     f'<p class="home-links"><a href="/ui/mcp">MCP setup for Claude or OpenCode</a></p></section>')
     elif not broken_month:
         parts.append('<p class="empty">Nothing ingested yet. An uploader must upload a month and call ingest_month first.</p>')
     if months:
