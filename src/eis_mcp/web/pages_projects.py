@@ -51,7 +51,7 @@ def _next_cell(p: dict, today: str, passed: dict) -> str:
         w = passed[p["code"]]
         return f'<b class="sig">{e(w["ms"])} {e(w["date"])}</b><small class="sig">overdue {w["days"]} days</small>'
     n = next_milestone(p, today) if p["in_briefing"] else None
-    when = "today" if n and n["days"] == 0 else f'in {n["days"]} days' if n else ""
+    when = "on Briefing day" if n and n["days"] == 0 else f'in {n["days"]} days' if n else ""
     return f'{e(n["key"].upper())} {e(n["date"])}<small>{when}</small>' if n else '<span class="dim">–</span>'
 
 

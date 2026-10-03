@@ -98,3 +98,10 @@ def test_list_months_shows_uploads_and_ingest(ingested):
 def test_rerun_appends_ingest_log(ingested):
     err, out = call_tool(ingested, "tok-up", "ingest_month", {"report_month": "202609", "today": TODAY})
     assert not err and len(ingested.state.eis.store.ingests("202609")) == 2
+
+
+def test_ingest_without_today_uses_the_briefing_snapshot(uploaded):
+    err, out = call_tool(uploaded, "tok-up", "ingest_month", {"report_month": "202609"})
+    assert not err
+    snap = uploaded.state.eis.store.load_snapshot("202609")
+    assert snap["meta"]["generated"] == "-".join((snap["meta"]["snap_date"][:4], snap["meta"]["snap_date"][4:6], snap["meta"]["snap_date"][6:]))

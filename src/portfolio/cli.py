@@ -1,7 +1,6 @@
 """python -m src.portfolio.cli --input input-09 --report-month 202610"""
 from __future__ import annotations
 import argparse
-import datetime as dt
 import sys
 from pathlib import Path
 from .config import load_config
@@ -13,7 +12,7 @@ from .render.pii import find_pii  # 保留：tests/portfolio/test_cli.py 會 mon
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True); ap.add_argument("--report-month", required=True)
-    ap.add_argument("--today", default=dt.date.today().isoformat()); ap.add_argument("--lang", default="en")
+    ap.add_argument("--today", default=None, help="reference date YYYY-MM-DD; default: the Briefing snapshot date"); ap.add_argument("--lang", default="en")
     ap.add_argument("--snapshots", default="data/snapshots"); ap.add_argument("--out", default="out")
     a = ap.parse_args(argv)
     d = Path(a.input)

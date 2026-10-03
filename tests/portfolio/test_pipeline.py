@@ -58,3 +58,19 @@ def test_pii_check_is_injectable(tmp_path):
     inp = tmp_path / "input-09"; inp.mkdir(); build_input(inp)
     res = build_month(inp, "202609", "2026-09-12", tmp_path / "s", load_config(), pii_check=lambda text: ["LA0000001"])
     assert "LA0000001" in res.pii_hits
+
+
+def test_reference_date_defaults_to_the_briefing_snapshot_not_the_run_day(tmp_path):
+    """2026-10-03 需求方：延後與天數一律以 Briefing 快照日為準；事後重新 ingest 不可得到不同結果。"""
+    inp = tmp_path / "input-09"; inp.mkdir(); build_input(inp)
+    res = build_month(inp, "202609", None, tmp_path / "s1", load_config())
+    assert res.snap["meta"]["generated"] == "2026-09-07"                                 # fixture 的 Briefing 快照日 20260907
+    again = build_month(inp, "202609", None, tmp_path / "s2", load_config())
+    assert again.snap["exceptions"] == res.snap["exceptions"] and again.html == res.html
+
+
+def test_cli_without_today_uses_the_briefing_snapshot(tmp_path):
+    inp = tmp_path / "input-09"; inp.mkdir(); build_input(inp)
+    snaps, out = tmp_path / "snaps", tmp_path / "out"
+    assert main(["--input", str(inp), "--report-month", "202609", "--snapshots", str(snaps), "--out", str(out)]) == 0
+    assert json.loads((snaps / "202609" / "portfolio.json").read_text(encoding="utf-8"))["meta"]["generated"] == "2026-09-07"

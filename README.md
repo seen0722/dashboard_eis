@@ -40,7 +40,7 @@ python -m src.portfolio.cli --input input-10 --report-month 202610
 |---|---|---|
 | `--input` | 必填 | 輸入包目錄 |
 | `--report-month` | 必填 | 報告月份 `YYYYMM`，也是快照目錄名 |
-| `--today` | 今天 | 計算「已過期」「未來八週」的基準日，重跑歷史月份時指定 |
+| `--today` | Briefing 快照日 | 計算「已過期」「未來八週」的基準日。預設用 Briefing 快照日，事後重跑同一個月結果相同；只在需要另一個基準時指定 |
 | `--lang` | `en` | `zh` 可產中文版（字串表已備，未經完整驗證） |
 | `--snapshots` | `data/snapshots` | 每月正規化 JSON 存放處，下個月自動拿來比對 |
 | `--out` | `out` | HTML 輸出目錄 |

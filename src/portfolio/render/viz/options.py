@@ -217,7 +217,7 @@ def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: 
                           "data": bars[k], "itemStyle": {"color": T.MS_COLORS[k]}, "clip": True, "silent": True} for k in MS),
                        {"type": "scatter", "data": marks, "clip": True, "z": 3,
                         "markLine": {"silent": True, "symbol": "none", "lineStyle": {"color": T.BAD, "type": "dashed"},
-                                     "label": {"formatter": t(lang, "v_today"), "color": T.INK2, "position": "start"}, "data": [{"xAxis": _ms(today)}]}}]}
+                                     "label": {"formatter": t(lang, "v_today", d=today[5:].replace("-", "/")), "color": T.INK2, "position": "start"}, "data": [{"xAxis": _ms(today)}]}}]}
 
 
 def gantt(snap: dict, lang: str, today: str, months: int) -> Chart:

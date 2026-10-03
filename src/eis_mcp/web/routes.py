@@ -15,6 +15,7 @@ from ...portfolio.render.viz.options import at_risk_rows
 from ..state import ServerState
 from ..store import MONTH_RE, SnapshotBroken, UnknownMonth
 from .. import queries
+from ..queries import snap_day
 from . import pages_decisions, pages_health, pages_home, pages_load, pages_mcp, pages_overview, pages_project, pages_projects
 from .shell import SITE, SITE_ZH, render_error, render_shell
 
@@ -33,11 +34,11 @@ def ok_months(state: ServerState) -> list[str]:
 
 def load_snap(state: ServerState, month: str) -> dict:
     if not MONTH_RE.match(month):
-        raise WebError(404, f"No snapshot for {month}", "<p>Months are written YYYYMM, e.g. 202609.</p>", "unknown_month")
+        raise WebError(404, f"No data for {month}", "<p>Months are written YYYYMM, e.g. 202609.</p>", "unknown_month")
     try:
         return state.store.load_snapshot(month)
     except UnknownMonth:
-        raise WebError(404, f"No snapshot for {month}", "<p>That month has not been ingested.</p>", "unknown_month") from None
+        raise WebError(404, f"No data for {month}", "<p>That month has not been ingested.</p>", "unknown_month") from None
     except SnapshotBroken:
         raise WebError(503, f"Snapshot for {month} is unreadable",
                        f"<p>Ask an uploader to run <code>ingest_month('{e(month)}')</code> again.</p>", "snapshot_broken") from None
@@ -67,16 +68,6 @@ def float_param(request: Request, name: str, lo: float, hi: float) -> float | No
     if not lo <= v <= hi:
         raise WebError(400, f"Bad {name}", f"<p>{e(name)} must be between {lo:g} and {hi:g}.</p>", f"bad_{name}")
     return v
-
-
-def snap_day(snap: dict) -> str:
-    """快照的 Briefing 日期（YYYY-MM-DD）。頁面上的「幾天前/後」預設以它為準，與例外文字的天數同一基準；
-    用 server 當天會讓舊月份越看越偏，且同一頁出現兩個基準。缺值才退回當天。"""
-    sd = str(snap.get("meta", {}).get("snap_date", ""))
-    try:
-        return dt.date(int(sd[:4]), int(sd[4:6]), int(sd[6:8])).isoformat()
-    except ValueError:
-        return dt.date.today().isoformat()
 
 
 def date_param(request: Request, default: str, name: str = "today") -> str:
@@ -166,7 +157,9 @@ def register_routes(mcp: MCPServer, state: ServerState) -> None:
             broken = next((m["month"] for m in months if m["status"] == "broken" and (latest is None or m["month"] > latest)), None)
             snap = state.store.load_snapshot(latest) if latest else None
             body = pages_home.home_body(months, snap, state.cfg.thresholds, broken)
-            return render_shell(title=SITE, title_zh=SITE_ZH, body=body, months=ok, active="home")
+            # 側欄帶最新月份的導覽、頁首帶資料日期；首頁本身只放搜尋、狀態卡與連結
+            return render_shell(title=SITE, title_zh=SITE_ZH, body=body, months=ok, active="home", month=latest if snap else None,
+                                meta=snap["meta"] if snap else None, decisions=nav_count(snap) if snap else None)
         return await respond(state, request, build)
 
     async def tool_list() -> list[tuple[str, str]]:

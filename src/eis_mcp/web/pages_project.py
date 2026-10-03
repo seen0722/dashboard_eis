@@ -25,7 +25,7 @@ def _top_cards(p: dict, lm: int, today: str, risk: dict | None) -> str:
     if late:
         nx = {"value": f'{late["ms"]} {late["date"]}', "sub": f'overdue {late["days"]} days', "tone": "bad"}
     elif nxt:
-        nx = {"value": f'{nxt["key"].upper()} {nxt["date"]}', "sub": f'in {nxt["days"]} days'}
+        nx = {"value": f'{nxt["key"].upper()} {nxt["date"]}', "sub": "on Briefing day" if nxt["days"] == 0 else f'in {nxt["days"]} days'}
     else:
         nx = {"value": "–", "sub": "none ahead in the briefing" if p["in_briefing"] else "not in briefing"}
     kind = ", ".join(x for x in (p.get("biz_type", ""), p.get("category", "")) if x)
@@ -53,7 +53,7 @@ def _milestones(p: dict, today: str, risk: dict | None) -> str:
         d = p["dates"].get(k)
         if d:
             n = (dt.date.fromisoformat(d) - dt.date.fromisoformat(today)).days
-            when = f"overdue {-n} days" if k in late else (f"in {n} days" if n >= 0 else f"{-n} days ago")
+            when = f"overdue {-n} days" if k in late else ("on Briefing day" if n == 0 else f"in {n} days" if n > 0 else f"{-n} days ago")
         else:
             when = "not filled" if p["in_briefing"] else "not in briefing"
         cls = ' class="sig"' if k in late else ""
@@ -92,7 +92,7 @@ def _task_month(m: int, ts: list[dict], open_: bool) -> str:
                   for x in sorted(ts, key=lambda x: -x["fte"]))
     summary = f'{MONTHS[m - 1]}: {bu} BU tasks, {len(ts) - bu} FU tasks, {sum(x["fte"] for x in ts):.1f} FTE'
     return (f'<details class="month"{" open" if open_ else ""}><summary data-expand="expand" data-collapse="collapse"><span>{e(summary)}</span></summary>'
-            f'<div class="wide"><table class="tg"><thead><tr><th>Side</th><th>Function</th><th class="num">Depts</th><th class="num">FTE</th><th>What they reported (same text merged)</th></tr></thead>'
+            f'<div class="wide"><table class="tg"><thead><tr><th>Side</th><th>Function</th><th class="num">Depts</th><th class="num">FTE</th><th>Task description (identical text merged)</th></tr></thead>'
             f'<tbody>{"".join(trs)}</tbody></table></div>'
             f'<details class="raw"><summary data-expand="expand" data-collapse="collapse"><span>Show all {len(ts)} rows</span></summary>'
             f'<div class="wide"><table><thead><tr><th>Side</th><th>Function</th><th>Department</th><th class="num">FTE</th><th>Task</th></tr></thead><tbody>{raw}</tbody></table></div></details></details>')
@@ -114,7 +114,7 @@ def project_body(month: str, p: dict, today: str, lm: int, prev: str | None, ris
             f'<span class="dim">{e(p["code"])}</span></p>') if prev else f'<p class="page-actions"><span class="dim">{e(p["code"])}</span></p>'
     head = "".join(f'<th class="num">{m}</th>' for m in MONTHS)
     months_tbl = (f'<div class="wide"><table><thead><tr><th></th>{head}</tr></thead><tbody>{_twelve("FTE", p["fte"], ".1f")}{_twelve("NTD", p["ntd"], ",.0f")}</tbody></table></div>'
-                  f'<p class="dim">Manpower keyed in through {MONTHS[lm - 1]}; later months are plan or zero.</p>')
+                  f'<p class="dim">Manpower reported through {MONTHS[lm - 1]}; later months are plan or zero.</p>')
     return (f'<section>{cmp_}{_top_cards(p, lm, today, risk)}{_warnings(p)}</section>'
             f'<section><div class="tl-row eq">{_drift(p)}{_milestones(p, today, risk)}</div></section>'
             f'<section><h2>Plan vs actual</h2>{_pva(p, lm)}</section>'

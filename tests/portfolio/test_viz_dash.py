@@ -25,7 +25,7 @@ def test_safe_chart_card_reports_missing_data():
     def broken():
         raise KeyError("capacity")
     h = safe_chart_card("Forecast vs capacity", broken, "en")
-    assert "<h3>Forecast vs capacity</h3>" in h and "Not in this snapshot." in h and "data-chart" not in h
+    assert "<h3>Forecast vs capacity</h3>" in h and "Not in this month’s data." in h and "data-chart" not in h
     assert 'id="c-stage"' in safe_chart_card("x", lambda: CH, "en")
 
 

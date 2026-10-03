@@ -87,7 +87,7 @@ def test_heatmap_by_function_never_shows_missing_months_as_zero():
     assert ch.rows[0] == ("ME", *([70] * 8), None, None, None, None) and ch.rows[1] == ("QTC", *([None] * 12))
     pieces = ch.option["visualMap"]["pieces"]
     assert pieces[0]["lt"] == 85 and pieces[2]["gte"] == 95
-    assert "not headcount" in ch.note
+    assert "not official headcount" in ch.note
 
 
 def test_heatmap_by_department_has_one_row_per_department():
@@ -100,23 +100,23 @@ def test_forecast_capacity_series_and_budget_coverage():
     ch = O.forecast_capacity(snap(), "en")
     s = {x["name"]: x for x in ch.option["series"]}
     val = lambda d: d["value"] if isinstance(d, dict) else d  # noqa: E731
-    assert s["Keyed-in BU headcount"]["data"] == [10] * 8 + [None] * 4
+    assert s["Reported BU headcount"]["data"] == [10] * 8 + [None] * 4
     assert [val(d) for d in s["Headcount, assumed same as Aug"]["data"]] == [None] * 7 + [10] * 5
     val = lambda d: d["value"] if isinstance(d, dict) else d  # noqa: E731
-    withb, nob = s["With budget, 1 projects"], s["No budget, 1 projects"]
+    withb, nob = s["With plan, 1 projects"], s["No plan, 1 projects"]
     assert withb["stack"] == nob["stack"] == "actual"
     assert [val(d) for d in withb["data"]] == [10.0] * 8 + [None] * 4               # THORPE：BU RD 9 + PM 1
     assert [val(d) for d in nob["data"]] == [3.0] * 8 + [None] * 4                  # TR_KOS：沒有 budget
-    plan = s["Budget plan, BU RD + PM"]
+    plan = s["Plan, BU RD + PM"]
     assert [d[1] for d in plan["data"]] == [11.0] * 12 and plan["renderItem"]["$fn"] == "planMark"
     assert plan["renderItem"]["args"][1] == "Plan 11"                                # 拿掉圖例後，短橫線要自己說明是什麼
-    assert nob["data"][7]["label"]["formatter"] == "No budget 3"                    # 最新月直接標在長條旁，不靠圖例
+    assert nob["data"][7]["label"]["formatter"] == "No plan 3"                    # 最新月直接標在長條旁，不靠圖例
     assert "legend" not in ch.option
     carried = s["Headcount, assumed same as Aug"]
     assert carried["data"][11]["label"]["position"] == "top" and carried["data"][11]["label"]["align"] == "right"   # 長標籤放線上方、往左長，不被右緣切掉
     assert "endLabel" not in carried and carried["data"][11]["label"]["formatter"] == "Aug headcount 10, assumed unchanged" and carried["data"][11]["symbol"] != "none"   # endLabel 遇到前段 null 會算出 NaN（瀏覽器實測）
     assert ch.headline == "Aug: 13 of 10 in use, 3 over"
-    assert ch.note == "Budget covers 1 / 2 projects, BU RD + PM only"
+    assert ch.note == "Plan covers 1 / 2 projects, BU RD + PM only"
     assert ch.rows[7] == ("Aug", 10, 13.0, 10.0, 3.0, 11.0)
     assert ch.rows[8] == ("Sep", None, None, None, None, 11.0)
 
@@ -131,7 +131,7 @@ def test_pva_without_plan_draws_actual_only_and_says_so():
     with_plan = O.pva(ps["BR1"], "BU RD", 8, "en", 0)
     assert with_plan.id == "pva-0-burd" and len(with_plan.option["series"]) == 2 and with_plan.note == ""
     no_plan = O.pva(ps["TR_KOS"], "BU RD", 8, "en", 5)
-    assert no_plan.id == "pva-5-burd" and len(no_plan.option["series"]) == 1 and no_plan.note == "No budget plan for this group."
+    assert no_plan.id == "pva-5-burd" and len(no_plan.option["series"]) == 1 and no_plan.note == "No plan for this group."
     assert no_plan.option["series"][0]["data"] == [3.0] * 8 + [None] * 4
 
 
@@ -206,9 +206,9 @@ def test_forecast_tooltip_tells_series_apart():
     names = [x["name"] for x in ch.option["series"]]
     tip = ch.option["tooltip"]
     assert tip["formatter"] == {"$fn": "axisTip", "args": [["bar", "bar", "mark", "line", "dashed"], {"4": 3}, 1]}
-    assert names[4] == "Headcount, assumed same as Aug" and names[3] == "Keyed-in BU headcount"     # 推算線在實線有值的月份不列
-    plan = next(x for x in ch.option["series"] if x["name"] == "Budget plan, BU RD + PM")
-    assert plan["itemStyle"]["color"] != next(x for x in ch.option["series"] if x["name"] == "Keyed-in BU headcount")["itemStyle"]["color"]
+    assert names[4] == "Headcount, assumed same as Aug" and names[3] == "Reported BU headcount"     # 推算線在實線有值的月份不列
+    plan = next(x for x in ch.option["series"] if x["name"] == "Plan, BU RD + PM")
+    assert plan["itemStyle"]["color"] != next(x for x in ch.option["series"] if x["name"] == "Reported BU headcount")["itemStyle"]["color"]
 
 
 def test_plan_vs_actual_charts_share_one_design_language():
@@ -289,5 +289,5 @@ def test_gantt_table_names_current_mp_and_shows_original_mp():
 
 
 def test_plan_label_uses_the_darker_violet():
-    plan = next(x for x in O.forecast_capacity(snap(), "en").option["series"] if x["name"] == "Budget plan, BU RD + PM")
+    plan = next(x for x in O.forecast_capacity(snap(), "en").option["series"] if x["name"] == "Plan, BU RD + PM")
     assert plan["renderItem"]["args"][2] == "#7C3AED" and plan["renderItem"]["args"][4] == "#6D28D9"

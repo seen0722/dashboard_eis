@@ -71,9 +71,9 @@ def test_report_html_is_served_verbatim(ingested):
 # ---- 錯誤頁 ----
 def test_unknown_and_bad_month_are_404_with_month_links(ingested):
     t = html(ingested, "/ui/202501/report.html", 404)
-    assert "No snapshot for 202501" in t and 'href="/ui/202609/"' in t
+    assert "No data for 202501" in t and 'href="/ui/202609/"' in t
     t = html(ingested, "/ui/2026-09/report.html", 404)
-    assert "No snapshot for 2026-09" in t
+    assert "No data for 2026-09" in t
     assert last_audit(ingested)["kind"] == "web" and last_audit(ingested)["status"] == "error"
 
 
@@ -149,12 +149,12 @@ def test_overview_survives_snapshot_without_capacity(ingested):
     del snap["capacity"]
     f.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8"); store.invalidate()
     t = html(ingested, f"/ui/202609/?today={TODAY}")
-    assert "Not in this snapshot." in t and 'id="c-stage"' in t
+    assert "Not in this month’s data." in t and 'id="c-stage"' in t
 
 
 def test_loads_page_has_department_heatmap(ingested):
     t = html(ingested, "/ui/202609/loads")
-    assert 'id="c-heat-dept"' in t and "Grey cells: nobody keyed in." in t
+    assert 'id="c-heat-dept"' in t and "Grey cells: nobody reported." in t
 
 
 def test_project_page_top_cards(ingested):
@@ -233,7 +233,7 @@ def test_project_page_links_previous_month_when_present(ingested):
 # ---- loads / corrections ----
 def test_loads_page_filters_and_capacity_chart(ingested):
     t = html(ingested, "/ui/202609/loads")
-    assert 'id="c-forecast"' in t and "Capacity" in t and "latest util" in t.lower() and "BA80700R01" in t
+    assert 'id="c-forecast"' in t and "Capacity" in t and "latest load" in t.lower() and "BA80700R01" in t
     assert 'class="num sig">100<' not in t                                     # 100% 不標橘；橘色只給低於 spare_capacity_pct 的
     assert 'class="num sig">62<' in t                                        # 低於 spare_capacity_pct(85) 的部門標橘
     n_rows = t.count("<tr><td>")
@@ -297,7 +297,7 @@ def test_exceptions_and_health_link_to_projects(ingested):
     assert f'href="/ui/202609/projects/{CODE}"' in ex
     health = html(ingested, "/ui/202609/health")
     health = health[health.index("<h1>Data health"):]
-    assert "<details" in health and "repeat items on the Decisions page" in health   # decide 級與 Decisions 重複，收合
+    assert "<details" in health and "already listed on the Decisions page" in health   # decide 級與 Decisions 重複，收合
 
 
 def test_today_defaults_to_snapshot_date(ingested):
@@ -311,12 +311,12 @@ def test_today_defaults_to_snapshot_date(ingested):
 
 def test_milestone_footnote_matches_inactive_rule(ingested):
     t = html(ingested, f"/ui/202609/?today={TODAY}")
-    assert "Active projects only (in briefing, not terminated or suspended)." in t
+    assert "Active projects only (in the Briefing, not terminated or suspended)." in t
 
 
 def test_meta_line_is_readable(ingested):
     t = html(ingested, "/ui/202609/")
-    assert "Report month 2026-09" in t and "manpower keyed in through" in t and f"Briefing {snap_date_iso(ingested)}" in t
+    assert "Report month 2026-09" in t and "manpower reported through" in t and f"Briefing {snap_date_iso(ingested)}" in t
     assert "latest_month" not in t[t.index("<header>"):t.index("</header>")]
 
 
@@ -367,36 +367,41 @@ def test_open_links_can_wrap(ingested):
 
 def test_project_page_dates_and_footnote_are_readable(ingested):
     t = html(ingested, f"/ui/202609/projects/{CODE}?today={TODAY}")
-    assert "latest_month =" not in t and "Manpower keyed in through" in t
+    assert "latest_month =" not in t and "Manpower reported through" in t
     hist = t[t.index('id="c-mp-drift"'):]
     assert "<td>2026-" in hist and "<td>2026090" not in hist
 
 
 # ---- 首頁（2026-10-01：中英並列 landing page）----
-def test_home_explains_purpose_in_both_languages(ingested):
+def test_home_is_a_launchpad_without_long_explanations(ingested):
+    """2026-10-03 需求方：首頁只要簡單的 landing page，不要過多文字。"""
     t = html(ingested, "/ui/")
-    assert "BU10 Portfolio Review" in t and "BU10 專案組合檢討" in t
-    assert "Exceptions first, evidence after" in t and "先看例外，再看依據" in t
-    assert "Read-only" in t and "唯讀" in t
-    assert 'lang="zh-Hant"' in t
+    body = t[t.index("</nav>"):]
+    assert "BU10 Portfolio Review" in t and "BU10 專案組合檢討" in t and "Report month 2026-09" in body
+    for gone in ("Where to start", "Terms", "Read-only", "Use it from an AI agent", "Monthly review of BU10 projects"):
+        assert gone not in body, gone
+    assert 'action="/ui/202609/projects"' in body                                         # 搜尋是首頁的主要動作
 
 
-def test_home_summarises_latest_month_and_links_entry_points(ingested):
-    from src.eis_mcp.web.pages_home import exception_titles
-    from src.portfolio.render.page import exceptions_html
+def test_home_status_tiles_link_to_their_pages(ingested):
+    from src.portfolio.render.viz.options import at_risk_codes
     snap = ingested.state.eis.store.load_snapshot("202609")
-    th = ingested.state.eis.cfg.thresholds
+    risk = len(at_risk_codes(snap, ingested.state.eis.cfg.thresholds["mp_slip_days"]))
     t = html(ingested, "/ui/")
-    assert "Report month 2026-09" in t and "Latest" in t
-    titles = exception_titles(snap, th, "en")
-    assert titles and all(x in exceptions_html(snap, "en", th) for x in titles)      # 與月報同一份標題，不另編
-    from html import escape
-    assert all(escape(x) in t for x in titles)
-    for href in ('href="/ui/202609/"', 'href="/ui/202609/decisions"', 'href="/ui/202609/projects"', 'href="/ui/202609/loads"',
-                 'href="/ui/202609/health"', 'href="/ui/202609/report.html"'):
-        assert href in t, href
-    assert 'action="/ui/202609/projects"' in t[t.index("</nav>"):]                    # 頁面本體有搜尋框，不只 nav
-    assert "<details" in t and "Data history" in t and "Terms" in t
+    tiles = t[t.index('<div class="kpis home-tiles">'):]
+    tiles = tiles[:tiles.index("</div></section>") if "</div></section>" in tiles else len(tiles)]
+    assert f'href="/ui/202609/decisions"><span class="k-label">At risk</span><b class="k-value">{risk}</b>' in tiles
+    assert f'<span class="k-label">Decisions</span><b class="k-value">{len(snap["exceptions"])}</b>' in tiles
+    assert f'href="/ui/202609/projects"><span class="k-label">Projects</span><b class="k-value">{len(snap["projects"])}</b>' in tiles
+    assert 'href="/ui/202609/loads"><span class="k-label">FTE, Aug</span>' in tiles
+
+
+def test_home_sidebar_carries_the_latest_month_navigation(ingested):
+    t = html(ingested, "/ui/")
+    nav = t[t.index("<nav"):t.index("</nav>")]
+    assert 'href="/ui/202609/decisions"' in nav and 'href="/ui/202609/projects"' in nav and 'href="/ui/" class="brand on"' in nav
+    body = t[t.index("</nav>"):]
+    assert 'href="/ui/202609/report.html"' in body and 'href="/ui/mcp"' in body and "Data history" in body
 
 
 def test_home_when_latest_snapshot_is_broken_still_explains(ingested):
@@ -462,7 +467,7 @@ def test_mcp_guide_missing_is_loud(ingested, monkeypatch):
 
 def test_home_links_to_mcp_page(ingested):
     t = html(ingested, "/ui/")
-    assert 'href="/ui/mcp"' in t and "AI agent" in t
+    assert 'href="/ui/mcp"' in t and "MCP setup" in t
 
 
 def test_install_script_ships_the_setup_guide():
@@ -516,7 +521,7 @@ def test_decisions_page_and_badge_count(ingested):
 
 def test_health_page_merges_corrections_and_old_url_redirects(ingested):
     t = html(ingested, "/ui/202609/health")
-    assert "<h1>Data health" in t and "<h2>Data health" not in t and "repeat items on the Decisions page" in t and "No corrections" in t
+    assert "<h1>Data health" in t and "<h2>Data health" not in t and "already listed on the Decisions page" in t and "No corrections" in t
     r = get(ingested, "/ui/202609/corrections")
     assert r.status_code == 301 and r.headers["location"] == "/ui/202609/health"
 
@@ -663,7 +668,7 @@ def test_project_list_sections_share_column_widths_and_avoid_repeats():
          "fte": [1.0] * 12, "pva": {}, "dates": {"evt": None, "dvt": None, "pvt": None, "mp": "2026-09-29"}}
     row = _row("202609", p, 8, "2026-09-29", {}, {})
     assert "<small>MP</small>" not in row                                                # 階段與分類同名不重複
-    assert "today" in _next_cell(p, "2026-09-29", {}) and "in 0 days" not in _next_cell(p, "2026-09-29", {})
+    assert "on Briefing day" in _next_cell(p, "2026-09-29", {}) and "in 0 days" not in _next_cell(p, "2026-09-29", {})
 
 
 def test_project_list_tables_use_one_column_layout(ingested):

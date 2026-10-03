@@ -37,6 +37,6 @@ def overview_body(snap: dict, th: dict, today: str, weeks: int) -> str:
             f'{bar_list_card(customer_bars(snap, "en"), "en", t("en", "v_src_customer"))}'
             f'{donut_card(category_donut(snap, "en"), "en", t("en", "v_src_category"))}</div>'
             f'<div class="tl-row eq">{safe_chart_card(f"Timeline, next {months} months", lambda: gantt(snap, "en", today, months), "en")}'
-            f'{milestone_card(milestone_rows(snap, today, weeks), "en", weeks, link=link)}</div>'
+            f'{milestone_card(milestone_rows(snap, today, weeks), "en", weeks, link=link, asof=today)}</div>'
             f'<div class="grid-2 eq">{safe_chart_card(t("en", "v_c_forecast"), lambda: forecast_capacity(snap, "en"), "en")}'
             f'{safe_chart_card(t("en", "v_c_fu"), lambda: fu_plan_actual(snap, "en"), "en")}</div></section>')

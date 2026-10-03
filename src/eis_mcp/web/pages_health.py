@@ -44,11 +44,11 @@ def health_section(snap: dict) -> str:
     if empty:
         main += (f'<details class="group"><summary data-expand="expand" data-collapse="collapse"><span>{len(empty)} check{"" if len(empty) == 1 else "s"} found nothing</span></summary>'
                  f'<div class="wide">{_linked_health(snap, empty)}</div></details>')
-    dup = (f'<details class="dup"><summary data-expand="expand" data-collapse="collapse"><span>{len(decide)} decision-level check{"" if len(decide) == 1 else "s"} repeat items on the Decisions page</span></summary>'
+    dup = (f'<details class="dup"><summary data-expand="expand" data-collapse="collapse"><span>{len(decide)} Action needed check{"" if len(decide) == 1 else "s"}, already listed on the Decisions page</span></summary>'
            f'<div class="wide">{_linked_health(snap, decide)}</div></details>') if decide else ""
     return main + dup
 
 
 def health_body(month: str, snap: dict, corrections: dict) -> str:
-    return (f'<section><p class="lead">What the source files could not answer.</p>'
+    return (f'<section><p class="lead">Gaps and mismatches found in the source files.</p>'
             f'<div class="card">{health_section(snap)}</div></section>{corrections_body(month, corrections)}')

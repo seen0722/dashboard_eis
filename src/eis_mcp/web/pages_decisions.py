@@ -27,6 +27,6 @@ def linked_exceptions(snap: dict, th: dict) -> str:
 
 
 def decisions_body(snap: dict, th: dict) -> str:
-    return (f'<section><p class="lead">Exceptions the rules found, ranked; each names the decision asked for.</p>'
+    return (f'<section><p class="lead">Items that need a decision this month, most urgent first, each with its evidence and source.</p>'
             f'{at_risk_html(snap, "en", th, link=lambda c: f"/ui/{snap["meta"]["report_month"]}/projects/{c}")}'
             f'<div class="card">{linked_exceptions(snap, th)}</div></section>')

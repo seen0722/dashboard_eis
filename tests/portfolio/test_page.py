@@ -52,14 +52,14 @@ def test_page_sections_and_strings():
     assert "Q11" not in gantt and "KOS" not in gantt                     # inactive projects are kept out of the timeline
     assert '<span class="pill bad">Passed</span>' in html                 # THORPE DVT 09/08, in milestones_passed
     assert '<span class="pill mute">Passed</span>' in html                # AX200 PVT 09/08, stage moved on
-    assert "Second identity, likely the same project under another code" in html
-    assert "1 suspended of 5 briefed, 0 still charging manpower, 1 booked under a second code" in html
+    assert "Booked under a second project code" in html
+    assert "1 of 5 Briefing projects suspended, 0 inactive projects still have FTE booked, 1 booked under a second project code" in html
     assert "terminated and" not in html                                            # terminated total lives in the stage strip only
-    assert "KOS (BR5) is terminated in the briefing" in html                       # twin line uses the real category
+    assert "KOS (BR5) is terminated in the Briefing" in html                       # twin line uses the real category
     assert "Suspended but no manpower since Jul" in html and "Q11: peak 12.2 FTE in May" in html   # suspended wound = question
     assert "Terminated and closed out" not in html and "Sabre" not in html         # terminated + zero manpower is normal: not shown
     assert "No manpower all year" not in html                                      # all-zero list dropped (only suspended ones matter)
-    assert "Terminated projects should carry no manpower" in html                 # ask
+    assert "Terminated projects should have no FTE booked" in html                 # ask
     assert "Briefing stage column; Resource Summary; Control List" in html         # source
     assert "% of the portfolio" not in html
     assert re.search(r'<div>[^<]*TR_BU10_IPC_KOS[^<]*</div>', html)                  # 2026-10-03：佐證不用橘色，橘色留給 Decision needed
@@ -116,7 +116,7 @@ def test_exception_two_shows_terminated_only_when_still_charging_and_suspended_z
     ex2["extra"].update({"charging": 1, "charging_list": [{"name": "ZOMBIE", "code": "BRZ", "cat": "Terminated", "fte": 0.8}],
                          "zero_list": [{"name": "KOS", "code": "BR5", "cat": "Terminated"}, {"name": "NAP", "code": "BRN", "cat": "Suspended"}]})
     html = render_page(sn, "en", "2026-09-12", TH)
-    assert "Still charging in Aug" in html and "ZOMBIE 0.8 FTE (terminated)" in html
+    assert "Still has FTE booked in Aug" in html and "ZOMBIE 0.8 FTE (terminated)" in html
     assert "Suspended with no manpower all year" in html and "NAP" in html
     assert "KOS, NAP" not in html and "No manpower all year (" not in html
 
@@ -129,8 +129,8 @@ def test_render_tolerates_snapshot_ingested_before_terminated_split():
     ex2["extra"] = {"pct": 20, "charging": 0, "twins": 1, "charging_list": [], "wound_list": [{"name": "Q11", "code": "BR3", "peak": 12.2, "peak_month": "May", "zero_since": "Jul"}],
                     "zero_list": [{"name": "KOS", "code": "BR5"}], "twin_list": [{k: v for k, v in sn["exceptions"][1]["extra"]["twin_list"][0].items() if k != "cat"}]}
     html = render_page(sn, "en", "2026-09-12", TH)
-    assert "1 inactive (snapshot predates the terminated/suspended split)" in html
-    assert "KOS (BR5) is inactive in the briefing" in html
+    assert "1 inactive (data predates the terminated / suspended split)" in html
+    assert "KOS (BR5) is inactive in the Briefing" in html
     assert "Q11: peak 12.2 FTE in May" in html          # 無 cat 的 wound/zero 視為「要問的」，不靜默丟掉
 
 
@@ -176,7 +176,7 @@ def test_report_survives_snapshot_without_capacity():
     sn = snap()
     del sn["capacity"]
     html = render_page(sn, "en", "2026-09-12", TH)
-    assert "Not in this snapshot." in html and 'id="c-stage"' in html
+    assert "Not in this month’s data." in html and 'id="c-stage"' in html
 
 
 def test_appendix_task_tables_scroll_instead_of_widening_the_page():
@@ -219,4 +219,4 @@ def test_overview_timeline_with_milestones_then_bu_fu():
     assert 'class="status"' not in ov and 'id="c-heat-function"' not in ov
     assert '<a class="kpi bad" href="#decisions"><span class="k-label">At risk</span><b class="k-value">1</b>' in ov
     ms = ov[ov.index("<h3>Milestones"):ov.index('<div class="grid-2 eq">')]
-    assert "Past 7 days to next 8 weeks" in ms and "<form" not in ms and "<th>Status</th>" in ms and "Days left" not in ms
+    assert "Past 7 days to 8 weeks after the" in ms and "<form" not in ms and "<th>Status</th>" in ms and "Days left" not in ms

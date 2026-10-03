@@ -129,7 +129,7 @@ def _overview(snap: dict, lang: str, today: str, th: dict, late: set[str]) -> st
             + f'{bar_list_card(customer_bars(snap, lang), lang, t(lang, "v_src_customer"))}'
             + f'{donut_card(category_donut(snap, lang), lang, t(lang, "v_src_category"))}</div>'
             + f'<div class="tl-row eq">{safe_chart_card(t(lang, "v_c_gantt", months=months), lambda: gantt(snap, lang, today, months), lang)}'
-            + f'{milestone_card(milestone_rows(snap, today, weeks), lang, weeks)}</div>'
+            + f'{milestone_card(milestone_rows(snap, today, weeks), lang, weeks, asof=today)}</div>'
             + f'<div class="grid-2 eq">{safe_chart_card(t(lang, "v_c_forecast"), lambda: forecast_capacity(snap, lang), lang)}'
             + f'{safe_chart_card(t(lang, "v_c_fu"), lambda: fu_plan_actual(snap, lang), lang)}</div>')
 

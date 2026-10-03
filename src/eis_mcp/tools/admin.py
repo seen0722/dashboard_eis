@@ -1,6 +1,5 @@
 """uploader 用的 tools：ingest_month、list_months（list_months 兩種角色都可）。"""
 from __future__ import annotations
-import datetime as dt
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from ...portfolio.pipeline import INPUT_GLOBS, InputUnreadable, MissingInput, NoManpowerMonth
@@ -14,12 +13,12 @@ def register(mcp: MCPServer, state: ServerState) -> None:
     def ingest_month(report_month: str, ctx: Context, today: str | None = None) -> dict:
         """Build the snapshot for one month from the Excel pack already uploaded to /upload/{report_month}. Uploader role only.
 
-        Args: report_month "YYYYMM"; today "YYYY-MM-DD" (optional) as the reference date for overdue/upcoming milestones,
-        pass it when re-running a past month. Returns status "ok" with summary/health/issues_count/warnings, or
+        Args: report_month "YYYYMM"; today "YYYY-MM-DD" (optional) as the reference date for overdue/upcoming milestones.
+        Leave it out: the Briefing snapshot date is used, so re-running the same month later gives the same result. Returns status "ok" with summary/health/issues_count/warnings, or
         status "rejected_pii" (nothing written) with the offending fragments. Errors name what to do next.
         """
         def go(p):
-            ref_date = check_date(today) if today else dt.date.today().isoformat()
+            ref_date = check_date(today) if today else None              # None → Briefing 快照日（pipeline 決定）
             try:
                 return run_ingest(state, report_month, ref_date, p.name)
             except ValueError as ex:

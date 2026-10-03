@@ -1,0 +1,55 @@
+"""2026-10-03 make-interfaces-feel-better review：焦點、點擊範圍、狀態轉換、按下回饋、斷行、圓角、字體平滑。"""
+import re
+import pytest
+from tests.eis_mcp.test_web import html
+
+
+def css() -> str:
+    from src.portfolio.render.css import CSS
+    from src.eis_mcp.web.shell import WEB_CSS
+    return CSS + WEB_CSS
+
+
+def test_clickable_cards_show_a_visible_focus_ring_not_only_a_shadow():
+    c = css()
+    assert "outline:none" not in c
+    assert "a.kpi:focus-visible,a.status-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}" in c
+
+
+def test_state_changes_transition_named_properties_only():
+    c = css()
+    assert "transition:all" not in c.replace(" ", "") and "will-change" not in c
+    assert "transition-property:box-shadow,background-color,border-color,color,transform;transition-duration:150ms" in c
+
+
+def test_buttons_and_cards_respond_when_pressed():
+    c = css()
+    assert "button:active{transform:scale(.97)}" in c and "a.kpi:active,a.status-card:active{" in c
+    assert re.search(r"prefers-reduced-motion: reduce\)\{[^}]*transform:none", c)
+
+
+def test_headings_balance_and_short_text_wraps_pretty():
+    c = css()
+    assert "h1,h2,h3{text-wrap:balance}" in c and ".k-sub,.lead,.note,.card-sub{text-wrap:pretty}" in c
+
+
+def test_radius_comes_from_three_tokens():
+    c = css()
+    assert "--r-ctl:6px;--r-card:10px;--r-pill:999px" in c
+    raw = set(re.findall(r"border-radius:(\d+)px", c))
+    assert raw <= {"2"}, raw                                                              # 只剩圖例色票的 2px
+
+
+def test_macos_font_smoothing():
+    assert "html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}" in css()
+
+
+@pytest.mark.parametrize("path, sel, min_h", [
+    ("/projects", "a.sort", 32), ("/health", "details.more>summary", 32), ("/decisions", "a.chip", 30)])
+def test_small_controls_have_usable_hit_areas(ingested, path, sel, min_h):
+    """量的是 CSS 撐出來的可點高度；用真瀏覽器量在 test 之外（scratchpad 腳本），這裡鎖住 CSS 規則存在。"""
+    c = css()
+    rule = {"a.sort": "table.plist a.sort{display:block;padding:10px 0;margin:-10px 0}",
+            "details.more>summary": "details.more summary{display:inline;padding:10px 4px;margin:-10px -4px;",
+            "a.chip": "a.chip{display:inline-flex;align-items:center;min-height:30px}"}[sel]
+    assert rule in c
