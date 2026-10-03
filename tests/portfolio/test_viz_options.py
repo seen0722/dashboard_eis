@@ -336,3 +336,19 @@ def test_timeline_shows_projects_that_reached_mp_this_month_and_drops_older_ones
     assert mark["label"]["formatter"] == "MP 09/01 reached" and mark["label"]["color"] == T.OK
     b["dates"].update({"mp": "2026-07-28"})                                              # 7 月就量產：不是本月的事
     assert "Brandy" not in O.gantt(s, "en", "2026-09-12", 6).option["yAxis"]["data"]
+
+
+def test_blank_mp_with_an_original_date_is_drawn_hollow_and_says_so():
+    """2026-10-03 需求方選 A：N1X 的 MP Date 空白、Original MP 10/23 有填——畫在原訂日期，灰色空心，寫明目前未填；
+    不把原訂日期當成目前 MP（AGENTS.md 第一守則）。"""
+    from src.portfolio.render.viz import options as O
+    from src.portfolio.render.viz import tokens as T
+    s = snap()
+    n1x = next(p for p in s["projects"] if p["code"] == "BR6")
+    n1x["dates"].update({"mp": None, "mp_orig": "2026-10-23"})
+    ch = O.gantt(s, "en", "2026-09-12", 6)
+    m = next(x for x in ch.option["series"][-1]["data"] if "Original MP" in str(x["label"].get("formatter", "")))
+    assert m["label"]["formatter"] == "Original MP 10/23, current not filled"
+    assert m["value"][0] == O._ms("2026-10-23") and m["label"]["color"] == T.INK3
+    assert m["itemStyle"]["color"] == "transparent" and m["itemStyle"]["borderColor"] == T.INK3
+    assert not any(x.get("label", {}).get("formatter") == "MP 10/23" for x in ch.option["series"][-1]["data"])   # 不畫成目前的 MP

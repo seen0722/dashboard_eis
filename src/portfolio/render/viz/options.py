@@ -193,7 +193,8 @@ def _gantt_rows(snap: dict, today: str, months: int, overdue: dict | None = None
     # 已量產（MP、Sustain / EOP）通常不列：沒有下一個里程碑可追。例外是「本月進入 MP」——每月 review 要看到它（需求方 2026-10-03，Brandy）
     rows = [p for p in snap["projects"] if p["in_briefing"] and p["stage_cat"] not in INACTIVE
             and (p["stage_cat"] not in SHIPPED or _reached_mp(p, t0, today))
-            and (p["code"] in overdue or any(in_win(p["dates"].get(k)) for k in MS) or (p["stage_cat"] == "RFQ / RFI" and not p["dates"].get("mp")))]
+            and (p["code"] in overdue or any(in_win(p["dates"].get(k)) for k in MS) or (p["stage_cat"] == "RFQ / RFI" and not p["dates"].get("mp"))
+                 or (not p["dates"].get("mp") and in_win(p["dates"].get("mp_orig"))))]
     rows.sort(key=lambda p: (p["code"] not in overdue, -overdue[p["code"]][2] if p["code"] in overdue else 0,
                              p["dates"].get("mp") or p["dates"].get("pvt") or p["dates"].get("dvt") or p["dates"].get("evt") or "9", p["name"].casefold()))
     return t0, t1, rows
@@ -225,6 +226,13 @@ def _gantt_option(rows: list[dict], t0: dt.date, t1: dt.date, today: str, late: 
                           "label": {"show": True, "position": "top" if close else "right",
                                     "formatter": t(lang, "v_gantt_reached", ms=k.upper(), d=f"{d[5:7]}/{d[8:10]}") if reached else f"{k.upper()} {d[5:7]}/{d[8:10]}",
                                     "color": T.BAD if overdue else T.OK if reached else T.INK, "fontWeight": 700 if overdue or reached else 400, "fontSize": 11}})
+        mo = p["dates"].get("mp_orig")
+        if not p["dates"].get("mp") and mo and t0 <= dt.date.fromisoformat(mo) < t1:   # MP Date 空白只有原訂：畫原訂、空心灰色、寫明未填
+            label = t(lang, "v_gantt_orig_only", d=f"{mo[5:7]}/{mo[8:10]}")
+            marks.append({"value": [_ms(mo), y], "symbol": SYMBOL["mp"], "symbolSize": MS_SIZE["mp"],
+                          "itemStyle": {"color": "transparent", "borderColor": T.INK3, "borderWidth": 1.5},
+                          "tooltip": {"formatter": f"{escape(p['name'])}: {label}"},
+                          "label": {"show": True, "position": "right", "formatter": label, "color": T.INK3, "fontSize": 11}})
         od = pinned.get(p["code"])
         if od and dt.date.fromisoformat(od[1]) < t0:                # 逾期的里程碑在圖的左邊界之外：釘在左邊界，標出日期與天數
             ms, d, n_days = od
