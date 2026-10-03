@@ -714,3 +714,13 @@ def test_project_list_columns_are_grouped(ingested):
 def test_bad_sort_value_falls_back_to_default(ingested):
     t = html(ingested, f"/ui/202609/projects?today={TODAY}&sort=%3Cx%3E&dir=up")
     assert "<x>" not in t and "THORPE" in t
+
+
+def test_plan_column_names_the_unit_and_the_months(ingested):
+    """2026-10-03 需求方：「Plan to date」沒說比的是 FTE、也沒說期間。"""
+    t = html(ingested, f"/ui/202609/projects?today={TODAY}")
+    head = t[t.index('<table class="plist">'):t.index("</thead>")]
+    assert "% of planned FTE, Jan to Aug" in head and "Plan to date" not in t
+    assert 'title="Actual FTE as a share of planned FTE, summed over Jan to Aug, all roles"' in head
+    row = t[t.index('href="/ui/202609/projects/BR0000015346">THORPE'):]
+    assert 'title="Jan to Aug: planned FTE ' in row[:row.index("</tr>")]

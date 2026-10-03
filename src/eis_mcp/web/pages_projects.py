@@ -60,7 +60,7 @@ def _plan_cell(p: dict, lm: int) -> str:
     if pt is None:
         return '<td class="num dim" title="No plan in the Control List">–</td>'
     plan, act = pt
-    return f'<td class="num" title="Jan–{MONTHS[lm - 1]} plan {plan:.1f}, actual {act:.1f}">{round(act / plan * 100)}%</td>'
+    return f'<td class="num" title="Jan to {MONTHS[lm - 1]}: planned FTE {plan:.1f}, actual FTE {act:.1f}">{round(act / plan * 100)}%</td>'
 
 
 def _two(top: str, sub: str = "") -> str:
@@ -87,12 +87,12 @@ def _row(month: str, p: dict, lm: int, today: str, risk: dict, passed: dict) -> 
 # 欄位：(key, 表頭, 可排序鍵, 預設方向, class)。g = 每組第一欄（左側分隔線）
 COLUMNS = (("name", "Name", True, "asc", ""), ("customer", "Customer", True, "asc", ""), ("product", "Product", False, "", ""),
            ("stage", "Stage", True, "asc", "g"), ("next", "Next milestone", True, "asc", ""),
-           ("trend", "FTE, Jan to {mon}", False, "", "g"), ("fte", "FTE {mon}", True, "desc", "num"), ("plan", "Plan to date", True, "asc", "num"))
+           ("trend", "FTE, Jan to {mon}", False, "", "g"), ("fte", "FTE {mon}", True, "desc", "num"), ("plan", "% of planned FTE, Jan to {mon}", True, "asc", "num"))
 SORTS = {c[0]: c[3] for c in COLUMNS if c[2]}
 DEFAULT_SORT = "fte"
 COLS = "".join(f'<col style="width:{w}%">' for w in (17, 14, 14, 10, 14, 12, 9, 10))
 TIPS = {"trend": "Each line is scaled to the project peak; compare shapes, not heights",
-        "plan": "Actual over plan, Jan to the latest month, all roles", "next": "Overdue first, then the nearest date"}
+        "plan": "Actual FTE as a share of planned FTE, summed over Jan to {mon}, all roles", "next": "Overdue first, then the nearest date"}
 
 
 def _head(month: str, mon: str, filters: dict, sort: str, dir_: str) -> str:
@@ -102,7 +102,7 @@ def _head(month: str, mon: str, filters: dict, sort: str, dir_: str) -> str:
         text = e(label.format(mon=mon))
         attrs = f' class="{cls}"' if cls else ""
         if key in TIPS:
-            attrs += f' title="{e(TIPS[key])}"'
+            attrs += f' title="{e(TIPS[key].format(mon=mon))}"'
         if sortable:
             on = key == sort
             nxt = ("desc" if dir_ == "asc" else "asc") if on else default
