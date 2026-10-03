@@ -53,3 +53,12 @@ def test_small_controls_have_usable_hit_areas(ingested, path, sel, min_h):
             "details.more>summary": "details.more summary{display:inline;padding:10px 4px;margin:-10px -4px;",
             "a.chip": "a.chip{display:inline-flex;align-items:center;min-height:30px}"}[sel]
     assert rule in c
+
+
+def test_every_page_and_the_report_carry_the_site_icon(ingested):
+    """2026-10-03 需求方：瀏覽器分頁沒有圖示。內嵌 SVG（data URI），不另放靜態檔，轉寄出去的月報也帶得到。"""
+    from src.eis_mcp.web.icon import FAVICON
+    assert FAVICON.startswith('<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,')
+    assert "%232563EB" in FAVICON                                                          # 主色（# 已 URL 編碼）
+    for path in ("/ui/", "/ui/202609/", "/ui/202609/projects", "/ui/202609/report.html"):
+        assert FAVICON in html(ingested, path), path
